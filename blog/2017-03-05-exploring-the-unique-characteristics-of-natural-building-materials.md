@@ -5,7 +5,7 @@ authors: reubenliengaard
 tags: [hola, docusaurus]
 ---
 
-# Exploring the Unique Characteristics of Natural Building Materials
+# Exploring the Unique Characteristics of Natural Building Materials v
 
 Inspired by the idea of using natural building materials, we set out to explore the unique characteristics and personalities of each material and use them in innovative ways in our design. We wanted to capture the mood and atmosphere of the natural environments where these materials are typically found, such as the underground world of stone and water or the airy heights of wood.
 

@@ -51,6 +51,8 @@ sudo fwupdmgr update
 # Install Qgis
 sudo dnf install qgis python3-qgis qgis-grass qgis-server
 
+## Install pgadmin4
+sudo yum install pgadmin4
 
 # Install ranger
 sudo dnf ranger

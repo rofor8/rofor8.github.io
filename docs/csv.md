@@ -2,7 +2,6 @@
 sidebar_position: 4
 ---
 
-
 ### Create a pod
 ``` bash
 podman pod create -p 8080:8080 -p 5432:5432 -n geospatial
@@ -17,10 +16,12 @@ podman run \
 -d postgis/postgis
 ```
 
+### make directory for systemd
+mkdir -p /home/$user/.config/systemd/user/
+
 ### auto gen systemd file
 ``` bash
-podman generate systemd postgis >
-/home/$user/.config/systemd/user/postgis.service
+podman generate systemd postgis > /home/$user/.config/systemd/user/postgis.service
 ```
 
 ### start postgis service
@@ -30,18 +31,90 @@ systemctl start --user postgis.service
 
 ### enable postgis service
 ``` bash
-systemctl start --user postgis.service
+systemctl enable --user postgis.service
 ```
 
-``` bash
-podman start postgis
+### install psql
 ```
+sudo dnf install psql
+```
+
 ## Check
 ``` bash
 psql -h localhost -p 5432 -U postgres 
 ```
 
 
-sudo dnf install psql
-psql -U postgres -c -h 0.0.0.0 -p 5432 "CREATE DATABASE bank_statements;"
-psql -U postgres -d -h 0.0.0.0 -p 5432   bank_statements -c "CREATE TABLE transactions (date date, account_number int, sort_code int, amount int, type varchar(255), description varchar(255));"
+## Upload income data
+
+### create bank_statements database
+psql -U postgres -h localhost -p 5432  -c  "CREATE DATABASE bank_statements;"
+
+### create bank_statements tables
+```
+psql -U postgres -h localhost -p 5432 -d  bank_statements -c "CREATE TABLE transactions (date date, account_number int, sort_code int, debit float, credit float,type varchar(255), description varchar(255));"
+```
+
+### copy to container
+``` bash
+podman cp bank_statements.csv postgis:/bank_statements.csv
+```
+
+### enter psql
+```
+psql -U postgres -h localhost -p 5432 -d bank_statements
+```
+
+### copy data into bank_statements database
+```
+COPY transactions FROM '/bank_statements.csv' DELIMITER ',' CSV HEADER;
+```
+
+## Upload expense data
+
+### create database
+psql -U postgres -h localhost -p 5432  -c  "CREATE DATABASE ebay;"
+
+### create tables
+```
+psql -U postgres -h localhost -p 5432 -d  ebay -c "CREATE TABLE transactions (date date, id float, title varchar(255), price float, quantity int, postage float,total float, currency varchar(255), seller varchar(255));"
+```
+
+### copy to container
+``` bash
+podman cp ebay.csv postgis:/ebay.csv
+```
+
+### enter psql
+```
+psql -U postgres -h localhost -p 5432 -d ebay
+```
+
+### copy data into database, and change date format
+```
+COPY transactions FROM '/ebay.csv' DELIMITER ',' CSV HEADER;
+```
+
+## Query income data
+
+
+### open database
+```
+psql -U postgres -h localhost -p 5432 -d bank_statements
+```
+
+
+### select fiscal total income
+``` sql
+SELECT
+  YEAR(date) AS year,
+  SUM(credit) AS total_income
+FROM
+  bank_statements
+WHERE
+  MONTH(date) >= 8 AND DAY(date) >= 6
+GROUP BY
+  YEAR(date)
+ORDER BY
+  year;
+  ```

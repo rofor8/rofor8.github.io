@@ -47,29 +47,65 @@ sudo fwupdmgr refresh --force
 sudo fwupdmgr get-updates
 sudo fwupdmgr update
 
-# Install Gnome Tweak Tool and tool for working with CoreOS
-sudo dnf install gnome-tweak-tool rpi-imager coreos-installer
 
 # Install Qgis
 sudo dnf install qgis python3-qgis qgis-grass qgis-server
 
-# Install pgadmin4
-sudo tum install pgadmin4
 
 # Install ranger
 sudo dnf ranger
 
-# Install zsh
-sudo dnf zsh
-
-# Install kitty
-sudo dnf kitty
-
 # Install psql
 sudo dnf psql
 
-# Oh My ZSH
-wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
-sh install.sh
-```
 
+# Install dnf-plugins-core
+sudo dnf install dnf-plugins-core
+
+# Add the Brave browser repository
+sudo dnf config-manager --add-repo https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
+
+# Import the Brave browser's key
+sudo rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
+
+# Install the Brave browser
+sudo dnf install brave-browser
+
+# Import the Microsoft key
+sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+
+# Add the Visual Studio Code repository
+sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
+
+# Check for updates
+dnf check-update
+
+# Install Visual Studio Code
+sudo dnf install code
+
+# Set the global git user name and email
+git config --global user.name "user"
+git config --global user.email email
+
+# Remove nano-default-editor
+sudo dnf remove nano-default-editor
+
+# Reinstall the package vim-default-editor
+sudo dnf install vim-default-editor
+
+# Install gnome-shell-extensions package
+sudo dnf install gnome-shell-extensions
+
+# Install gimp
+sudo dnf install gimp
+
+sudo dnf install xclip
+
+sudo dnf install yarn
+
+git config --global user.name "rofor8"
+git config --global user.email "rofor8@gmail.com"
+
+ssh-keygen -t rsa -b 4096 -C "rofor8@gmail.com"
+ssh-add ~/.ssh/id_rs
+xclip -sel clip < ~/.ssh/id_rsa.pub

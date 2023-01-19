@@ -1,0 +1,722 @@
+{
+  "/__docusaurus/debug-59c": {
+    "__comp": "__comp---theme-debug-config-23-a-2ff",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-8-c-1-08a"
+    }
+  },
+  "/__docusaurus/debug/config-ce9": {
+    "__comp": "__comp---theme-debug-config-23-a-2ff",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-8-c-1-08a"
+    }
+  },
+  "/__docusaurus/debug/content-4f5": {
+    "__comp": "__comp---theme-debug-contentba-8-ce7",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-8-c-1-08a"
+    },
+    "allContent": "allContent---docusaurus-debug-content-246-9aa"
+  },
+  "/__docusaurus/debug/globalData-560": {
+    "__comp": "__comp---theme-debug-global-dataede-0fa",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-8-c-1-08a"
+    }
+  },
+  "/__docusaurus/debug/metadata-eb5": {
+    "__comp": "__comp---theme-debug-site-metadata-68-e-3d4",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-8-c-1-08a"
+    }
+  },
+  "/__docusaurus/debug/registry-7ad": {
+    "__comp": "__comp---theme-debug-registry-679-501",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-8-c-1-08a"
+    }
+  },
+  "/__docusaurus/debug/routes-fc2": {
+    "__comp": "__comp---theme-debug-routes-946-699",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-8-c-1-08a"
+    }
+  },
+  "/about-cf0": {
+    "__comp": "__comp---site-src-pages-about-js-779-319",
+    "__context": {
+      "plugin": "plugin---about-810-5cf"
+    },
+    "config": "config---about-5-e-9-bcb"
+  },
+  "/blog-e57": {
+    "__comp": "__comp---theme-blog-list-pagea-6-a-7ba",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "items": [
+      {
+        "content": "content---blog-913-d0d"
+      },
+      {
+        "content": "content---blogfa-0-49b"
+      },
+      {
+        "content": "content---blog-366-ca3"
+      },
+      {
+        "content": "content---blog-895-33d"
+      },
+      {
+        "content": "content---bloge-1-a-bd7"
+      },
+      {
+        "content": "content---blog-1-a-0-e9f"
+      },
+      {
+        "content": "content---blog-198-5ec"
+      },
+      {
+        "content": "content---bloge-2-d-8e8"
+      },
+      {
+        "content": "content---blog-5-a-0-4c8"
+      },
+      {
+        "content": "content---blogdc-5-cee"
+      }
+    ],
+    "metadata": "metadata---blogb-2-b-df1"
+  },
+  "/blog/archive-9e3": {
+    "__comp": "__comp---theme-blog-archive-page-9-e-4-1d8",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "archive": "archive---blog-archiveb-2-f-393"
+  },
+  "/blog/constructing-a-3d-egg-shape-from-regular-polygons-589": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-constructing-a-3-d-egg-shape-from-regular-polygons-8-a-7-161"
+  },
+  "/blog/creating-3d-buildings-from-mastermap-with-qgis-ebb": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-creating-3-d-buildings-from-mastermap-with-qgis-2-ca-e85"
+  },
+  "/blog/designing-a-living-building:-an-organism-with-a-symbiotic-relationship-with-its-occupants-9ad": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-designing-a-living-building-an-organism-with-a-symbiotic-relationship-with-its-occupants-145-a2d"
+  },
+  "/blog/designing-for-comfort-and-practicality-in-motor-caravans-0ca": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-designing-for-comfort-and-practicality-in-motor-caravansf-0-a-a11"
+  },
+  "/blog/designing-hardware-for-mounting-wireless-hardware-equiptment-on-marquees-8e8": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-designing-hardware-for-mounting-wireless-hardware-equiptment-on-marquees-6-ed-9fa"
+  },
+  "/blog/exploring-the-unique-characteristics-of-natural-building-materials-127": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-exploring-the-unique-characteristics-of-natural-building-materials-7-b-5-a7a"
+  },
+  "/blog/flood-risk-assessment-of-pudding-brook-3c0": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-flood-risk-assessment-of-pudding-brookaf-9-18e"
+  },
+  "/blog/gifford-circus-cry-wheel-performances-a05": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-gifford-circus-cry-wheel-performancesa-26-1bf"
+  },
+  "/blog/inspire-index-polygon-house-prices-fd2": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-inspire-index-polygon-house-prices-3-b-7-15d"
+  },
+  "/blog/live-network-map-for-womad-festival-a20": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-live-network-map-for-womad-festivaldf-4-e92"
+  },
+  "/blog/mapping-wireless-coverage-at-the-royal-windsor-horse-show-with-arcgis-d0e": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-mapping-wireless-coverage-at-the-royal-windsor-horse-show-with-arcgisf-2-c-bbc"
+  },
+  "/blog/modeling-a-spherical-solar-concentrator-bf7": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-modeling-a-spherical-solar-concentratorb-11-bfa"
+  },
+  "/blog/page/2-ca6": {
+    "__comp": "__comp---theme-blog-list-pagea-6-a-7ba",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "items": [
+      {
+        "content": "content---blog-page-250-f-4c6"
+      },
+      {
+        "content": "content---blog-page-22-d-3-a83"
+      },
+      {
+        "content": "content---blog-page-2-b-85-5c9"
+      },
+      {
+        "content": "content---blog-page-2-f-54-f0e"
+      },
+      {
+        "content": "content---blog-page-201-c-cbb"
+      },
+      {
+        "content": "content---blog-page-2907-9f0"
+      },
+      {
+        "content": "content---blog-page-2-c-81-ebc"
+      },
+      {
+        "content": "content---blog-page-2-d-39-e30"
+      },
+      {
+        "content": "content---blog-page-241-e-6fc"
+      },
+      {
+        "content": "content---blog-page-23-af-749"
+      }
+    ],
+    "metadata": "metadata---blog-page-28-eb-625"
+  },
+  "/blog/parish-house-prices-b2a": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-parish-house-prices-4-c-6-5ac"
+  },
+  "/blog/provisioning-cisco-cloud-wireless-controller-4fb": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-provisioning-cisco-cloud-wireless-controller-1-c-5-e2f"
+  },
+  "/blog/tags-226": {
+    "__comp": "__comp---theme-blog-tags-list-page-01-a-d0b",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "tags": "tags---blog-tagsa-70-da2"
+  },
+  "/blog/tags/docusaurus-80f": {
+    "__comp": "__comp---theme-blog-tags-posts-page-687-b6c",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "items": [
+      {
+        "content": "content---blog-913-d0d"
+      },
+      {
+        "content": "content---blogfa-0-49b"
+      },
+      {
+        "content": "content---blog-366-ca3"
+      },
+      {
+        "content": "content---blog-895-33d"
+      },
+      {
+        "content": "content---bloge-1-a-bd7"
+      },
+      {
+        "content": "content---blog-1-a-0-e9f"
+      },
+      {
+        "content": "content---blog-198-5ec"
+      },
+      {
+        "content": "content---bloge-2-d-8e8"
+      },
+      {
+        "content": "content---blog-5-a-0-4c8"
+      },
+      {
+        "content": "content---blogdc-5-cee"
+      }
+    ],
+    "tag": "tag---blog-tags-docusaurusa-80-728",
+    "listMetadata": "listMetadata---blog-tags-docusaurus-608-c09"
+  },
+  "/blog/tags/docusaurus/page/2-f81": {
+    "__comp": "__comp---theme-blog-tags-posts-page-687-b6c",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "items": [
+      {
+        "content": "content---blog-page-250-f-4c6"
+      },
+      {
+        "content": "content---blog-page-22-d-3-a83"
+      },
+      {
+        "content": "content---blog-page-2-b-85-5c9"
+      },
+      {
+        "content": "content---blog-page-2-f-54-f0e"
+      },
+      {
+        "content": "content---blog-page-201-c-cbb"
+      },
+      {
+        "content": "content---blog-page-2907-9f0"
+      },
+      {
+        "content": "content---blog-page-2-c-81-ebc"
+      },
+      {
+        "content": "content---blog-page-2-d-39-e30"
+      },
+      {
+        "content": "content---blog-page-241-e-6fc"
+      },
+      {
+        "content": "content---blog-page-23-af-749"
+      }
+    ],
+    "tag": "tag---blog-tags-docusaurus-page-2-b-57-8b6",
+    "listMetadata": "listMetadata---blog-tags-docusaurus-page-2333-bcd"
+  },
+  "/blog/tags/hello-88b": {
+    "__comp": "__comp---theme-blog-tags-posts-page-687-b6c",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "items": [
+      {
+        "content": "content---blog-366-ca3"
+      },
+      {
+        "content": "content---blog-895-33d"
+      },
+      {
+        "content": "content---bloge-1-a-bd7"
+      },
+      {
+        "content": "content---blog-1-a-0-e9f"
+      },
+      {
+        "content": "content---blog-198-5ec"
+      },
+      {
+        "content": "content---blog-page-2-b-85-5c9"
+      },
+      {
+        "content": "content---blog-page-2-f-54-f0e"
+      },
+      {
+        "content": "content---blog-page-201-c-cbb"
+      }
+    ],
+    "tag": "tag---blog-tags-hello-30-a-bed",
+    "listMetadata": "listMetadata---blog-tags-hello-664-70a"
+  },
+  "/blog/tags/hola-3a8": {
+    "__comp": "__comp---theme-blog-tags-posts-page-687-b6c",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "items": [
+      {
+        "content": "content---blog-913-d0d"
+      },
+      {
+        "content": "content---blogfa-0-49b"
+      },
+      {
+        "content": "content---bloge-2-d-8e8"
+      },
+      {
+        "content": "content---blog-5-a-0-4c8"
+      },
+      {
+        "content": "content---blogdc-5-cee"
+      },
+      {
+        "content": "content---blog-page-250-f-4c6"
+      },
+      {
+        "content": "content---blog-page-22-d-3-a83"
+      },
+      {
+        "content": "content---blog-page-2907-9f0"
+      },
+      {
+        "content": "content---blog-page-2-c-81-ebc"
+      },
+      {
+        "content": "content---blog-page-2-d-39-e30"
+      }
+    ],
+    "tag": "tag---blog-tags-holae-16-18a",
+    "listMetadata": "listMetadata---blog-tags-hola-4-c-9-a24"
+  },
+  "/blog/tags/hola/page/2-6de": {
+    "__comp": "__comp---theme-blog-tags-posts-page-687-b6c",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "items": [
+      {
+        "content": "content---blog-page-241-e-6fc"
+      },
+      {
+        "content": "content---blog-page-23-af-749"
+      }
+    ],
+    "tag": "tag---blog-tags-hola-page-2-a-26-dac",
+    "listMetadata": "listMetadata---blog-tags-hola-page-238-f-8d1"
+  },
+  "/blog/tracking-network-hardware-assets-at-the-isle-of-wight-festival-024": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-tracking-network-hardware-assets-at-the-isle-of-wight-festivaldee-730"
+  },
+  "/blog/truss-connection-node-modeling-240": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-truss-connection-node-modeling-59-f-286"
+  },
+  "/blog/using-data-queries-to-enhance-wildlife-connectivity-c5a": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-using-data-queries-to-enhance-wildlife-connectivity-480-c4f"
+  },
+  "/blog/vertical-farming-for-continuous-salad-production-c74": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-vertical-farming-for-continuous-salad-productiond-03-cde"
+  },
+  "/blog/wireless-coverage-at-manchester-pride-cfe": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-wireless-coverage-at-manchester-pride-317-134"
+  },
+  "/blog/wireless-coverage-at-the-bath-festival-a-heatmap-analasis-e3f": {
+    "__comp": "__comp---theme-blog-post-pageccc-cab",
+    "__context": {
+      "plugin": "plugin---blogcdf-2de"
+    },
+    "sidebar": "sidebar---blog-814-8ac",
+    "content": "content---blog-wireless-coverage-at-the-bath-festival-a-heatmap-analasis-443-c83"
+  },
+  "/markdown-page-dbe": {
+    "__comp": "__comp---theme-mdx-page-1-f-3-b90",
+    "__context": {
+      "plugin": "plugin---about-810-5cf"
+    },
+    "content": "content---markdown-page-393-028"
+  },
+  "/about-8a0": {
+    "__comp": "__comp---theme-doc-page-1-be-9be",
+    "__context": {
+      "plugin": "plugin---about-532-49f"
+    },
+    "versionMetadata": "versionMetadata---about-781-3fc"
+  },
+  "/about/about-8ac": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---about-aboutdf-4-474"
+  },
+  "/docs-37a": {
+    "__comp": "__comp---theme-doc-page-1-be-9be",
+    "__context": {
+      "plugin": "plugin---docs-4-d-1-240"
+    },
+    "versionMetadata": "versionMetadata---docs-935-398"
+  },
+  "/docs/artificial-intelligence/using-deepl-api-13e": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-artificial-intelligence-using-deepl-apifc-2-6a7"
+  },
+  "/docs/artificial-intelligence/using-openai-api-189": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-artificial-intelligence-using-openai-apiae-0-a5f"
+  },
+  "/docs/category/artificial-intelligence-314": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-artificial-intelligenceabb-70d"
+  },
+  "/docs/category/cloud-computing-d34": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-cloud-computingd-18-a78"
+  },
+  "/docs/category/desktop-linux-938": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-desktop-linux-505-1fe"
+  },
+  "/docs/category/environmental-monitoring-f5a": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-environmental-monitoring-214-ca3"
+  },
+  "/docs/category/geospatial-analysis-e4d": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-geospatial-analysis-117-ac4"
+  },
+  "/docs/category/parametric-modeling-671": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-parametric-modelingb-09-fdc"
+  },
+  "/docs/category/postgis-data-management-and-queries-b86": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-postgis-data-management-and-queries-611-2d8"
+  },
+  "/docs/category/publishing-maps-with-leaflet-9f1": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-publishing-maps-with-leaflet-8-c-0-06b"
+  },
+  "/docs/category/python-for-gis-a74": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-python-for-gisb-98-ed6"
+  },
+  "/docs/category/reading-sensors-with-python-f3e": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-reading-sensors-with-python-089-94a"
+  },
+  "/docs/category/uploading-data-to-postgis-with-linux-shell-90c": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-uploading-data-to-postgis-with-linux-shell-188-df8"
+  },
+  "/docs/category/working-with-files-via-linux-shell-afc": {
+    "__comp": "__comp---theme-doc-category-generated-index-page-14-e-640",
+    "categoryGeneratedIndex": "categoryGeneratedIndex---docs-category-working-with-files-via-linux-shell-931-893"
+  },
+  "/docs/cloud-computing/infrastructure-as-a-service-f30": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-cloud-computing-infrastructure-as-a-serviceac-5-d16"
+  },
+  "/docs/cloud-computing/platform-as-a-service-ac8": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-cloud-computing-platform-as-a-service-1-be-c1a"
+  },
+  "/docs/cloud-computing/software-as-a-service-44f": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-cloud-computing-software-as-a-service-6-ad-bf0"
+  },
+  "/docs/desktop-linux/configuring-visual-studio-code-ddf": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-desktop-linux-configuring-visual-studio-code-60-e-789"
+  },
+  "/docs/desktop-linux/provisioning-fedora-workstation-630": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-desktop-linux-provisioning-fedora-workstation-65-a-62d"
+  },
+  "/docs/desktop-linux/setting-up-qgis-237": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-desktop-linux-setting-up-qgisba-1-b71"
+  },
+  "/docs/desktop-linux/setup-rclone-e3e": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-desktop-linux-setup-rclonea-54-bb0"
+  },
+  "/docs/desktop-linux/working-with-files-via-linux-shell/cp-files-into-directories-by-extension-44a": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-desktop-linux-working-with-files-via-linux-shell-cp-files-into-directories-by-extension-5-d-2-f70"
+  },
+  "/docs/desktop-linux/working-with-files-via-linux-shell/extract-all-zips-f83": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-desktop-linux-working-with-files-via-linux-shell-extract-all-zips-381-554"
+  },
+  "/docs/desktop-linux/working-with-files-via-linux-shell/rename-all-linux-frendly-d8b": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-desktop-linux-working-with-files-via-linux-shell-rename-all-linux-frendly-4-a-8-750"
+  },
+  "/docs/environmental-monitoring/installing-cisco-cloud-wireless-controller-16f": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-environmental-monitoring-installing-cisco-cloud-wireless-controller-58-a-ea6"
+  },
+  "/docs/environmental-monitoring/provisioning-fedora-coreos-on-the-raspberry-pi 4-48d": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-environmental-monitoring-provisioning-fedora-coreos-on-the-raspberry-pi-4-b-3-e-b51"
+  },
+  "/docs/environmental-monitoring/reading-sensors-with-python/ac-current-c0f": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-environmental-monitoring-reading-sensors-with-python-ac-current-1-d-7-f15"
+  },
+  "/docs/environmental-monitoring/reading-sensors-with-python/car-obd-port-097": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-environmental-monitoring-reading-sensors-with-python-car-obd-port-075-fee"
+  },
+  "/docs/environmental-monitoring/reading-sensors-with-python/carbon-dioxide-b7c": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-environmental-monitoring-reading-sensors-with-python-carbon-dioxide-8-e-4-14b"
+  },
+  "/docs/environmental-monitoring/reading-sensors-with-python/starting-scripts-with-systemd-c03": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-environmental-monitoring-reading-sensors-with-python-starting-scripts-with-systemd-42-a-392"
+  },
+  "/docs/environmental-monitoring/reading-sensors-with-python/thermocouple-662": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-environmental-monitoring-reading-sensors-with-python-thermocouple-75-d-8b2"
+  },
+  "/docs/environmental-monitoring/setting-up-influxdb-database-server-bdb": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-environmental-monitoring-setting-up-influxdb-database-serverd-73-e55"
+  },
+  "/docs/geospatial-analysis/postgis-data-management-and-queries/query-flood-risk-600": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-postgis-data-management-and-queries-query-flood-riskaa-6-ff6"
+  },
+  "/docs/geospatial-analysis/postgis-data-management-and-queries/query-least-cost-path-wildlife-corridors-955": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-postgis-data-management-and-queries-query-least-cost-path-wildlife-corridorsb-55-df4"
+  },
+  "/docs/geospatial-analysis/postgis-data-management-and-queries/query-microclimates-cb0": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-postgis-data-management-and-queries-query-microclimates-454-2cb"
+  },
+  "/docs/geospatial-analysis/postgis-data-management-and-queries/query-price-paid-parcels-6eb": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-postgis-data-management-and-queries-query-price-paid-parcels-739-c29"
+  },
+  "/docs/geospatial-analysis/postgis-data-management-and-queries/query-price-paid-parish-07c": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-postgis-data-management-and-queries-query-price-paid-parish-0-f-2-7a5"
+  },
+  "/docs/geospatial-analysis/postgis-data-management-and-queries/query-workings-bf5": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-postgis-data-management-and-queries-query-workings-9-bd-d76"
+  },
+  "/docs/geospatial-analysis/postgis-data-management-and-queries/wildlife-corridors-overview-dfc": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-postgis-data-management-and-queries-wildlife-corridors-overviewa-2-a-428"
+  },
+  "/docs/geospatial-analysis/publishing-maps/mapbox-map-with-leaflet-006": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-publishing-maps-mapbox-map-with-leaflet-408-589"
+  },
+  "/docs/geospatial-analysis/publishing-maps/network-status-map-265": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-publishing-maps-network-status-map-8-b-0-4a0"
+  },
+  "/docs/geospatial-analysis/python-for-gis/identify-flat-terrain-with-above-average-sun-4aa": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-python-for-gis-identify-flat-terrain-with-above-average-suna-2-c-ca5"
+  },
+  "/docs/geospatial-analysis/setting-up-a-postgis-database-server-94d": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-setting-up-a-postgis-database-server-8-b-4-87d"
+  },
+  "/docs/geospatial-analysis/tax-return-with-sql-458": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-tax-return-with-sqlbe-1-4d6"
+  },
+  "/docs/geospatial-analysis/upload-data-to-postgis-with-linux-shell/loading-bristol-city-council-geojson-files-c60": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-upload-data-to-postgis-with-linux-shell-loading-bristol-city-council-geojson-files-3-af-d1b"
+  },
+  "/docs/geospatial-analysis/upload-data-to-postgis-with-linux-shell/loading-environment-agency-lidar-b0e": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-upload-data-to-postgis-with-linux-shell-loading-environment-agency-lidar-06-e-1df"
+  },
+  "/docs/geospatial-analysis/upload-data-to-postgis-with-linux-shell/loading-land-registry-inspire-polygons-aee": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-upload-data-to-postgis-with-linux-shell-loading-land-registry-inspire-polygonsa-2-d-b82"
+  },
+  "/docs/geospatial-analysis/upload-data-to-postgis-with-linux-shell/loading-ordnance-survey-mastermap-with-astun-loader-66f": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-upload-data-to-postgis-with-linux-shell-loading-ordnance-survey-mastermap-with-astun-loader-642-f0c"
+  },
+  "/docs/geospatial-analysis/upload-data-to-postgis-with-linux-shell/loading-ordnance-survey-satellite-imagery-a39": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-geospatial-analysis-upload-data-to-postgis-with-linux-shell-loading-ordnance-survey-satellite-imagery-46-b-b0d"
+  },
+  "/docs/intro-aed": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-intro-0-e-3-be1"
+  },
+  "/docs/parametric-modeling/spherical-solar-concentrator-with-ladybug-214": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-parametric-modeling-spherical-solar-concentrator-with-ladybuge-3-d-0fd"
+  },
+  "/docs/parametric-modeling/sun-shading-model-with-radiance-0e0": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-parametric-modeling-sun-shading-model-with-radiancec-1-a-c2e"
+  },
+  "/-0e7": {
+    "__comp": "__comp---site-src-pages-index-jsc-4-f-f99",
+    "__context": {
+      "plugin": "plugin---about-810-5cf"
+    },
+    "config": "config---about-5-e-9-bcb"
+  }
+}

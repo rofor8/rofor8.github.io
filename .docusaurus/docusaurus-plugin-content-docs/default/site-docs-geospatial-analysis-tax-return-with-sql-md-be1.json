@@ -1,0 +1,26 @@
+{
+  "unversionedId": "geospatial-analysis/tax-return-with-sql",
+  "id": "geospatial-analysis/tax-return-with-sql",
+  "title": "Setting up Postgres Database Server",
+  "description": "Create a pod",
+  "source": "@site/docs/geospatial-analysis/tax-return-with-sql.md",
+  "sourceDirName": "geospatial-analysis",
+  "slug": "/geospatial-analysis/tax-return-with-sql",
+  "permalink": "/docs/geospatial-analysis/tax-return-with-sql",
+  "draft": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Setting up PostGIS Database Server",
+    "permalink": "/docs/geospatial-analysis/setting-up-a-postgis-database-server"
+  },
+  "next": {
+    "title": "Python for GIS",
+    "permalink": "/docs/category/python-for-gis"
+  }
+}

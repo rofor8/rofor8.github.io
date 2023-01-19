@@ -106,15 +106,15 @@ psql -U postgres -h localhost -p 5432 -d bank_statements
 
 ### select fiscal total income
 ``` sql
-SELECT
-  YEAR(date) AS year,
+SELECT 
+  EXTRACT(YEAR FROM date) AS year,
   SUM(credit) AS total_income
 FROM
-  bank_statements
+  transactions
 WHERE
-  MONTH(date) >= 8 AND DAY(date) >= 6
+  EXTRACT(MONTH FROM date) >= 8 AND EXTRACT(DAY FROM date) >= 6
 GROUP BY
-  YEAR(date)
+  year
 ORDER BY
   year;
   ```

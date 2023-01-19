@@ -2,6 +2,8 @@
 sidebar_position: 4
 ---
 
+## Upload CSV to postgres
+
 ### Create a pod
 ``` bash
 podman pod create -p 8080:8080 -p 5432:5432 -n geospatial

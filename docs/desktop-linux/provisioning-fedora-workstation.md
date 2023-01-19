@@ -93,7 +93,7 @@ sudo dnf remove nano-default-editor
 # Reinstall the package vim-default-editor
 sudo dnf install vim-default-editor
 
-# Install gnome-shell-extensions package
+# Install gnome-shell-extensions package e
 sudo dnf install gnome-shell-extensions
 
 # Install gimp

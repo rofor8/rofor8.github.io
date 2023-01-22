@@ -5,8 +5,8 @@
   "permalink": "/docs/category/python-for-gis",
   "navigation": {
     "previous": {
-      "title": "Setting up Postgres Database Server",
-      "permalink": "/docs/geospatial-analysis/tax-return-with-sql"
+      "title": "Setting up PostGIS Database Server",
+      "permalink": "/docs/geospatial-analysis/setting-up-a-postgis-database-server"
     },
     "next": {
       "title": "Identify flat terrain with above average sun",

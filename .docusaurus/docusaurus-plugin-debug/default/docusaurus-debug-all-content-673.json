@@ -148,6 +148,32 @@
               }
             },
             {
+              "unversionedId": "csv",
+              "id": "csv",
+              "title": "csv",
+              "description": "Upload CSV to postgres",
+              "source": "@site/docs/csv.md",
+              "sourceDirName": ".",
+              "slug": "/csv",
+              "permalink": "/docs/csv",
+              "draft": false,
+              "tags": [],
+              "version": "current",
+              "sidebarPosition": 4,
+              "frontMatter": {
+                "sidebar_position": 4
+              },
+              "sidebar": "tutorialSidebar",
+              "previous": {
+                "title": "Network Status Map",
+                "permalink": "/docs/geospatial-analysis/publishing-maps/network-status-map"
+              },
+              "next": {
+                "title": "Artificial Intelligence",
+                "permalink": "/docs/category/artificial-intelligence"
+              }
+            },
+            {
               "unversionedId": "desktop-linux/configuring-visual-studio-code",
               "id": "desktop-linux/configuring-visual-studio-code",
               "title": "Configuring Visual Studio Code",
@@ -177,7 +203,7 @@
               "unversionedId": "desktop-linux/provisioning-fedora-workstation",
               "id": "desktop-linux/provisioning-fedora-workstation",
               "title": "Provisioning Fedora Workstation",
-              "description": "This script installs and updates various packages and tools on a Fedora system. It installs the PostgreSQL database management system, the RPM Fusion repositories, and the Flathub repository. It also updates the system's packages and firmware, installs the Gnome Tweak Tool, some tools for working with CoreOS, and sets some configuration options for dnf (the Fedora package manager).",
+              "description": "This script installs and updates various packages and tools on a Fedora system. It installs the PostgreSQL database management system, the RPM Fusion repositories, and the Flathub repository. It also updates the system's packages and firmware, installs the Gnome Tweak Tool, some tools for working with CoreOS, and sets some configuration options for dnf (the Fedora package manager) ss.",
               "source": "@site/docs/desktop-linux/provisioning-fedora-workstation.md",
               "sourceDirName": "desktop-linux",
               "slug": "/desktop-linux/provisioning-fedora-workstation",
@@ -767,8 +793,8 @@
                 "permalink": "/docs/geospatial-analysis/publishing-maps/mapbox-map-with-leaflet"
               },
               "next": {
-                "title": "Artificial Intelligence",
-                "permalink": "/docs/category/artificial-intelligence"
+                "title": "csv",
+                "permalink": "/docs/csv"
               }
             },
             {
@@ -817,32 +843,6 @@
               "previous": {
                 "title": "Geospatial Analysis",
                 "permalink": "/docs/category/geospatial-analysis"
-              },
-              "next": {
-                "title": "Setting up Postgres Database Server",
-                "permalink": "/docs/geospatial-analysis/tax-return-with-sql"
-              }
-            },
-            {
-              "unversionedId": "geospatial-analysis/tax-return-with-sql",
-              "id": "geospatial-analysis/tax-return-with-sql",
-              "title": "Setting up Postgres Database Server",
-              "description": "Create a pod",
-              "source": "@site/docs/geospatial-analysis/tax-return-with-sql.md",
-              "sourceDirName": "geospatial-analysis",
-              "slug": "/geospatial-analysis/tax-return-with-sql",
-              "permalink": "/docs/geospatial-analysis/tax-return-with-sql",
-              "draft": false,
-              "tags": [],
-              "version": "current",
-              "sidebarPosition": 1,
-              "frontMatter": {
-                "sidebar_position": 1
-              },
-              "sidebar": "tutorialSidebar",
-              "previous": {
-                "title": "Setting up PostGIS Database Server",
-                "permalink": "/docs/geospatial-analysis/setting-up-a-postgis-database-server"
               },
               "next": {
                 "title": "Python for GIS",
@@ -1128,10 +1128,6 @@
                     "id": "geospatial-analysis/setting-up-a-postgis-database-server"
                   },
                   {
-                    "type": "doc",
-                    "id": "geospatial-analysis/tax-return-with-sql"
-                  },
-                  {
                     "type": "category",
                     "label": "Python for GIS",
                     "collapsible": true,
@@ -1254,6 +1250,10 @@
                   "slug": "/category/geospatial-analysis",
                   "permalink": "/docs/category/geospatial-analysis"
                 }
+              },
+              {
+                "type": "doc",
+                "id": "csv"
               },
               {
                 "type": "category",

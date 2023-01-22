@@ -1,0 +1,26 @@
+{
+  "unversionedId": "csv",
+  "id": "csv",
+  "title": "csv",
+  "description": "Upload CSV to postgres",
+  "source": "@site/docs/csv.md",
+  "sourceDirName": ".",
+  "slug": "/csv",
+  "permalink": "/docs/csv",
+  "draft": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Network Status Map",
+    "permalink": "/docs/geospatial-analysis/publishing-maps/network-status-map"
+  },
+  "next": {
+    "title": "Artificial Intelligence",
+    "permalink": "/docs/category/artificial-intelligence"
+  }
+}

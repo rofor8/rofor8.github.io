@@ -5,8 +5,8 @@
   "permalink": "/docs/category/artificial-intelligence",
   "navigation": {
     "previous": {
-      "title": "Network Status Map",
-      "permalink": "/docs/geospatial-analysis/publishing-maps/network-status-map"
+      "title": "csv",
+      "permalink": "/docs/csv"
     },
     "next": {
       "title": "Translating books with DeepL",

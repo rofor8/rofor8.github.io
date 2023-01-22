@@ -206,7 +206,7 @@ export default [
   },
   {
     path: '/docs',
-    component: ComponentCreator('/docs', '37a'),
+    component: ComponentCreator('/docs', '2f3'),
     routes: [
       {
         path: '/docs/artificial-intelligence/using-deepl-api',
@@ -307,6 +307,12 @@ export default [
       {
         path: '/docs/cloud-computing/software-as-a-service',
         component: ComponentCreator('/docs/cloud-computing/software-as-a-service', '44f'),
+        exact: true,
+        sidebar: "tutorialSidebar"
+      },
+      {
+        path: '/docs/csv',
+        component: ComponentCreator('/docs/csv', '8ef'),
         exact: true,
         sidebar: "tutorialSidebar"
       },
@@ -463,12 +469,6 @@ export default [
       {
         path: '/docs/geospatial-analysis/setting-up-a-postgis-database-server',
         component: ComponentCreator('/docs/geospatial-analysis/setting-up-a-postgis-database-server', '94d'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/docs/geospatial-analysis/tax-return-with-sql',
-        component: ComponentCreator('/docs/geospatial-analysis/tax-return-with-sql', '458'),
         exact: true,
         sidebar: "tutorialSidebar"
       },

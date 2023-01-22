@@ -20,7 +20,7 @@
     "permalink": "/docs/category/geospatial-analysis"
   },
   "next": {
-    "title": "Setting up Postgres Database Server",
-    "permalink": "/docs/geospatial-analysis/tax-return-with-sql"
+    "title": "Python for GIS",
+    "permalink": "/docs/category/python-for-gis"
   }
 }

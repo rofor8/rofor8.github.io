@@ -94,12 +94,6 @@
             "docId": "geospatial-analysis/setting-up-a-postgis-database-server"
           },
           {
-            "type": "link",
-            "label": "Setting up Postgres Database Server",
-            "href": "/docs/geospatial-analysis/tax-return-with-sql",
-            "docId": "geospatial-analysis/tax-return-with-sql"
-          },
-          {
             "type": "category",
             "label": "Python for GIS",
             "collapsible": true,
@@ -227,6 +221,12 @@
           }
         ],
         "href": "/docs/category/geospatial-analysis"
+      },
+      {
+        "type": "link",
+        "label": "csv",
+        "href": "/docs/csv",
+        "docId": "csv"
       },
       {
         "type": "category",
@@ -390,6 +390,12 @@
       "description": "SaaS stands for \"Software as a Service.\" It refers to a cloud computing model in which an organization uses software applications that are hosted and managed by a third-party provider. The organization pays for the software on a subscription basis, typically based on the number of users or the amount of data processed. With SaaS, the organization does not need to worry about installing, configuring, or maintaining the software, as these tasks are handled by the provider.",
       "sidebar": "tutorialSidebar"
     },
+    "csv": {
+      "id": "csv",
+      "title": "csv",
+      "description": "Upload CSV to postgres",
+      "sidebar": "tutorialSidebar"
+    },
     "desktop-linux/configuring-visual-studio-code": {
       "id": "desktop-linux/configuring-visual-studio-code",
       "title": "Configuring Visual Studio Code",
@@ -399,7 +405,7 @@
     "desktop-linux/provisioning-fedora-workstation": {
       "id": "desktop-linux/provisioning-fedora-workstation",
       "title": "Provisioning Fedora Workstation",
-      "description": "This script installs and updates various packages and tools on a Fedora system. It installs the PostgreSQL database management system, the RPM Fusion repositories, and the Flathub repository. It also updates the system's packages and firmware, installs the Gnome Tweak Tool, some tools for working with CoreOS, and sets some configuration options for dnf (the Fedora package manager).",
+      "description": "This script installs and updates various packages and tools on a Fedora system. It installs the PostgreSQL database management system, the RPM Fusion repositories, and the Flathub repository. It also updates the system's packages and firmware, installs the Gnome Tweak Tool, some tools for working with CoreOS, and sets some configuration options for dnf (the Fedora package manager) ss.",
       "sidebar": "tutorialSidebar"
     },
     "desktop-linux/setting-up-qgis": {
@@ -543,12 +549,6 @@
     "geospatial-analysis/setting-up-a-postgis-database-server": {
       "id": "geospatial-analysis/setting-up-a-postgis-database-server",
       "title": "Setting up PostGIS Database Server",
-      "description": "Create a pod",
-      "sidebar": "tutorialSidebar"
-    },
-    "geospatial-analysis/tax-return-with-sql": {
-      "id": "geospatial-analysis/tax-return-with-sql",
-      "title": "Setting up Postgres Database Server",
       "description": "Create a pod",
       "sidebar": "tutorialSidebar"
     },

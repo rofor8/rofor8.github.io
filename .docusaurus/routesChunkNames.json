@@ -497,7 +497,7 @@
     "__comp": "__comp---theme-doc-item-178-a40",
     "content": "content---about-aboutdf-4-474"
   },
-  "/docs-37a": {
+  "/docs-2f3": {
     "__comp": "__comp---theme-doc-page-1-be-9be",
     "__context": {
       "plugin": "plugin---docs-4-d-1-240"
@@ -571,6 +571,10 @@
   "/docs/cloud-computing/software-as-a-service-44f": {
     "__comp": "__comp---theme-doc-item-178-a40",
     "content": "content---docs-cloud-computing-software-as-a-service-6-ad-bf0"
+  },
+  "/docs/csv-8ef": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-csv-087-d11"
   },
   "/docs/desktop-linux/configuring-visual-studio-code-ddf": {
     "__comp": "__comp---theme-doc-item-178-a40",
@@ -675,10 +679,6 @@
   "/docs/geospatial-analysis/setting-up-a-postgis-database-server-94d": {
     "__comp": "__comp---theme-doc-item-178-a40",
     "content": "content---docs-geospatial-analysis-setting-up-a-postgis-database-server-8-b-4-87d"
-  },
-  "/docs/geospatial-analysis/tax-return-with-sql-458": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-geospatial-analysis-tax-return-with-sqlbe-1-4d6"
   },
   "/docs/geospatial-analysis/upload-data-to-postgis-with-linux-shell/loading-bristol-city-council-geojson-files-c60": {
     "__comp": "__comp---theme-doc-item-178-a40",

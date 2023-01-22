@@ -1112,7 +1112,7 @@
                 ],
                 "link": {
                   "type": "generated-index",
-                  "description": "Welcome to the section on environmental monitoring! Environmental monitoring is the practice of collecting and analyzing data on the state of the environment, including factors such as air quality, water quality, soil conditions, and wildlife populations. This data is used to understand the impacts of human activities on the environment and to identify and address environmental problems and risks. Environmental monitoring is an important field that plays a key role in protecting the planet and ensuring the sustainability of our natural resources. It helps us to monitor and understand the health of the environment, and to take action to address any issues that may arise. In this section, we will be exploring the various aspects of environmental monitoring, including the different types of data that are collected, the methods and technologies used to gather and analyze this data, and the ways in which the results of environmental monitoring can be used to inform decision-making and policy. By the end of this section, you should have a good understanding of environmental monitoring and its role in protecting the environment.",
+                  "description": "test",
                   "slug": "/category/environmental-monitoring",
                   "permalink": "/docs/category/environmental-monitoring"
                 }
@@ -1246,7 +1246,7 @@
                 ],
                 "link": {
                   "type": "generated-index",
-                  "description": "Welcome to the geospatial analysis tutorial! In this section, we will be exploring the process of using geographic data and tools to analyze and understand spatial relationships and patterns. Geospatial analysis is an important field that allows us to understand and visualize the spatial aspects of phenomena and events, and to make informed decisions about the use and management of resources. Whether you are working in the fields of urban planning, natural resource management, or disaster response, the ability to analyze and interpret geospatial data is crucial for effectively managing resources and making informed decisions. In this tutorial, we will cover the basics of geospatial analysis, including how to acquire and manipulate geospatial data, and how to use various tools and techniques to visualize and analyze spatial patterns and relationships. By the end of this tutorial, you will have a solid foundation in geospatial analysis and be well-equipped to begin using these powerful tools and techniques in your own work. So let's get started!",
+                  "description": "test",
                   "slug": "/category/geospatial-analysis",
                   "permalink": "/docs/category/geospatial-analysis"
                 }
@@ -1272,7 +1272,7 @@
                 ],
                 "link": {
                   "type": "generated-index",
-                  "description": "Artificial intelligence (AI) is a rapidly growing field that is transforming many aspects of our lives. At its core, AI is about the development of intelligent computer systems that can perform tasks that would normally require human intelligence, such as learning, decision-making, and problem-solving. AI has the potential to revolutionize many areas of society, including healthcare, education, transportation, and manufacturing. For example, AI-powered systems can analyze large amounts of data and make informed decisions, allowing for more efficient and effective healthcare and education. In transportation, AI can be used to optimize routes and reduce traffic congestion. And in manufacturing, AI can be used to improve quality control and increase productivity. In this section, we will explore the basics of artificial intelligence and its applications in various fields. By the end of this section, you will have a solid understanding of the potential of AI and how it is being used to transform our world.",
+                  "description": "test",
                   "slug": "/category/artificial-intelligence",
                   "permalink": "/docs/category/artificial-intelligence"
                 }
@@ -1298,7 +1298,7 @@
                 ],
                 "link": {
                   "type": "generated-index",
-                  "description": "Welcome to this tutorial on cloud computing! In this section, we will be exploring the fundamental concepts and principles of cloud computing. Cloud computing is a model for delivering computing resources, such as storage, computing power, and networking, over the internet. It allows users to access and use these resources on demand, without the need to invest in expensive infrastructure or maintain complex systems. Cloud computing has revolutionized the way we think about computing, and it has opened up a wide range of possibilities for businesses, organizations, and individuals. Throughout this tutorial, we will be diving into the various aspects of cloud computing, including the different types of cloud services, the benefits and challenges of using the cloud, and best practices for implementing cloud solutions. By the end of this tutorial, you should have a solid understanding of cloud computing and be able to make informed decisions about how to use the cloud in your own work. So, let's get started!",
+                  "description": "test",
                   "slug": "/category/cloud-computing",
                   "permalink": "/docs/category/cloud-computing"
                 }
@@ -1354,7 +1354,7 @@
                 ],
                 "link": {
                   "type": "generated-index",
-                  "description": "Welcome to the section on Linux! Linux is an open source operating system that has gained widespread adoption across a variety of platforms, including servers, desktops, embedded systems, and mobile devices. It is known for its stability, security, flexibility, and performance, as well as its large and active user community. Linux is a powerful and versatile operating system that can be customized to meet the specific needs of different users and applications. It is used in many different contexts, from personal computing to large-scale enterprise systems, and it is supported by a wide range of software and tools. In this section, we will be exploring the key features and capabilities of Linux, as well as its history and development. We will also look at some of the common use cases for Linux and the benefits of using it as an operating system. By the end of this section, you should have a good understanding of Linux and be able to evaluate its potential as a solution for your own needs.",
+                  "description": "test",
                   "slug": "/category/desktop-linux",
                   "permalink": "/docs/category/desktop-linux"
                 }
@@ -1376,7 +1376,7 @@
                 ],
                 "link": {
                   "type": "generated-index",
-                  "description": "Welcome to the parametric modeling tutorial! In this section, we will be exploring the process of using mathematical models that are based on a set of parameters to represent and analyze data. Parametric modeling is a powerful tool that allows us to make predictions and draw conclusions about data, and to understand the relationships between different variables. It is widely used in fields such as engineering, finance, and science to analyze and understand complex systems and processes. In this tutorial, we will introduce the basics of parametric modeling, including how to select and fit appropriate models to data, and how to use these models to make predictions and draw conclusions. By the end of this tutorial, you will have a solid understanding of parametric modeling and be well-equipped to use these techniques in your own data analysis projects. So let's get started!",
+                  "description": "test",
                   "slug": "/category/parametric-modeling",
                   "permalink": "/docs/category/parametric-modeling"
                 }

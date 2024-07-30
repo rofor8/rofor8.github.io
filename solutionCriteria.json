@@ -1,0 +1,15 @@
+{
+    "sustainable drainage": ["soil permeability", "flood risk"],
+    "green and blue roofs": ["building density", "rainfall"],
+    "green walls": ["building height", "air quality"],
+    "rain gardens": ["soil type", "urban runoff"],
+    "swales": ["topography", "water flow"],
+    "features for species": ["biodiversity index", "habitat connectivity"],
+    "trees in hard landscapes": ["urban heat island", "air quality"],
+    "street furniture": ["population density", "pedestrian flow"],
+    "traffic-free routes": ["current road network", "air quality"],
+    "allotments": ["soil quality", "population density"],
+    "orchards": ["soil type", "sunlight exposure"],
+    "private domestic gardens": ["housing density", "socioeconomic factors"],
+    "green spaces": ["land availability", "accessibility"]
+  }

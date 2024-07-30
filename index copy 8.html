@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UK Urban Planning Map Application</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; height: 100vh; font-family: Arial, sans-serif; }
+        #app-container { display: flex; height: 100vh; }
+        #leftSidebar, #rightSidebar { width: 250px; padding: 10px; background-color: #f0f0f0; overflow-y: auto; }
+        #mapContainer { flex-grow: 1; position: relative; }
+        #map { height: 100%; }
+        .slider-container { margin-bottom: 10px; }
+        #infoPanel { position: absolute; top: 10px; right: 10px; background: white; padding: 10px; border: 1px solid #ccc; z-index: 1000; }
+        .dropdown { position: relative; display: inline-block; width: 100%; }
+        .dropbtn { background-color: #f1f1f1; color: black; padding: 10px; font-size: 16px; border: none; cursor: pointer; width: 100%; text-align: left; }
+        .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 160px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1; width: 100%; max-height: 300px; overflow-y: auto; }
+        .dropdown-content button { color: black; padding: 12px 16px; text-decoration: none; display: block; width: 100%; text-align: left; border: none; background-color: white; cursor: pointer; }
+        .dropdown-content button:hover { background-color: #f1f1f1; }
+        .dropdown:hover .dropdown-content { display: block; }
+        .dropdown:hover .dropbtn { background-color: #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div id="leftSidebar">
+            <div class="dropdown">
+                <button class="dropbtn">Biodiversity and soils</button>
+                <div id="categoryButtons" class="dropdown-content"></div>
+            </div>
+            <div id="sliders">
+                <div class="slider-container">
+                    <label for="thresholdSlider">Threshold:</label>
+                    <input type="range" id="thresholdSlider" min="0" max="100" value="0">
+                    <span id="thresholdValue">0</span>
+                </div>
+                <div class="slider-container">
+                    <label for="rankSlider">Rank Filter:</label>
+                    <input type="range" id="rankSlider" min="1" max="1" value="1">
+                    <span id="rankValue">1</span>
+                </div>
+                <div class="slider-container">
+                    <label for="costSlider">Cost Threshold:</label>
+                    <input type="range" id="costSlider" min="0" max="1000" value="1000">
+                    <span id="costValue">1000</span>
+                </div>
+                <div class="slider-container">
+                    <label for="gridSizeSlider">Grid Cell Size (km):</label>
+                    <input type="range" id="gridSizeSlider" min="0.5" max="5" step="0.5" value="2">
+                    <span id="gridSizeValue">2</span>
+                </div>
+            </div>
+        </div>
+        <div id="mapContainer">
+            <div id="map"></div>
+            <div id="infoPanel"></div>
+        </div>
+        <div id="rightSidebar"></div>
+    </div>
+
+    <script>
+    let map, gridLayer, criteriaLayer;
+    let solutionCriteria = {};
+    let challengeCategories = {};
+    let solutionCosts = {};
+    let currentCategory = "Biodiversity and soils";
+    let currentSolution = null;
+    let currentThreshold = 0;
+    let currentRank = 1;
+    let currentCostThreshold = 1000;
+    let currentGridCellSize = 2;
+    let selectedCells = new Set();
+
+    const customColors = [
+        "#4e79a7", "#f28e2c", "#e15759", "#76b7b2", "#59a14f",
+        "#edc949", "#af7aa1", "#ff9da7", "#9c755f", "#bab0ab"
+    ];
+
+    const colorScale = d3.scaleOrdinal()
+        .range(customColors);
+
+    async function fetchJSONData() {
+        try {
+            const [solutionCriteriaResponse, challengeCategoriesResponse] = await Promise.all([
+                fetch('solutionCriteria.json'),
+                fetch('challengeCategories.json')
+            ]);
+
+            solutionCriteria = await solutionCriteriaResponse.json();
+            challengeCategories = await challengeCategoriesResponse.json();
+
+            colorScale.domain(Object.keys(solutionCriteria));
+
+            Object.keys(solutionCriteria).forEach(solution => {
+                solutionCosts[solution] = Math.floor(Math.random() * 1000);
+            });
+
+            initializeApp();
+        } catch (error) {
+            console.error('Error loading JSON data:', error);
+        }
+    }
+
+    function initializeApp() {
+        map = L.map('map').setView([51.505, -0.09], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        createButtons();
+        setupEventListeners();
+        updateMap();
+    }
+
+    function createButtons() {
+        const container = document.getElementById('categoryButtons');
+        Object.keys(challengeCategories).forEach(category => {
+            const button = document.createElement('button');
+            button.textContent = category;
+            button.onclick = () => {
+                currentCategory = category;
+                document.querySelector('.dropbtn').textContent = category;
+                updateMap();
+            };
+            container.appendChild(button);
+        });
+    }
+
+    function setupEventListeners() {
+        document.getElementById('thresholdSlider').addEventListener('input', updateSliders);
+        document.getElementById('rankSlider').addEventListener('input', updateSliders);
+        document.getElementById('costSlider').addEventListener('input', updateSliders);
+        document.getElementById('gridSizeSlider').addEventListener('input', updateSliders);
+    }
+
+    function updateSliders() {
+        currentThreshold = parseInt(document.getElementById('thresholdSlider').value);
+        currentRank = parseInt(document.getElementById('rankSlider').value);
+        currentCostThreshold = parseInt(document.getElementById('costSlider').value);
+        currentGridCellSize = parseFloat(document.getElementById('gridSizeSlider').value);
+        
+        document.getElementById('thresholdValue').textContent = currentThreshold;
+        document.getElementById('rankValue').textContent = currentRank;
+        document.getElementById('costValue').textContent = currentCostThreshold;
+        document.getElementById('gridSizeValue').textContent = currentGridCellSize;
+        
+        updateMap();
+    }
+
+    function updateMap() {
+        if (gridLayer) {
+            map.removeLayer(gridLayer);
+        }
+
+        const bounds = map.getBounds();
+        const cellSize = currentGridCellSize * 1000; // Convert km to meters
+
+        gridLayer = L.layerGroup().addTo(map);
+
+        for (let lat = bounds.getSouth(); lat <= bounds.getNorth(); lat += cellSize / 111319.9) {
+            for (let lng = bounds.getWest(); lng <= bounds.getEast(); lng += cellSize / (111319.9 * Math.cos(lat * Math.PI / 180))) {
+                const cellBounds = L.latLngBounds(
+                    [lat, lng],
+                    [lat + cellSize / 111319.9, lng + cellSize / (111319.9 * Math.cos(lat * Math.PI / 180))]
+                );
+                
+                const cellData = calculateCellData(cellBounds);
+                const fillColor = getCellColor(cellData);
+
+                const rect = L.rectangle(cellBounds, {
+                    color: 'black',
+                    weight: 1,
+                    fillColor: fillColor,
+                    fillOpacity: 0.7,
+                }).addTo(gridLayer);
+
+                rect.cellData = cellData;
+                rect.on('click', onCellClick);
+            }
+        }
+
+        updateInfoPanel();
+    }
+
+    function calculateCellData(cellBounds) {
+        // Placeholder for actual calculation based on criteria rasters
+        const cellData = {};
+        Object.keys(solutionCriteria).forEach(solution => {
+            cellData[solution] = Math.random() * 100;
+        });
+        return cellData;
+    }
+
+    function getCellColor(cellData) {
+        if (currentSolution) {
+            return cellData[currentSolution] >= currentThreshold && solutionCosts[currentSolution] <= currentCostThreshold
+                ? d3.interpolateBlues(cellData[currentSolution] / 100)
+                : 'white';
+        } else {
+            const sortedSolutions = Object.entries(cellData)
+                .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold)
+                .sort((a, b) => b[1] - a[1]);
+            return sortedSolutions.length > 0 ? colorScale(sortedSolutions[currentRank - 1][0]) : 'white';
+        }
+    }
+
+    function onCellClick(e) {
+        const cell = e.target;
+        if (selectedCells.has(cell)) {
+            selectedCells.delete(cell);
+            cell.setStyle({ color: 'black', weight: 1 });
+        } else {
+            selectedCells.add(cell);
+            cell.setStyle({ color: 'red', weight: 2 });
+        }
+        updateInfoPanel();
+    }
+
+    function updateInfoPanel() {
+        const infoPanel = document.getElementById('infoPanel');
+        
+        if (selectedCells.size === 0) {
+            infoPanel.innerHTML = "<h3>No cells selected</h3>";
+            return;
+        }
+
+        const totals = {};
+        selectedCells.forEach(cell => {
+            Object.entries(cell.cellData)
+                .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold)
+                .forEach(([solution, score]) => {
+                    totals[solution] = (totals[solution] || 0) + score;
+                });
+        });
+
+        const sortedTotals = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+
+        let html = `<h3>Impact Scores (${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''}):</h3><ul>`;
+        for (const [solution, total] of sortedTotals) {
+            const color = colorScale(solution);
+            html += `<li class="solution-item" data-solution="${solution}">
+                <span style="display: inline-block; width: 20px; height: 20px; background-color: ${color}; margin-right: 5px;"></span>
+                <strong>${solution}:</strong> 
+                ${total.toFixed(2)}
+                (Cost: £${solutionCosts[solution]}/m²)
+            </li>`;
+        }
+        html += "</ul>";
+        infoPanel.innerHTML = html;
+
+        // Add click event listeners to the solution items
+        document.querySelectorAll('.solution-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const solution = this.getAttribute('data-solution');
+                displayCriteriaRasters(solution);
+            });
+        });
+    }
+
+    function displayCriteriaRasters(solution) {
+        if (criteriaLayer) {
+            map.removeLayer(criteriaLayer);
+        }
+
+        const criteria = solutionCriteria[solution];
+        criteriaLayer = L.layerGroup().addTo(map);
+
+        const bounds = map.getBounds();
+        const cellSize = 100; // Adjust this value to change the resolution of the criteria rasters
+
+        const raster1 = generateBinaryRaster(100, 100);
+        const raster2 = generateBinaryRaster(100, 100);
+
+        for (let lat = bounds.getSouth(); lat <= bounds.getNorth(); lat += cellSize / 111319.9) {
+            for (let lng = bounds.getWest(); lng <= bounds.getEast(); lng += cellSize / (111319.9 * Math.cos(lat * Math.PI / 180))) {
+                const cellBounds = L.latLngBounds(
+                    [lat, lng],
+                    [lat + cellSize / 111319.9, lng + cellSize / (111319.9 * Math.cos(lat * Math.PI / 180))]
+                );
+                
+                const x = Math.floor((lng - bounds.getWest()) / (bounds.getEast() - bounds.getWest()) * 100);
+                const y = Math.floor((bounds.getNorth() - lat) / (bounds.getNorth() - bounds.getSouth()) * 100);
+
+                if (raster1[y] && raster1[y][x]) {
+                    L.rectangle(cellBounds, {
+                        color: 'none',
+                        fillColor: 'red',
+                        fillOpacity: 0.5
+                    }).addTo(criteriaLayer);
+                }
+
+                if (raster2[y] && raster2[y][x]) {
+                    L.rectangle(cellBounds, {
+                        color: 'none',
+                        fillColor: 'blue',
+                        fillOpacity: 0.5
+                    }).addTo(criteriaLayer);
+                }
+            }
+        }
+
+        // Add a "Back to Impact Map" button
+        const backButton = L.control({position: 'topright'});
+        backButton.onAdd = function() {
+            const div = L.DomUtil.create('div', 'back-button');
+            div.innerHTML = '<button onclick="backToImpactMap()">Back to Impact Map</button>';
+            return div;
+        };
+        backButton.addTo(map);
+
+        updateCriteriaInfo(solution, criteria, raster1, raster2);
+    }
+
+    function updateCriteriaInfo(solution, criteria, raster1, raster2) {
+        const areas = calculateCriteriaAreas(raster1, raster2);
+
+        const infoPanel = document.getElementById('infoPanel');
+        infoPanel.innerHTML = `
+            <h3>${solution} Criteria Areas</h3>
+            <ul>
+                <li>
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: red; margin-right: 5px;"></span>
+                    <strong>${criteria[0]}:</strong> 
+${areas.criteria1.toFixed(2)}%
+                </li>
+                <li>
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: blue; margin-right: 5px;"></span>
+                    <strong>${criteria[1]}:</strong> 
+                    ${areas.criteria2.toFixed(2)}%
+                </li>
+                <li>
+                    <span style="display: inline-block; width: 20px; height: 20px; background: linear-gradient(to right, red, blue); margin-right: 5px;"></span>
+                    <strong>Overlap:</strong> 
+                    ${areas.overlap.toFixed(2)}%
+                </li>
+            </ul>
+            <p>Cost: £${solutionCosts[solution]}/m²</p>
+        `;
+    }
+
+    function backToImpactMap() {
+        if (criteriaLayer) {
+            map.removeLayer(criteriaLayer);
+        }
+        document.querySelector('.back-button').remove();
+        updateMap();
+    }
+
+    function generateBinaryRaster(width, height) {
+        const raster = [];
+        for (let y = 0; y < height; y++) {
+            const row = [];
+            for (let x = 0; x < width; x++) {
+                row.push(Math.random() > 0.5 ? 1 : 0);
+            }
+            raster.push(row);
+        }
+        return raster;
+    }
+
+    function calculateCriteriaAreas(raster1, raster2) {
+        let area1 = 0, area2 = 0, overlapArea = 0;
+        const totalCells = raster1.length * raster1[0].length;
+
+        for (let y = 0; y < raster1.length; y++) {
+            for (let x = 0; x < raster1[0].length; x++) {
+                if (raster1[y][x]) area1++;
+                if (raster2[y][x]) area2++;
+                if (raster1[y][x] && raster2[y][x]) overlapArea++;
+            }
+        }
+
+        return {
+            criteria1: (area1 / totalCells) * 100,
+            criteria2: (area2 / totalCells) * 100,
+            overlap: (overlapArea / totalCells) * 100
+        };
+    }
+
+    // Call the fetch function when the script loads
+    fetchJSONData();
+    </script>
+</body>
+</html>

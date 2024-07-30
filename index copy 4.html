@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UK Urban Planning D3 Map Application</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #leftSidebar, #rightSidebar {
+            background-color: #f0f0f0;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        #mainContent {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #mapContainer {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+        }
+
+        #map {
+            flex-grow: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        #map svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .section-explanation {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        #infoPanel {
+            position: fixed;
+            background: white;
+            border: 1px solid black;
+            padding: 10px;
+            right: 10px;
+            top: 10px;
+            width: 230px;
+            max-height: calc(90vh - 20px);
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        #infoPanel h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+
+        #infoPanel ul {
+            margin: 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        #infoPanel li {
+            margin-bottom: 5px;
+        }
+
+        #sliders {
+            margin-bottom: 10px;
+        }
+
+        .slider-container {
+            margin-bottom: 10px;
+        }
+
+        .slider-value {
+            margin-top: 5px;
+            font-size: 14px;
+        }
+
+        .dropdown {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .dropbtn {
+            background-color: #f1f1f1;
+            color: black;
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #f9f9f9;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1;
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .dropdown-content button {
+            color: black;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: none;
+            background-color: white;
+            cursor: pointer;
+        }
+
+        .dropdown-content button:hover {background-color: #f1f1f1}
+
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+
+        .dropdown:hover .dropbtn {
+            background-color: #e0e0e0;
+        }
+
+        @media (min-width: 768px) {
+            #app-container {
+                flex-direction: row;
+            }
+
+            #leftSidebar, #rightSidebar {
+                width: 250px;
+            }
+        }
+
+        #backButton {
+            margin-bottom: 10px;
+        }
+
+        .solution-item {
+            cursor: pointer;
+        }
+
+        .solution-item:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div id="leftSidebar">
+            <p class="section-explanation">
+                For every solution the suitable area is calculated within each grid cell. Each Challenge category ascribes different weights to each solution. The impact scores for each cell are determined by multiplying the solution area by the weight for that challenge category. The colour of the highest impact solution is displayed in the cell. Click on cells to select or unselect them and view the impact scores.
+
+                Select an impact category to view the analysis results.
+            </p>
+            <div class="dropdown">
+                <button class="dropbtn">Biodiversity and soils</button>
+                <div id="categoryButtons" class="dropdown-content"></div>
+            </div>
+            <div id="sliders">
+                <div class="slider-container">
+                    <label for="thresholdSlider">Threshold:</label>
+                    <input type="range" id="thresholdSlider" min="0" max="100" step="1" value="0">
+                    <div id="thresholdValue" class="slider-value">0</div>
+                </div>
+                <div class="slider-container">
+                    <label for="rankSlider">Rank Filter:</label>
+                    <input type="range" id="rankSlider" min="1" max="1" step="1" value="1">
+                    <div id="rankValue" class="slider-value">1</div>
+                </div>
+                <div class="slider-container">
+                    <label for="costSlider">Cost Threshold:</label>
+                    <input type="range" id="costSlider" min="0" max="1000" step="1" value="1000">
+                    <div id="costValue" class="slider-value">1000</div>
+                </div>
+            </div>
+            <p class="section-explanation">
+                Dummy data is generated for all the criteria rasters. Currently geographic suitability for every solution is determined by the overlap of two required criteria.
+            </p>
+        </div>
+        
+        <div id="mainContent">
+            <div id="mapContainer">
+                <div id="map"></div>
+            </div>
+        </div>
+
+        <div id="rightSidebar">
+            <p class="section-explanation">
+            </p>
+        </div>
+        
+        <div id="infoPanel"></div>
+    </div>
+
+    <script>
+    let solutionCriteria = {};
+    let challengeCategories = {};
+    let solutionCosts = {};
+
+    async function fetchJSONData() {
+        try {
+            const [solutionCriteriaResponse, challengeCategoriesResponse] = await Promise.all([
+                fetch('solutionCriteria.json'),
+                fetch('challengeCategories.json')
+            ]);
+
+            solutionCriteria = await solutionCriteriaResponse.json();
+            challengeCategories = await challengeCategoriesResponse.json();
+
+            // Generate random costs for each solution (replace with actual costs when available)
+            Object.keys(solutionCriteria).forEach(solution => {
+                solutionCosts[solution] = Math.floor(Math.random() * 1000);
+            });
+
+            initializeApp();
+        } catch (error) {
+            console.error('Error loading JSON data:', error);
+        }
+    }
+
+    function initializeApp() {
+        function generateBinaryRaster(width, height, seed) {
+            const raster = [];
+            const numShapes = 5 + Math.floor(Math.random() * 5);
+
+            for (let y = 0; y < height; y++) {
+                raster.push(new Array(width).fill(0));
+            }
+
+            for (let i = 0; i < numShapes; i++) {
+                const centerX = Math.floor(Math.random() * width);
+                const centerY = Math.floor(Math.random() * height);
+                const maxRadius = Math.min(20, Math.min(width, height) / 5);
+                const radius = 5 + Math.floor(Math.random() * maxRadius);
+
+                for (let y = Math.max(0, centerY - radius); y < Math.min(height, centerY + radius); y++) {
+                    for (let x = Math.max(0, centerX - radius); x < Math.min(width, centerX + radius); x++) {
+                        if (Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2) <= Math.pow(radius, 2)) {
+                            raster[y][x] = 1;
+                        }
+                    }
+                }
+            }
+
+            return raster;
+        }
+
+        const criteriaRasters = {};
+        Object.values(solutionCriteria).flat().forEach((criterion, index) => {
+            criteriaRasters[criterion] = generateBinaryRaster(100, 100, index);
+        });
+
+        function calculateSuitabilityScores(gridSize, challengeCategory) {
+            const grid = [];
+            for (let y = 0; y < gridSize; y++) {
+                const row = [];
+                for (let x = 0; x < gridSize; x++) {
+                    const cellScores = {};
+                    for (const [solution, criteria] of Object.entries(solutionCriteria)) {
+                        const area = calculateOverlapArea(x, y, criteria, gridSize);
+                        const weight = challengeCategories[challengeCategory][solution];
+                        cellScores[solution] = area * weight * 100; // Scale up the result
+                    }
+                    row.push(cellScores);
+                }
+                grid.push(row);
+            }
+            return grid;
+        }
+
+        function calculateOverlapArea(x, y, criteria, gridSize) {
+            let totalValue = 0;
+            criteria.forEach(criterion => {
+                const raster = criteriaRasters[criterion];
+                const rasterX = Math.floor(x / gridSize * raster.length);
+                const rasterY = Math.floor(y / gridSize * raster[0].length);
+                totalValue += raster[rasterY][rasterX];
+            });
+            return totalValue / criteria.length;
+        }
+
+        const svg = d3.select("#map").append("svg")
+            .attr("id", "mapSvg")
+            .attr("width", "100%")
+            .attr("height", "100%");
+
+        const customColors = [
+            "#4e79a7", "#f28e2c", "#e15759", "#76b7b2", "#59a14f",
+            "#edc949", "#af7aa1", "#ff9da7", "#9c755f", "#bab0ab",
+            "#4e79a7", "#f28e2c", "#e15759"
+        ];
+
+        const colorScale = d3.scaleOrdinal()
+            .domain(Object.keys(solutionCriteria))
+            .range(customColors);
+
+        let currentCategory = "Biodiversity and soils";
+        let currentSolution = null;
+        let currentThreshold = 0;
+        let currentRank = 1;
+        let currentCostThreshold = 1000;
+        let selectedCells = new Set();
+
+        const thresholdSlider = document.getElementById('thresholdSlider');
+        const rankSlider = document.getElementById('rankSlider');
+        const costSlider = document.getElementById('costSlider');
+        const thresholdValue = document.getElementById('thresholdValue');
+        const rankValue = document.getElementById('rankValue');
+        const costValue = document.getElementById('costValue');
+
+        thresholdSlider.addEventListener('input', updateSliders);
+        rankSlider.addEventListener('input', updateSliders);
+        costSlider.addEventListener('input', updateSliders);
+
+        function updateSliders() {
+            currentThreshold = parseInt(thresholdSlider.value);
+            currentRank = parseInt(rankSlider.value);
+            currentCostThreshold = parseInt(costSlider.value);
+            thresholdValue.textContent = currentThreshold;
+            rankValue.textContent = currentRank;
+            costValue.textContent = currentCostThreshold;
+            updateMap(currentCategory, currentSolution);
+            updateScores();
+        }
+
+        function updateMap(challengeCategory, solution) {
+            const gridSize = 13;
+            const suitabilityScores = calculateSuitabilityScores(gridSize, challengeCategory);
+
+            svg.selectAll("rect").remove();
+
+            const svgWidth = parseInt(svg.style("width"));
+            const svgHeight = parseInt(svg.style("height"));
+            const cellSize = Math.min(svgWidth, svgHeight) / gridSize;
+
+            svg.selectAll("rect")
+                .data(suitabilityScores.flat())
+                .enter().append("rect")
+                .attr("x", (d, i) => (i % gridSize) * cellSize)
+                .attr("y", (d, i) => Math.floor(i / gridSize) * cellSize)
+                .attr("width", cellSize)
+                .attr("height", cellSize)
+                .attr("fill", d => {
+                    if (solution) {
+                        return d[solution] >= currentThreshold && solutionCosts[solution] <= currentCostThreshold ? d3.interpolateBlues(d[solution] / 100) : "white";
+                    } else {
+                        const sortedSolutions = Object.entries(d)
+                            .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold)
+                            .sort((a, b) => b[1] - a[1]);
+                        const rankedSolution = sortedSolutions[currentRank - 1];
+                        return rankedSolution ? colorScale(rankedSolution[0]) : "white";
+                    }
+                })
+                .attr("opacity", 0.7)
+                .attr("stroke", "black")
+                .attr("stroke-width", 0.5)
+                .on("click", toggleCellSelection);
+
+            rankSlider.max = Object.keys(solutionCriteria).length;
+
+            // Update selected cells
+            svg.selectAll("rect")
+                .attr("stroke-width", d => selectedCells.has(d) ? 2 : 0.5)
+                .attr("stroke", d => selectedCells.has(d) ? "red" : "black");
+        }
+
+        function toggleCellSelection(event, d) {
+            const cellElement = d3.select(this);
+            if (selectedCells.has(d)) {
+                selectedCells.delete(d);
+                cellElement.attr("stroke-width", 0.5).attr("stroke", "black");
+            } else {
+                selectedCells.add(d);
+                cellElement.attr("stroke-width", 2).attr("stroke", "red");
+            }
+            updateScores();
+        }
+
+        function updateScores() {
+            const infoPanel = d3.select("#infoPanel");
+            
+            if (selectedCells.size === 0) {
+                infoPanel.html("<h3>No cells selected</h3>");
+                return;
+            }
+
+            const totals = {};
+            selectedCells.forEach(cell => {
+                Object.entries(cell)
+                    .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold)
+                    .forEach(([solution, score]) => {
+                        totals[solution] = (totals[solution] || 0) + score;
+                    });
+            });
+
+            const sortedTotals = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+
+            let html = `<h3>Impact Scores (${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''}):</h3><ul>`;
+            for (const [solution, total] of sortedTotals) {
+                const color = colorScale(solution);
+                html += `<li class="solution-item" data-solution="${solution}">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: ${color}; margin-right: 5px; vertical-align: middle;"></span>
+                    <span style="font-weight: bold;">${solution}:</span> 
+                    <span style="float: right;">${total.toFixed(2)}</span>
+                    <span style="margin-left: 10px; color: #666;">(Cost: £${solutionCosts[solution]}/m²)</span>
+                </li>`;
+            }
+            html += "</ul>";
+            infoPanel.html(html);
+
+            // Add click event listeners to the solution items
+            infoPanel.selectAll(".solution-item")
+                .on("click", function() {
+                    const solution = d3.select(this).attr("data-solution");
+                    displayCriteriaRasters(solution);
+                });
+        }
+
+        function createButtons(containerId, dataArray, buttonClass, clickHandler) {
+            const container = d3.select(`#${containerId}`);
+            container.selectAll("button")
+                .data(dataArray)
+                .enter().append("button")
+                .attr("class", buttonClass)
+                .text(d => d)
+                .on("click", clickHandler);
+        }
+
+        createButtons("categoryButtons", Object.keys(challengeCategories), "category-button", function(event, d) {
+            d3.selectAll(".category-button").classed("active", false);
+            d3.select(this).classed("active", true);
+            d3.select("#leftSidebar .dropbtn:first-child").text(d);
+            currentCategory = d;
+            currentSolution = null;
+            updateMap(d);
+            selectedCells.clear();
+            updateScores();
+        });
+
+        function calculateCriteriaAreas(raster1, raster2) {
+            let area1 = 0, area2 = 0, overlapArea = 0;
+            const totalCells = raster1.length * raster1[0].length;
+
+            for (let y = 0; y < raster1.length; y++) {
+                for (let x = 0; x < raster1[0].length; x++) {
+                    if (raster1[y][x]) area1++;
+                    if (raster2[y][x]) area2++;
+                    if (raster1[y][x] && raster2[y][x]) overlapArea++;
+                }
+            }
+
+            return {
+                criteria1: (area1 / totalCells) * 100,
+                criteria2: (area2 / totalCells) * 100,
+                overlap: (overlapArea / totalCells) * 100
+            };
+        }
+
+        function displayCriteriaRasters(solution) {
+            const criteria = solutionCriteria[solution];
+            const raster1 = criteriaRasters[criteria[0]];
+            const raster2 = criteriaRasters[criteria[1]];
+
+            svg.selectAll("rect").remove();
+
+            const svgWidth = parseInt(svg.style("width"));
+            const svgHeight = parseInt(svg.style("height"));
+            const cellSize = Math.min(svgWidth, svgHeight) / raster1.length;
+
+            const allCriteria = [...new Set(Object.values(solutionCriteria).flat())];
+            const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(allCriteria);
+
+            svg.selectAll(".raster1")
+                .data(raster1.flat())
+                .enter().append("rect")
+                .attr("class", "raster1")
+                .attr("x", (d, i) => (i % raster1.length) * cellSize)
+                .attr("y", (d, i) => Math.floor(i / raster1.length) * cellSize)
+                .attr("width", cellSize / 2)
+                .attr("height", cellSize)
+                .attr("fill", d => d ? criteriaColorScale(criteria[0]) : "white")
+                .attr("opacity", d => d ? 1 : 0.1);
+
+            svg.selectAll(".raster2")
+                .data(raster2.flat())
+                .enter().append("rect")
+                .attr("class", "raster2")
+                .attr("x", (d, i) => (i % raster2.length) * cellSize + cellSize / 2)
+                .attr("y", (d, i) => Math.floor(i / raster2.length) * cellSize)
+                .attr("width", cellSize / 2)
+                .attr("height", cellSize)
+                .attr("fill", d => d ? criteriaColorScale(criteria[1]) : "white")
+                .attr("opacity", d => d ? 1 : 0.1);
+
+            // Calculate and display criteria areas
+            const areas = calculateCriteriaAreas(raster1, raster2);
+            updateCriteriaInfo(solution, criteria, areas, criteriaColorScale);
+
+            // Add a "Back to Impact Map" button
+            d3.select("#mapContainer")
+                .insert("button", ":first-child")
+                .attr("id", "backButton")
+                .text("Back to Impact Map")
+                .on("click", () => {
+                    d3.select("#backButton").remove();
+                    updateMap(currentCategory, currentSolution);
+                    updateScores();
+                });
+        }
+
+        function updateCriteriaInfo(solution, criteria, areas, colorScale) {
+            const infoPanel = d3.select("#infoPanel");
+            infoPanel.html(`
+                <h3>${solution} Criteria Areas</h3>
+                <ul>
+                    <li>
+                        <span style="display: inline-block; width: 20px; height: 20px; background-color: ${colorScale(criteria[0])}; margin-right: 5px; vertical-align: middle;"></span>
+                        <span style="font-weight: bold;">${criteria[0]}:</span> 
+                        <span style="float: right;">${areas.criteria1.toFixed(2)}%</span>
+                    </li>
+                    <li>
+                        <span style="display: inline-block; width: 20px; height: 20px; background-color: ${colorScale(criteria[1])}; margin-right: 5px; vertical-align: middle;"></span>
+                        <span style="font-weight: bold;">${criteria[1]}:</span> 
+                        <span style="float: right;">${areas.criteria2.toFixed(2)}%</span>
+                    </li>
+                    <li>
+                        <span style="display: inline-block; width: 20px; height: 20px; background: linear-gradient(to right, ${colorScale(criteria[0])}, ${colorScale(criteria[1])}); margin-right: 5px; vertical-align: middle;"></span>
+                        <span style="font-weight: bold;">Overlap:</span> 
+                        <span style="float: right;">${areas.overlap.toFixed(2)}%</span>
+                    </li>
+                </ul>
+                <p>Cost: £${solutionCosts[solution]}/m²</p>
+            `);
+        }
+
+        // Set the default category in the dropdown
+        d3.select("#leftSidebar .dropbtn:first-child").text(currentCategory);
+
+        // Set the default category button as active
+        d3.select("#categoryButtons")
+            .selectAll("button")
+            .filter(d => d === currentCategory)
+            .classed("active", true);
+
+        // Initial map render with the default category
+        updateMap(currentCategory);
+    }
+
+    // Call the fetch function when the script loads
+    fetchJSONData();
+    </script>
+</body>
+</html>

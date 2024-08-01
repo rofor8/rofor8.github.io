@@ -179,12 +179,10 @@
                 <div id="categoryButtons" class="dropdown-content"></div>
             </div>
             <div class="dropdown">
-                <button class="dropbtn">Color by: Impact (High to Low)</button>
-                <div id="coloringButtons" class="dropdown-content">
-                    <button onclick="changeColoring('impact-high-low')">Impact (High to Low)</button>
-                    <button onclick="changeColoring('impact-low-high')">Impact (Low to High)</button>
-                    <button onclick="changeColoring('cost-high-low')">Cost (High to Low)</button>
-                    <button onclick="changeColoring('cost-low-high')">Cost (Low to High)</button>
+                <button class="dropbtn">Rank by: Impact</button>
+                <div id="rankingButtons" class="dropdown-content">
+                    <button onclick="changeRanking('impact')">Impact</button>
+                    <button onclick="changeRanking('cost')">Cost</button>
                 </div>
             </div>
             <div id="sliders">
@@ -199,9 +197,9 @@
                     <div id="costValue" class="slider-value">1000</div>
                 </div>
                 <div class="slider-container">
-                    <label for="gridSizeSlider">Grid Size:</label>
-                    <input type="range" id="gridSizeSlider" min="5" max="100" step="1" value="100">
-                    <div id="gridSizeValue" class="slider-value">13</div>
+                    <label for="rankSlider">Rank:</label>
+                    <input type="range" id="rankSlider" min="1" max="1" step="1" value="1">
+                    <div id="rankValue" class="slider-value">1</div>
                 </div>
             </div>
         </div>
@@ -224,26 +222,40 @@
     <script>
     let solutionCriteria = {};
     let challengeCategories = {};
-    let solutionCosts = {};
+    let solutionCosts = {
+        "sustainable drainage": 50,
+        "green and blue roofs": 100,
+        "green walls": 80,
+        "rain gardens": 60,
+        "swales": 40,
+        "features for species": 30,
+        "trees in hard landscapes": 70,
+        "street furniture": 20,
+        "traffic-free routes": 90,
+        "allotments": 25,
+        "orchards": 35,
+        "private domestic gardens": 15,
+        "green spaces": 45
+    };
     let map;
     let gridLayer;
     let rasterLayers = {};
     let selectedCells = new Set();
     let gridOrigin = null;
     let gridExtent = null;
-    let currentColoring = 'impact-high-low';
+    let currentRanking = 'impact';
+    let currentRank = 1;
+    const GRID_SIZE = 100; // Fixed grid size
 
     async function fetchJSONData() {
         try {
-            const [solutionCriteriaResponse, challengeCategoriesResponse, solutionCostsResponse] = await Promise.all([
+            const [solutionCriteriaResponse, challengeCategoriesResponse] = await Promise.all([
                 fetch('solutionCriteria.json'),
-                fetch('challengeCategories.json'),
-                fetch('solutionCosts.json')
+                fetch('challengeCategories.json')
             ]);
 
             solutionCriteria = await solutionCriteriaResponse.json();
             challengeCategories = await challengeCategoriesResponse.json();
-            solutionCosts = await solutionCostsResponse.json();
 
             initializeApp();
         } catch (error) {
@@ -298,9 +310,11 @@
                     for (const [solution, criteria] of Object.entries(solutionCriteria)) {
                         const area = calculateOverlapArea(x, y, criteria, gridSize);
                         const weight = challengeCategories[challengeCategory][solution];
-                        const impactScore = area * weight * 100; // Scale up the result
-                        const totalCost = area * solutionCosts[solution]; // Calculate cost based on area
-                        cellScores[solution] = { impactScore, totalCost };
+                        cellScores[solution] = {
+                            impact: area * weight * 100, // Scale up the result
+                            cost: area * solutionCosts[solution],
+                            area: area
+                        };
                     }
                     row.push(cellScores);
                 }
@@ -334,32 +348,31 @@
         let currentSolution = null;
         let currentThreshold = 0;
         let currentCostThreshold = 1000;
-        let currentGridSize = 100;
 
         const thresholdSlider = document.getElementById('thresholdSlider');
         const costSlider = document.getElementById('costSlider');
-        const gridSizeSlider = document.getElementById('gridSizeSlider');
+        const rankSlider = document.getElementById('rankSlider');
         const thresholdValue = document.getElementById('thresholdValue');
         const costValue = document.getElementById('costValue');
-        const gridSizeValue = document.getElementById('gridSizeValue');
+        const rankValue = document.getElementById('rankValue');
 
         thresholdSlider.addEventListener('input', updateSliders);
         costSlider.addEventListener('input', updateSliders);
-        gridSizeSlider.addEventListener('input', updateSliders);
+        rankSlider.addEventListener('input', updateSliders);
 
         function updateSliders() {
             currentThreshold = parseInt(thresholdSlider.value);
             currentCostThreshold = parseInt(costSlider.value);
-            currentGridSize = parseInt(gridSizeSlider.value);
+            currentRank = parseInt(rankSlider.value);
             thresholdValue.textContent = currentThreshold;
             costValue.textContent = currentCostThreshold;
-            gridSizeValue.textContent = currentGridSize;
-            updateMap(currentCategory, currentSolution);
+            rankValue.textContent = currentRank;
+            updateMap(currentCategory);
             updateScores();
         }
 
-        function updateMap(challengeCategory, solution) {
-            const suitabilityScores = calculateSuitabilityScores(currentGridSize, challengeCategory);
+        function updateMap(challengeCategory) {
+            const suitabilityScores = calculateSuitabilityScores(GRID_SIZE, challengeCategory);
 
             if (gridLayer) {
                 map.removeLayer(gridLayer);
@@ -381,7 +394,7 @@
             const latDegreeSize = 111000; // meters per degree of latitude (approximately constant)
             const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180); // meters per degree of longitude
 
-            const cellSizeMeters = gridSizeMeters / currentGridSize;
+            const cellSizeMeters = gridSizeMeters / GRID_SIZE;
             const cellSizeLat = cellSizeMeters / latDegreeSize;
             const cellSizeLng = cellSizeMeters / lngDegreeSize;
 
@@ -401,27 +414,24 @@
 
                     let fillColor, fillOpacity;
                     const validSolutions = Object.entries(cell)
-                        .filter(([sol, data]) => data.impactScore >= currentThreshold && data.totalCost <= currentCostThreshold);
+                        .filter(([sol, scores]) => scores.impact >= currentThreshold && scores.cost <= currentCostThreshold);
                     
-                    if (validSolutions.length > 0) {
+                        if (validSolutions.length > 0) {
                         let sortedSolutions;
-                        switch (currentColoring) {
-                            case 'impact-high-low':
-                                sortedSolutions = validSolutions.sort((a, b) => b[1].impactScore - a[1].impactScore);
-                                break;
-                            case 'impact-low-high':
-                                sortedSolutions = validSolutions.sort((a, b) => a[1].impactScore - b[1].impactScore);
-                                break;
-                            case 'cost-high-low':
-                                sortedSolutions = validSolutions.sort((a, b) => b[1].totalCost - a[1].totalCost);
-                                break;
-                            case 'cost-low-high':
-                                sortedSolutions = validSolutions.sort((a, b) => a[1].totalCost - b[1].totalCost);
-                                break;
+                        if (currentRanking === 'impact') {
+                            sortedSolutions = validSolutions.sort((a, b) => b[1].impact - a[1].impact);
+                        } else {
+                            sortedSolutions = validSolutions.sort((a, b) => b[1].cost - a[1].cost);
                         }
-                        const topSolution = sortedSolutions[0];
-                        fillColor = colorScale(topSolution[0]);
-                        fillOpacity = 0.7;
+                        
+                        if (currentRank <= sortedSolutions.length) {
+                            const rankedSolution = sortedSolutions[currentRank - 1];
+                            fillColor = colorScale(rankedSolution[0]);
+                            fillOpacity = 0.7;
+                        } else {
+                            fillColor = "none";
+                            fillOpacity = 0;
+                        }
                     } else {
                         fillColor = "none";
                         fillOpacity = 0;
@@ -446,6 +456,16 @@
             selectedCells.forEach(cell => {
                 cell.rectangle.setStyle({color: "red", weight: 2});
             });
+
+            // Update rank slider max value
+            const maxRank = Math.max(...suitabilityScores.flat().map(cell => 
+                Object.entries(cell)
+                    .filter(([sol, scores]) => scores.impact >= currentThreshold && scores.cost <= currentCostThreshold)
+                    .length
+            ));
+            rankSlider.max = maxRank;
+            rankSlider.value = Math.min(currentRank, maxRank);
+            rankValue.textContent = rankSlider.value;
         }
 
         function toggleCellSelection(cell, rectangle) {
@@ -470,41 +490,34 @@
             const totals = {};
             selectedCells.forEach(cell => {
                 Object.entries(cell)
-                    .filter(([sol, data]) => data.impactScore >= currentThreshold && data.totalCost <= currentCostThreshold)
-                    .forEach(([solution, data]) => {
+                    .filter(([sol, scores]) => scores.impact >= currentThreshold && scores.cost <= currentCostThreshold)
+                    .forEach(([solution, scores]) => {
                         if (!totals[solution]) {
-                            totals[solution] = { impactScore: 0, totalCost: 0 };
+                            totals[solution] = { impact: 0, cost: 0, area: 0 };
                         }
-                        totals[solution].impactScore += data.impactScore;
-                        totals[solution].totalCost += data.totalCost;
+                        totals[solution].impact += scores.impact;
+                        totals[solution].cost += scores.cost;
+                        totals[solution].area += scores.area;
                     });
             });
 
             let sortedTotals;
-            switch (currentColoring) {
-                case 'impact-high-low':
-                    sortedTotals = Object.entries(totals).sort((a, b) => b[1].impactScore - a[1].impactScore);
-                    break;
-                case 'impact-low-high':
-                    sortedTotals = Object.entries(totals).sort((a, b) => a[1].impactScore - b[1].impactScore);
-                    break;
-                case 'cost-high-low':
-                    sortedTotals = Object.entries(totals).sort((a, b) => b[1].totalCost - a[1].totalCost);
-                    break;
-                case 'cost-low-high':
-                    sortedTotals = Object.entries(totals).sort((a, b) => a[1].totalCost - b[1].totalCost);
-                    break;
+            if (currentRanking === 'impact') {
+                sortedTotals = Object.entries(totals).sort((a, b) => b[1].impact - a[1].impact);
+            } else {
+                sortedTotals = Object.entries(totals).sort((a, b) => b[1].cost - a[1].cost);
             }
 
-            let html = `<h3>Impact Scores and Costs (${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''})</h3>`;
-            html += `<p>Sorted by: ${getColoringDescription(currentColoring)}</p><ul>`;
-            for (const [solution, data] of sortedTotals) {
+            let html = `<h3>Scores (${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''})</h3>`;
+            html += `<p>Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}</p><ul>`;
+            for (const [solution, scores] of sortedTotals) {
                 const color = colorScale(solution);
                 html += `<li class="solution-item" data-solution="${solution}">
                     <span style="display: inline-block; width: 20px; height: 20px; background-color: ${color}; margin-right: 5px; vertical-align: middle;"></span>
                     <span style="font-weight: bold;">${solution}:</span> 
-                    <span style="float: right;">Impact: ${data.impactScore.toFixed(2)}</span><br>
-                    <span style="margin-left: 25px; color: #666;">Cost: £${data.totalCost.toFixed(2)}</span>
+                    <span style="float: right;">Impact: ${scores.impact.toFixed(2)}</span><br>
+                    <span style="float: right;">Cost: £${scores.cost.toFixed(2)}</span><br>
+                    <span style="float: right;">Area: ${(scores.area * 100).toFixed(2)}%</span>
                 </li>`;
             }
             html += "</ul>";
@@ -518,19 +531,10 @@
                 });
         }
 
-        function getColoringDescription(coloring) {
-            switch (coloring) {
-                case 'impact-high-low': return 'Impact (High to Low)';
-                case 'impact-low-high': return 'Impact (Low to High)';
-                case 'cost-high-low': return 'Cost (High to Low)';
-                case 'cost-low-high': return 'Cost (Low to High)';
-            }
-        }
-
-        function changeColoring(newColoring) {
-            currentColoring = newColoring;
-            d3.select("#leftSidebar .dropbtn:nth-child(2)").text(`Color by: ${getColoringDescription(newColoring)}`);
-            updateMap(currentCategory, currentSolution);
+        function changeRanking(newRanking) {
+            currentRanking = newRanking;
+            d3.select("#leftSidebar .dropbtn:nth-child(2)").text(`Rank by: ${newRanking.charAt(0).toUpperCase() + newRanking.slice(1)}`);
+            updateMap(currentCategory);
             updateScores();
         }
 
@@ -554,6 +558,25 @@
             selectedCells.clear();
             updateScores();
         });
+
+        function calculateCriteriaAreas(raster1, raster2) {
+            let area1 = 0, area2 = 0, overlapArea = 0;
+            const totalCells = raster1.length * raster1[0].length;
+
+            for (let y = 0; y < raster1.length; y++) {
+                for (let x = 0; x < raster1[0].length; x++) {
+                    if (raster1[y][x]) area1++;
+                    if (raster2[y][x]) area2++;
+                    if (raster1[y][x] && raster2[y][x]) overlapArea++;
+                }
+            }
+
+            return {
+                criteria1: (area1 / totalCells) * 100,
+                criteria2: (area2 / totalCells) * 100,
+                overlap: (overlapArea / totalCells) * 100
+            };
+        }
 
         function displayCriteriaRasters(solution) {
             const criteria = solutionCriteria[solution];
@@ -614,31 +637,12 @@
 
         function backToImpactMap() {
             Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-            updateMap(currentCategory, currentSolution);
+            updateMap(currentCategory);
             updateScores();
             const backButton = document.querySelector('.leaflet-control-container .back-button');
             if (backButton) {
                 backButton.remove();
             }
-        }
-
-        function calculateCriteriaAreas(raster1, raster2) {
-            let area1 = 0, area2 = 0, overlapArea = 0;
-            const totalCells = raster1.length * raster1[0].length;
-
-            for (let y = 0; y < raster1.length; y++) {
-                for (let x = 0; x < raster1[0].length; x++) {
-                    if (raster1[y][x]) area1++;
-                    if (raster2[y][x]) area2++;
-                    if (raster1[y][x] && raster2[y][x]) overlapArea++;
-                }
-            }
-
-            return {
-                criteria1: (area1 / totalCells) * 100,
-                criteria2: (area2 / totalCells) * 100,
-                overlap: (overlapArea / totalCells) * 100
-            };
         }
 
         function updateCriteriaInfo(solution, criteria, areas, colorScale) {
@@ -668,7 +672,7 @@
 
         function resetGridPosition() {
             gridOrigin = map.getCenter();
-            updateMap(currentCategory, currentSolution);
+            updateMap(currentCategory);
         }
 
         function addResetGridButton() {
@@ -699,7 +703,7 @@
         // Make functions global so they can be called from HTML
         window.backToImpactMap = backToImpactMap;
         window.resetGridPosition = resetGridPosition;
-        window.changeColoring = changeColoring;
+        window.changeRanking = changeRanking;
     }
 
     // Call the fetch function when the script loads

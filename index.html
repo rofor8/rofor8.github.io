@@ -195,7 +195,7 @@
                 </div>
                 <div class="slider-container">
                     <label for="gridSizeSlider">Grid Size:</label>
-                    <input type="range" id="gridSizeSlider" min="5" max="20" step="1" value="13">
+                    <input type="range" id="gridSizeSlider" min="5" max="100" step="1" value="13">
                     <div id="gridSizeValue" class="slider-value">13</div>
                 </div>
             </div>
@@ -249,8 +249,7 @@
     }
 
     function initializeApp() {
-        // Initialize the map
-// In the initializeApp function, update the map initialization:
+        // Initialize the map centered on Bristol, UK
         map = L.map('map').setView([51.454514, -2.587910], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -296,7 +295,7 @@
                     for (const [solution, criteria] of Object.entries(solutionCriteria)) {
                         const area = calculateOverlapArea(x, y, criteria, gridSize);
                         const weight = challengeCategories[challengeCategory][solution];
-                        cellScores[solution] = area * weight * 100; // Scale up the results
+                        cellScores[solution] = area * weight * 100; // Scale up the result
                     }
                     row.push(cellScores);
                 }
@@ -361,86 +360,86 @@
         }
 
         function updateMap(challengeCategory, solution) {
-            const suitabilityScores = calculateSuitabilityScores(currentGridSize, challengeCategory);
+    const suitabilityScores = calculateSuitabilityScores(currentGridSize, challengeCategory);
 
-            if (gridLayer) {
-                map.removeLayer(gridLayer);
+    if (gridLayer) {
+        map.removeLayer(gridLayer);
+    }
+
+    gridLayer = L.layerGroup().addTo(map);
+
+    // If gridOrigin is not set, initialize it to the center of the current map view
+    if (!gridOrigin) {
+        const center = map.getCenter();
+        gridOrigin = {lat: center.lat, lng: center.lng};
+    }
+
+    // Keep the grid size constant regardless of the number of cells
+    const gridSizeDegrees = 0.1; // Adjust this value to change the overall size of the grid
+    gridExtent = {
+        north: gridOrigin.lat + (gridSizeDegrees / 2),
+        south: gridOrigin.lat - (gridSizeDegrees / 2),
+        east: gridOrigin.lng + (gridSizeDegrees / 2),
+        west: gridOrigin.lng - (gridSizeDegrees / 2)
+    };
+
+    const cellSize = {
+        lat: (gridExtent.north - gridExtent.south) / currentGridSize,
+        lng: (gridExtent.east - gridExtent.west) / currentGridSize
+    };
+
+    suitabilityScores.forEach((row, y) => {
+        row.forEach((cell, x) => {
+            const cellBounds = [
+                [gridExtent.north - y * cellSize.lat, gridExtent.west + x * cellSize.lng],
+                [gridExtent.north - (y + 1) * cellSize.lat, gridExtent.west + (x + 1) * cellSize.lng]
+            ];
+
+            let fillColor, fillOpacity;
+            if (solution) {
+                if (cell[solution] >= currentThreshold && solutionCosts[solution] <= currentCostThreshold) {
+                    fillColor = d3.interpolateBlues(cell[solution] / 100);
+                    fillOpacity = 0.7;
+                } else {
+                    fillColor = "none";
+                    fillOpacity = 0;
+                }
+            } else {
+                const sortedSolutions = Object.entries(cell)
+                    .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold)
+                    .sort((a, b) => b[1] - a[1]);
+                const rankedSolution = sortedSolutions[currentRank - 1];
+                if (rankedSolution) {
+                    fillColor = colorScale(rankedSolution[0]);
+                    fillOpacity = 0.7;
+                } else {
+                    fillColor = "none";
+                    fillOpacity = 0;
+                }
             }
 
-            gridLayer = L.layerGroup().addTo(map);
+            const rectangle = L.rectangle(cellBounds, {
+                color: "black",
+                weight: 0.5,
+                fillColor: fillColor,
+                fillOpacity: fillOpacity
+            }).addTo(gridLayer);
 
-            // If gridOrigin is not set, initialize it to the center of the current map view
-            if (!gridOrigin) {
-                const center = map.getCenter();
-                gridOrigin = {lat: center.lat, lng: center.lng};
-            }
+            rectangle.on('click', () => toggleCellSelection(cell, rectangle));
 
-            // Calculate the grid extent based on the current grid size
-            const gridSizeDegrees = 0.1; // Adjust this value to change the overall size of the grid
-            gridExtent = {
-                north: gridOrigin.lat + (gridSizeDegrees / 2),
-                south: gridOrigin.lat - (gridSizeDegrees / 2),
-                east: gridOrigin.lng + (gridSizeDegrees / 2),
-                west: gridOrigin.lng - (gridSizeDegrees / 2)
-            };
+            // Store cell data and rectangle reference
+            cell.rectangle = rectangle;
+            cell.bounds = cellBounds;
+        });
+    });
 
-            const cellSize = {
-                lat: (gridExtent.north - gridExtent.south) / currentGridSize,
-                lng: (gridExtent.east - gridExtent.west) / currentGridSize
-            };
+    rankSlider.max = Object.keys(solutionCriteria).length;
 
-            suitabilityScores.forEach((row, y) => {
-                row.forEach((cell, x) => {
-                    const cellBounds = [
-                        [gridExtent.north - y * cellSize.lat, gridExtent.west + x * cellSize.lng],
-                        [gridExtent.north - (y + 1) * cellSize.lat, gridExtent.west + (x + 1) * cellSize.lng]
-                    ];
-
-                    let fillColor, fillOpacity;
-                    if (solution) {
-                        if (cell[solution] >= currentThreshold && solutionCosts[solution] <= currentCostThreshold) {
-                            fillColor = d3.interpolateBlues(cell[solution] / 100);
-                            fillOpacity = 0.7;
-                        } else {
-                            fillColor = "none";
-                            fillOpacity = 0;
-                        }
-                    } else {
-                        const sortedSolutions = Object.entries(cell)
-                            .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold)
-                            .sort((a, b) => b[1] - a[1]);
-                        const rankedSolution = sortedSolutions[currentRank - 1];
-                        if (rankedSolution) {
-                            fillColor = colorScale(rankedSolution[0]);
-                            fillOpacity = 0.7;
-                        } else {
-                            fillColor = "none";
-                            fillOpacity = 0;
-                        }
-                    }
-
-                    const rectangle = L.rectangle(cellBounds, {
-                        color: "black",
-                        weight: 0.5,
-                        fillColor: fillColor,
-                        fillOpacity: fillOpacity
-                    }).addTo(gridLayer);
-
-                    rectangle.on('click', () => toggleCellSelection(cell, rectangle));
-
-                    // Store cell data and rectangle reference
-                    cell.rectangle = rectangle;
-                    cell.bounds = cellBounds;
-                });
-            });
-
-            rankSlider.max = Object.keys(solutionCriteria).length;
-
-            // Update selected cells
-            selectedCells.forEach(cell => {
-                cell.rectangle.setStyle({color: "red", weight: 2});
-            });
-        }
+    // Update selected cells
+    selectedCells.forEach(cell => {
+        cell.rectangle.setStyle({color: "red", weight: 2});
+    });
+}
 
         function toggleCellSelection(cell, rectangle) {
             if (selectedCells.has(cell)) {

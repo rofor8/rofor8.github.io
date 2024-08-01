@@ -97,6 +97,7 @@
             position: relative;
             display: inline-block;
             width: 100%;
+            margin-bottom: 10px;
         }
 
         .dropbtn {
@@ -177,6 +178,15 @@
                 <button class="dropbtn">Biodiversity and soils</button>
                 <div id="categoryButtons" class="dropdown-content"></div>
             </div>
+            <div class="dropdown">
+                <button class="dropbtn">Color by: Impact (High to Low)</button>
+                <div id="coloringButtons" class="dropdown-content">
+                    <button onclick="changeColoring('impact-high-low')">Impact (High to Low)</button>
+                    <button onclick="changeColoring('impact-low-high')">Impact (Low to High)</button>
+                    <button onclick="changeColoring('cost-high-low')">Cost (High to Low)</button>
+                    <button onclick="changeColoring('cost-low-high')">Cost (Low to High)</button>
+                </div>
+            </div>
             <div id="sliders">
                 <div class="slider-container">
                     <label for="thresholdSlider">Threshold:</label>
@@ -226,6 +236,7 @@
     let selectedCells = new Set();
     let gridOrigin = null;
     let gridExtent = null;
+    let currentColoring = 'impact-high-low';
 
     async function fetchJSONData() {
         try {
@@ -360,86 +371,91 @@
         }
 
         function updateMap(challengeCategory, solution) {
-    const suitabilityScores = calculateSuitabilityScores(currentGridSize, challengeCategory);
+            const suitabilityScores = calculateSuitabilityScores(currentGridSize, challengeCategory);
 
-    if (gridLayer) {
-        map.removeLayer(gridLayer);
-    }
-
-    gridLayer = L.layerGroup().addTo(map);
-
-    // If gridOrigin is not set, initialize it to the center of the current map view
-    if (!gridOrigin) {
-        const center = map.getCenter();
-        gridOrigin = {lat: center.lat, lng: center.lng};
-    }
-
-    // Keep the grid size constant regardless of the number of cells
-    const gridSizeDegrees = 0.1; // Adjust this value to change the overall size of the grid
-    gridExtent = {
-        north: gridOrigin.lat + (gridSizeDegrees / 2),
-        south: gridOrigin.lat - (gridSizeDegrees / 2),
-        east: gridOrigin.lng + (gridSizeDegrees / 2),
-        west: gridOrigin.lng - (gridSizeDegrees / 2)
-    };
-
-    const cellSize = {
-        lat: (gridExtent.north - gridExtent.south) / currentGridSize,
-        lng: (gridExtent.east - gridExtent.west) / currentGridSize
-    };
-
-    suitabilityScores.forEach((row, y) => {
-        row.forEach((cell, x) => {
-            const cellBounds = [
-                [gridExtent.north - y * cellSize.lat, gridExtent.west + x * cellSize.lng],
-                [gridExtent.north - (y + 1) * cellSize.lat, gridExtent.west + (x + 1) * cellSize.lng]
-            ];
-
-            let fillColor, fillOpacity;
-            if (solution) {
-                if (cell[solution] >= currentThreshold && solutionCosts[solution] <= currentCostThreshold) {
-                    fillColor = d3.interpolateBlues(cell[solution] / 100);
-                    fillOpacity = 0.7;
-                } else {
-                    fillColor = "none";
-                    fillOpacity = 0;
-                }
-            } else {
-                const sortedSolutions = Object.entries(cell)
-                    .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold)
-                    .sort((a, b) => b[1] - a[1]);
-                const rankedSolution = sortedSolutions[currentRank - 1];
-                if (rankedSolution) {
-                    fillColor = colorScale(rankedSolution[0]);
-                    fillOpacity = 0.7;
-                } else {
-                    fillColor = "none";
-                    fillOpacity = 0;
-                }
+            if (gridLayer) {
+                map.removeLayer(gridLayer);
             }
 
-            const rectangle = L.rectangle(cellBounds, {
-                color: "black",
-                weight: 0.5,
-                fillColor: fillColor,
-                fillOpacity: fillOpacity
-            }).addTo(gridLayer);
+            gridLayer = L.layerGroup().addTo(map);
 
-            rectangle.on('click', () => toggleCellSelection(cell, rectangle));
+            // If gridOrigin is not set, initialize it to the center of the current map view
+            if (!gridOrigin) {
+                const center = map.getCenter();
+                gridOrigin = {lat: center.lat, lng: center.lng};
+            }
 
-            // Store cell data and rectangle reference
-            cell.rectangle = rectangle;
-            cell.bounds = cellBounds;
-        });
-    });
+            // Keep the grid size constant regardless of the number of cells
+            const gridSizeDegrees = 0.1; // Adjust this value to change the overall size of the grid
+            gridExtent = {
+                north: gridOrigin.lat + (gridSizeDegrees / 2),
+                south: gridOrigin.lat - (gridSizeDegrees / 2),
+                east: gridOrigin.lng + (gridSizeDegrees / 2),
+                west: gridOrigin.lng - (gridSizeDegrees / 2)
+            };
 
-    rankSlider.max = Object.keys(solutionCriteria).length;
+            const cellSize = {
+                lat: (gridExtent.north - gridExtent.south) / currentGridSize,
+                lng: (gridExtent.east - gridExtent.west) / currentGridSize
+            };
 
-    // Update selected cells
-    selectedCells.forEach(cell => {
-        cell.rectangle.setStyle({color: "red", weight: 2});
-    });
-}
+            suitabilityScores.forEach((row, y) => {
+                row.forEach((cell, x) => {
+                    const cellBounds = [
+                        [gridExtent.north - y * cellSize.lat, gridExtent.west + x * cellSize.lng],
+                        [gridExtent.north - (y + 1) * cellSize.lat, gridExtent.west + (x + 1) * cellSize.lng]
+                    ];
+
+                    let fillColor, fillOpacity;
+                    const validSolutions = Object.entries(cell)
+                        .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold);
+                    
+                    if (validSolutions.length > 0) {
+                        let sortedSolutions;
+                        switch (currentColoring) {
+                            case 'impact-high-low':
+                                sortedSolutions = validSolutions.sort((a, b) => b[1] - a[1]);
+                                break;
+                            case 'impact-low-high':
+                                sortedSolutions = validSolutions.sort((a, b) => a[1] - b[1]);
+                                break;
+                            case 'cost-high-low':
+                                sortedSolutions = validSolutions.sort((a, b) => solutionCosts[b[0]] - solutionCosts[a[0]]);
+                                break;
+                            case 'cost-low-high':
+                                sortedSolutions = validSolutions.sort((a, b) => solutionCosts[a[0]] - solutionCosts[b[0]]);
+                                break;
+                        }
+                        const topSolution = sortedSolutions[0];
+                        fillColor = colorScale(topSolution[0]);
+                        fillOpacity = 0.7;
+                    } else {
+                        fillColor = "none";
+                        fillOpacity = 0;
+                    }
+
+                    const rectangle = L.rectangle(cellBounds, {
+                        color: "black",
+                        weight: 0.5,
+                        fillColor: fillColor,
+                        fillOpacity: fillOpacity
+                    }).addTo(gridLayer);
+
+                    rectangle.on('click', () => toggleCellSelection(cell, rectangle));
+
+                    // Store cell data and rectangle reference
+                    cell.rectangle = rectangle;
+                    cell.bounds = cellBounds;
+                });
+            });
+
+            rankSlider.max = Object.keys(solutionCriteria).length;
+
+            // Update selected cells
+            selectedCells.forEach(cell => {
+                cell.rectangle.setStyle({color: "red", weight: 2});
+            });
+        }
 
         function toggleCellSelection(cell, rectangle) {
             if (selectedCells.has(cell)) {
@@ -469,9 +485,24 @@
                     });
             });
 
-            const sortedTotals = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+            let sortedTotals;
+            switch (currentColoring) {
+                case 'impact-high-low':
+                    sortedTotals = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+                    break;
+                case 'impact-low-high':
+                    sortedTotals = Object.entries(totals).sort((a, b) => a[1] - b[1]);
+                    break;
+                case 'cost-high-low':
+                    sortedTotals = Object.entries(totals).sort((a, b) => solutionCosts[b[0]] - solutionCosts[a[0]]);
+                    break;
+                case 'cost-low-high':
+                    sortedTotals = Object.entries(totals).sort((a, b) => solutionCosts[a[0]] - solutionCosts[b[0]]);
+                    break;
+            }
 
-            let html = `<h3>Impact Scores (${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''}):</h3><ul>`;
+            let html = `<h3>Impact Scores (${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''})</h3>`;
+            html += `<p>Sorted by: ${getColoringDescription(currentColoring)}</p><ul>`;
             for (const [solution, total] of sortedTotals) {
                 const color = colorScale(solution);
                 html += `<li class="solution-item" data-solution="${solution}">
@@ -490,6 +521,22 @@
                     const solution = d3.select(this).attr("data-solution");
                     displayCriteriaRasters(solution);
                 });
+        }
+
+        function getColoringDescription(coloring) {
+            switch (coloring) {
+                case 'impact-high-low': return 'Impact (High to Low)';
+                case 'impact-low-high': return 'Impact (Low to High)';
+                case 'cost-high-low': return 'Cost (High to Low)';
+                case 'cost-low-high': return 'Cost (Low to High)';
+            }
+        }
+
+        function changeColoring(newColoring) {
+            currentColoring = newColoring;
+            d3.select("#leftSidebar .dropbtn:nth-child(2)").text(`Color by: ${getColoringDescription(newColoring)}`);
+            updateMap(currentCategory, currentSolution);
+            updateScores();
         }
 
         function createButtons(containerId, dataArray, buttonClass, clickHandler) {
@@ -650,6 +697,7 @@
         // Make functions global so they can be called from HTML
         window.backToImpactMap = backToImpactMap;
         window.resetGridPosition = resetGridPosition;
+        window.changeColoring = changeColoring;
     }
 
     // Call the fetch function when the script loads

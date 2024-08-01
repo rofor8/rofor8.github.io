@@ -381,29 +381,34 @@
 
             // If gridOrigin is not set, initialize it to the center of the current map view
             if (!gridOrigin) {
-                const center = map.getCenter();
-                gridOrigin = {lat: center.lat, lng: center.lng};
+                gridOrigin = map.getCenter();
             }
 
-            // Keep the grid size constant regardless of the number of cells
-            const gridSizeDegrees = 0.1; // Adjust this value to change the overall size of the grid
-            gridExtent = {
-                north: gridOrigin.lat + (gridSizeDegrees / 2),
-                south: gridOrigin.lat - (gridSizeDegrees / 2),
-                east: gridOrigin.lng + (gridSizeDegrees / 2),
-                west: gridOrigin.lng - (gridSizeDegrees / 2)
-            };
+            const mapBounds = map.getBounds();
+            const mapCenter = map.getCenter();
+            
+            // Keep the total grid area constant
+            const gridSizeMeters = 2000; // Adjust this value to change the overall grid size
 
-            const cellSize = {
-                lat: (gridExtent.north - gridExtent.south) / currentGridSize,
-                lng: (gridExtent.east - gridExtent.west) / currentGridSize
+            const latDegreeSize = 111000; // meters per degree of latitude (approximately constant)
+            const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180); // meters per degree of longitude
+
+            const cellSizeMeters = gridSizeMeters / currentGridSize;
+            const cellSizeLat = cellSizeMeters / latDegreeSize;
+            const cellSizeLng = cellSizeMeters / lngDegreeSize;
+
+            gridExtent = {
+                north: gridOrigin.lat + (gridSizeMeters / latDegreeSize) / 2,
+                south: gridOrigin.lat - (gridSizeMeters / latDegreeSize) / 2,
+                east: gridOrigin.lng + (gridSizeMeters / lngDegreeSize) / 2,
+                west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
             };
 
             suitabilityScores.forEach((row, y) => {
                 row.forEach((cell, x) => {
                     const cellBounds = [
-                        [gridExtent.north - y * cellSize.lat, gridExtent.west + x * cellSize.lng],
-                        [gridExtent.north - (y + 1) * cellSize.lat, gridExtent.west + (x + 1) * cellSize.lng]
+                        [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                        [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
                     ];
 
                     let fillColor, fillOpacity;
@@ -587,10 +592,15 @@
             Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
             rasterLayers = {};
 
-            const cellSize = {
-                lat: (gridExtent.north - gridExtent.south) / raster1.length,
-                lng: (gridExtent.east - gridExtent.west) / raster1[0].length
-            };
+            const mapCenter = map.getCenter();
+            const gridSizeMeters = 2000; // Should be the same as in updateMap
+
+            const latDegreeSize = 111000; // meters per degree of latitude (approximately constant)
+            const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180); // meters per degree of longitude
+
+            const cellSizeMeters = gridSizeMeters / raster1.length;
+            const cellSizeLat = cellSizeMeters / latDegreeSize;
+            const cellSizeLng = cellSizeMeters / lngDegreeSize;
 
             const allCriteria = [...new Set(Object.values(solutionCriteria).flat())];
             const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(allCriteria);
@@ -604,8 +614,8 @@
                     row.forEach((value, x) => {
                         if (value) {
                             const cellBounds = [
-                                [gridExtent.north - y * cellSize.lat, gridExtent.west + x * cellSize.lng],
-                                [gridExtent.north - (y + 1) * cellSize.lat, gridExtent.west + (x + 1) * cellSize.lng]
+                                [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                                [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
                             ];
                             L.rectangle(cellBounds, {
                                 color: "none",
@@ -635,7 +645,10 @@
             Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
             updateMap(currentCategory, currentSolution);
             updateScores();
-            map.removeControl(document.querySelector('.leaflet-control-container').querySelector('.back-button'));
+            const backButton = document.querySelector('.leaflet-control-container .back-button');
+            if (backButton) {
+                backButton.remove();
+            }
         }
 
         function updateCriteriaInfo(solution, criteria, areas, colorScale) {
@@ -664,8 +677,7 @@
         }
 
         function resetGridPosition() {
-            const center = map.getCenter();
-            gridOrigin = {lat: center.lat, lng: center.lng};
+            gridOrigin = map.getCenter();
             updateMap(currentCategory, currentSolution);
         }
 

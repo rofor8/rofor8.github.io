@@ -3,18 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UK Urban Planning Map Application</title>
+    <title>Urban Planning Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Roboto', sans-serif;
             margin: 0;
             padding: 0;
             height: 100vh;
             overflow: hidden;
+            background-color: #f5f5f5;
         }
 
         #app-container {
@@ -23,17 +25,37 @@
             height: 100vh;
         }
 
-        #leftSidebar, #rightSidebar {
-            background-color: #f0f0f0;
-            padding: 10px;
-            overflow-y: auto;
+        #header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        #mainContent {
-            flex-grow: 1;
+        #header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        #main-content {
             display: flex;
-            flex-direction: column;
+            flex-grow: 1;
             overflow: hidden;
+        }
+
+        #sidebar {
+            width: 300px;
+            background-color: white;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            padding: 20px;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        #sidebar.hidden {
+            transform: translateX(-100%);
         }
 
         #mapContainer {
@@ -46,80 +68,45 @@
             height: 100%;
         }
 
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
         .section-explanation {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             font-size: 14px;
-        }
-
-        #infoPanel {
-            position: fixed;
-            background: white;
-            border: 1px solid black;
-            padding: 10px;
-            right: 10px;
-            top: 80px;
-            width: 230px;
-            max-height: calc(90vh - 90px);
-            overflow-y: auto;
-            z-index: 1000;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-
-        #infoPanel h3 {
-            margin-top: 0;
-            margin-bottom: 10px;
-        }
-
-        #infoPanel ul {
-            margin: 0;
-            padding: 0;
-            list-style-type: none;
-        }
-
-        #infoPanel li {
-            margin-bottom: 5px;
-        }
-
-        #sliders {
-            margin-bottom: 10px;
-        }
-
-        .slider-container {
-            margin-bottom: 10px;
-        }
-
-        .slider-value {
-            margin-top: 5px;
-            font-size: 14px;
+            color: #7f8c8d;
         }
 
         .dropdown {
-            position: relative;
-            display: inline-block;
-            width: 100%;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
         }
 
         .dropbtn {
-            background-color: #f1f1f1;
-            color: black;
+            background-color: #3498db;
+            color: white;
             padding: 10px;
             font-size: 16px;
             border: none;
             cursor: pointer;
             width: 100%;
             text-align: left;
+            transition: background-color 0.3s;
+        }
+
+        .dropbtn:hover {
+            background-color: #2980b9;
         }
 
         .dropdown-content {
             display: none;
-            position: absolute;
             background-color: #f9f9f9;
-            min-width: 160px;
             box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
             z-index: 1;
-            width: 100%;
-            max-height: 300px;
+            max-height: 200px;
             overflow-y: auto;
         }
 
@@ -133,102 +120,159 @@
             border: none;
             background-color: white;
             cursor: pointer;
+            transition: background-color 0.3s;
         }
 
-        .dropdown-content button:hover {background-color: #f1f1f1}
+        .dropdown-content button:hover {
+            background-color: #f1f1f1;
+        }
 
         .dropdown:hover .dropdown-content {
             display: block;
         }
 
-        .dropdown:hover .dropbtn {
-            background-color: #e0e0e0;
+        .slider-container {
+            margin-bottom: 20px;
         }
 
-        @media (min-width: 768px) {
-            #app-container {
-                flex-direction: row;
-            }
-
-            #leftSidebar, #rightSidebar {
-                width: 250px;
-            }
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 700;
+            color: #2c3e50;
         }
 
-        .back-button, .reset-grid-button {
-            margin: 10px;
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .slider-value {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        #infoPanel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            border-radius: 5px;
+            padding: 15px;
+            max-width: 300px;
+            max-height: calc(100% - 20px);
+            overflow-y: auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        #infoPanel h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        #infoPanel ul {
+            margin: 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        #infoPanel li {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        #infoPanel li:hover {
+            background-color: #ecf0f1;
         }
 
         .solution-item {
             cursor: pointer;
         }
 
-        .solution-item:hover {
-            background-color: #f0f0f0;
+        .current-rank {
+            font-weight: bold;
+            background-color: #e0e0e0;
         }
 
-        .leaflet-tile-pane {
-            opacity: 1;
-            transition: opacity 0.3s ease-in-out;
-        }
         .leaflet-tile-pane.transparent {
             opacity: 0.3;
         }
 
-        .current-rank {
-            font-weight: bold;
-            background-color: #e0e0e0;
+        .back-button, .reset-grid-button {
+            margin: 10px;
+        }
+
+        #toggleSidebar {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            #sidebar {
+                position: absolute;
+                z-index: 1001;
+                height: 100%;
+            }
+
+            #sidebar.hidden {
+                transform: translateX(-100%);
+            }
         }
     </style>
 </head>
 <body>
     <div id="app-container">
-        <div id="leftSidebar">
-            <p class="section-explanation">
-                Select a category and adjust the sliders to view different solutions.
-            </p>
-            <div class="dropdown">
-                <button class="dropbtn">Biodiversity and soils</button>
-                <div id="categoryButtons" class="dropdown-content"></div>
-            </div>
-            <div class="dropdown">
-                <button class="dropbtn">Rank by: Impact</button>
-                <div id="rankingButtons" class="dropdown-content">
-                    <button onclick="changeRanking('impact')">Impact</button>
-                    <button onclick="changeRanking('cost')">Cost</button>
-                </div>
-            </div>
-            <div id="sliders">
-                <div class="slider-container">
-                    <label for="thresholdSlider">Impact Threshold:</label>
-                    <input type="range" id="thresholdSlider" min="0" max="100" step="1" value="0">
-                    <div id="thresholdValue" class="slider-value">0</div>
-                </div>
-                <div class="slider-container">
-                    <label for="costSlider">Cost Threshold:</label>
-                    <input type="range" id="costSlider" min="0" max="100" step="1" value="100">
-                    <div id="costValue" class="slider-value">100</div>
-                </div>
-                <div class="slider-container">
-                    <label for="rankSlider">Rank:</label>
-                    <input type="range" id="rankSlider" min="1" max="1" step="1" value="1">
-                    <div id="rankValue" class="slider-value">1</div>
-                </div>
-            </div>
+        <div id="header">
+            <h1>Urban Planning Map</h1>
+            <button id="toggleSidebar">☰</button>
         </div>
-        
-        <div id="mainContent">
+        <div id="main-content">
+            <div id="sidebar">
+                <h2 class="section-title">Configuration</h2>
+                <p class="section-explanation">
+                    Select a category and adjust the sliders to view different solutions.
+                </p>
+                <div class="dropdown">
+                    <button class="dropbtn">Biodiversity and soils</button>
+                    <div id="categoryButtons" class="dropdown-content"></div>
+                </div>
+                <div class="dropdown">
+                    <button class="dropbtn">Rank by: Impact</button>
+                    <div id="rankingButtons" class="dropdown-content">
+                        <button onclick="changeRanking('impact')">Impact</button>
+                        <button onclick="changeRanking('cost')">Cost</button>
+                    </div>
+                </div>
+                <div id="sliders">
+                    <div class="slider-container">
+                        <label for="thresholdSlider">Impact Threshold:</label>
+                        <input type="range" id="thresholdSlider" min="0" max="100" step="1" value="0">
+                        <div id="thresholdValue" class="slider-value">0</div>
+                    </div>
+                    <div class="slider-container">
+                        <label for="costSlider">Cost Threshold:</label>
+                        <input type="range" id="costSlider" min="0" max="100" step="1" value="100">
+                        <div id="costValue" class="slider-value">100</div>
+                    </div>
+                    <div class="slider-container">
+                        <label for="rankSlider">Rank:</label>
+                        <input type="range" id="rankSlider" min="1" max="1" step="1" value="1">
+                        <div id="rankValue" class="slider-value">1</div>
+                    </div>
+                </div>
+            </div>
             <div id="mapContainer">
                 <div id="map"></div>
             </div>
         </div>
-
-        <div id="rightSidebar">
-            <p class="section-explanation">
-                Click on grid cells to select them and view impact scores.
-            </p>
-        </div>
-        
         <div id="infoPanel"></div>
     </div>
 
@@ -394,8 +438,8 @@
 
             gridLayer = L.layerGroup().addTo(map);
 
-            // If gridOrigin is not set, initialize it to the center of the current map view
-            if (!gridOrigin) {
+// If gridOrigin is not set, initialize it to the center of the current map view
+if (!gridOrigin) {
                 gridOrigin = map.getCenter();
             }
 
@@ -428,7 +472,7 @@
 
                     let fillColor, fillOpacity;
                     const validSolutions = Object.entries(cell)
-                        .filter(([sol, scores]) => scores.impact >= currentThreshold && scores.cost <= currentCostThreshold);
+                        .filter(([sol, scores]) => scores.impact > 0 && scores.cost > 0 && scores.impact >= currentThreshold && scores.cost <= currentCostThreshold);
                     
                     if (validSolutions.length > 0) {
                         let sortedSolutions;
@@ -475,7 +519,7 @@
             // Update rank slider max value
             const maxRank = Math.max(...suitabilityScores.flat().map(cell => 
                 Object.entries(cell)
-                    .filter(([sol, scores]) => scores.impact >= currentThreshold && scores.cost <= currentCostThreshold)
+                    .filter(([sol, scores]) => scores.impact > 0 && scores.cost > 0 && scores.impact >= currentThreshold && scores.cost <= currentCostThreshold)
                     .length
             ));
             rankSlider.max = maxRank;
@@ -509,7 +553,7 @@
             const totals = {};
             selectedCells.forEach(cell => {
                 Object.entries(cell)
-                    .filter(([sol, scores]) => scores.impact >= currentThreshold && scores.cost <= currentCostThreshold)
+                    .filter(([sol, scores]) => scores.impact > 0 && scores.cost > 0 && scores.impact >= currentThreshold && scores.cost <= currentCostThreshold)
                     .forEach(([solution, scores]) => {
                         if (!totals[solution]) {
                             totals[solution] = { impact: 0, cost: 0, area: 0 };
@@ -528,6 +572,7 @@
             }
 
             let html = `<h3>Scores (${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''})</h3>`;
+            html += `<p>Click on a solution to view its criteria rasters.</p>`;
             html += `<p>Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}</p><ul>`;
             sortedTotals.forEach(([solution, scores], index) => {
                 const color = colorScale(solution);
@@ -553,7 +598,7 @@
 
         function changeRanking(newRanking) {
             currentRanking = newRanking;
-            d3.select("#leftSidebar .dropbtn:nth-child(2)").text(`Rank by: ${newRanking.charAt(0).toUpperCase() + newRanking.slice(1)}`);
+            d3.select("#sidebar .dropbtn:nth-child(2)").text(`Rank by: ${newRanking.charAt(0).toUpperCase() + newRanking.slice(1)}`);
             updateMap(currentCategory);
             updateScores();
         }
@@ -571,7 +616,7 @@
         createButtons("categoryButtons", Object.keys(challengeCategories), "category-button", function(event, d) {
             d3.selectAll(".category-button").classed("active", false);
             d3.select(this).classed("active", true);
-            d3.select("#leftSidebar .dropbtn:first-child").text(d);
+            d3.select("#sidebar .dropbtn:first-child").text(d);
             currentCategory = d;
             currentSolution = null;
             updateMap(d);
@@ -705,7 +750,7 @@
                     </li>
                     <li>
                         <span style="display: inline-block; width: 20px; height: 20px; background: linear-gradient(to right, ${colorScale(criteria[0])}, ${colorScale(criteria[1])}); margin-right: 5px; vertical-align: middle;"></span>
-                        <span style="font-weight: bold;">Overlap:</span> 
+                        <span style="font-weight: bold;">Overlap:</span>
                         <span style="float: right;">${areas.overlap.toFixed(2)}%</span>
                     </li>
                 </ul>
@@ -729,7 +774,7 @@
         }
 
         // Set the default category in the dropdown
-        d3.select("#leftSidebar .dropbtn:first-child").text(currentCategory);
+        d3.select("#sidebar .dropbtn:first-child").text(currentCategory);
 
         // Set the default category button as active
         d3.select("#categoryButtons")
@@ -751,6 +796,11 @@
 
     // Call the fetch function when the script loads
     fetchJSONData();
+
+    // Toggle sidebar functionality
+    document.getElementById('toggleSidebar').addEventListener('click', function() {
+        document.getElementById('sidebar').classList.toggle('hidden');
+    });
     </script>
 </body>
 </html>

@@ -194,11 +194,6 @@
                     <div id="thresholdValue" class="slider-value">0</div>
                 </div>
                 <div class="slider-container">
-                    <label for="rankSlider">Rank Filter:</label>
-                    <input type="range" id="rankSlider" min="1" max="1" step="1" value="1">
-                    <div id="rankValue" class="slider-value">1</div>
-                </div>
-                <div class="slider-container">
                     <label for="costSlider">Cost Threshold:</label>
                     <input type="range" id="costSlider" min="0" max="1000" step="1" value="1000">
                     <div id="costValue" class="slider-value">1000</div>
@@ -336,131 +331,123 @@
             .domain(Object.keys(solutionCriteria))
             .range(customColors);
 
-        let currentCategory = "Biodiversity and soils";
-        let currentSolution = null;
-        let currentThreshold = 0;
-        let currentRank = 1;
-        let currentCostThreshold = 1000;
-        let currentGridSize = 13;
+            let currentCategory = "Biodiversity and soils";
+    let currentSolution = null;
+    let currentThreshold = 0;
+    let currentCostThreshold = 1000;
+    let currentGridSize = 13;
 
-        const thresholdSlider = document.getElementById('thresholdSlider');
-        const rankSlider = document.getElementById('rankSlider');
-        const costSlider = document.getElementById('costSlider');
-        const gridSizeSlider = document.getElementById('gridSizeSlider');
-        const thresholdValue = document.getElementById('thresholdValue');
-        const rankValue = document.getElementById('rankValue');
-        const costValue = document.getElementById('costValue');
-        const gridSizeValue = document.getElementById('gridSizeValue');
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    const costSlider = document.getElementById('costSlider');
+    const gridSizeSlider = document.getElementById('gridSizeSlider');
+    const thresholdValue = document.getElementById('thresholdValue');
+    const costValue = document.getElementById('costValue');
+    const gridSizeValue = document.getElementById('gridSizeValue');
 
-        thresholdSlider.addEventListener('input', updateSliders);
-        rankSlider.addEventListener('input', updateSliders);
-        costSlider.addEventListener('input', updateSliders);
-        gridSizeSlider.addEventListener('input', updateSliders);
+    thresholdSlider.addEventListener('input', updateSliders);
+    costSlider.addEventListener('input', updateSliders);
+    gridSizeSlider.addEventListener('input', updateSliders);
 
-        function updateSliders() {
-            currentThreshold = parseInt(thresholdSlider.value);
-            currentRank = parseInt(rankSlider.value);
-            currentCostThreshold = parseInt(costSlider.value);
-            currentGridSize = parseInt(gridSizeSlider.value);
-            thresholdValue.textContent = currentThreshold;
-            rankValue.textContent = currentRank;
-            costValue.textContent = currentCostThreshold;
-            gridSizeValue.textContent = currentGridSize;
-            updateMap(currentCategory, currentSolution);
-            updateScores();
+    function updateSliders() {
+        currentThreshold = parseInt(thresholdSlider.value);
+        currentCostThreshold = parseInt(costSlider.value);
+        currentGridSize = parseInt(gridSizeSlider.value);
+        thresholdValue.textContent = currentThreshold;
+        costValue.textContent = currentCostThreshold;
+        gridSizeValue.textContent = currentGridSize;
+        updateMap(currentCategory, currentSolution);
+        updateScores();
+    }
+
+    function updateMap(challengeCategory, solution) {
+        const suitabilityScores = calculateSuitabilityScores(currentGridSize, challengeCategory);
+
+        if (gridLayer) {
+            map.removeLayer(gridLayer);
         }
 
-        function updateMap(challengeCategory, solution) {
-            const suitabilityScores = calculateSuitabilityScores(currentGridSize, challengeCategory);
+        gridLayer = L.layerGroup().addTo(map);
 
-            if (gridLayer) {
-                map.removeLayer(gridLayer);
-            }
+        // If gridOrigin is not set, initialize it to the center of the current map view
+        if (!gridOrigin) {
+            gridOrigin = map.getCenter();
+        }
 
-            gridLayer = L.layerGroup().addTo(map);
+        const mapBounds = map.getBounds();
+        const mapCenter = map.getCenter();
+        
+        // Keep the total grid area constant
+        const gridSizeMeters = 2000; // Adjust this value to change the overall grid size
 
-            // If gridOrigin is not set, initialize it to the center of the current map view
-            if (!gridOrigin) {
-                gridOrigin = map.getCenter();
-            }
+        const latDegreeSize = 111000; // meters per degree of latitude (approximately constant)
+        const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180); // meters per degree of longitude
 
-            const mapBounds = map.getBounds();
-            const mapCenter = map.getCenter();
-            
-            // Keep the total grid area constant
-            const gridSizeMeters = 2000; // Adjust this value to change the overall grid size
+        const cellSizeMeters = gridSizeMeters / currentGridSize;
+        const cellSizeLat = cellSizeMeters / latDegreeSize;
+        const cellSizeLng = cellSizeMeters / lngDegreeSize;
 
-            const latDegreeSize = 111000; // meters per degree of latitude (approximately constant)
-            const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180); // meters per degree of longitude
+        gridExtent = {
+            north: gridOrigin.lat + (gridSizeMeters / latDegreeSize) / 2,
+            south: gridOrigin.lat - (gridSizeMeters / latDegreeSize) / 2,
+            east: gridOrigin.lng + (gridSizeMeters / lngDegreeSize) / 2,
+            west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
+        };
 
-            const cellSizeMeters = gridSizeMeters / currentGridSize;
-            const cellSizeLat = cellSizeMeters / latDegreeSize;
-            const cellSizeLng = cellSizeMeters / lngDegreeSize;
+        suitabilityScores.forEach((row, y) => {
+            row.forEach((cell, x) => {
+                const cellBounds = [
+                    [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                    [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+                ];
 
-            gridExtent = {
-                north: gridOrigin.lat + (gridSizeMeters / latDegreeSize) / 2,
-                south: gridOrigin.lat - (gridSizeMeters / latDegreeSize) / 2,
-                east: gridOrigin.lng + (gridSizeMeters / lngDegreeSize) / 2,
-                west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
-            };
-
-            suitabilityScores.forEach((row, y) => {
-                row.forEach((cell, x) => {
-                    const cellBounds = [
-                        [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                        [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                    ];
-
-                    let fillColor, fillOpacity;
-                    const validSolutions = Object.entries(cell)
-                        .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold);
-                    
-                    if (validSolutions.length > 0) {
-                        let sortedSolutions;
-                        switch (currentColoring) {
-                            case 'impact-high-low':
-                                sortedSolutions = validSolutions.sort((a, b) => b[1] - a[1]);
-                                break;
-                            case 'impact-low-high':
-                                sortedSolutions = validSolutions.sort((a, b) => a[1] - b[1]);
-                                break;
-                            case 'cost-high-low':
-                                sortedSolutions = validSolutions.sort((a, b) => solutionCosts[b[0]] - solutionCosts[a[0]]);
-                                break;
-                            case 'cost-low-high':
-                                sortedSolutions = validSolutions.sort((a, b) => solutionCosts[a[0]] - solutionCosts[b[0]]);
-                                break;
-                        }
-                        const topSolution = sortedSolutions[0];
-                        fillColor = colorScale(topSolution[0]);
-                        fillOpacity = 0.7;
-                    } else {
-                        fillColor = "none";
-                        fillOpacity = 0;
+                let fillColor, fillOpacity;
+                const validSolutions = Object.entries(cell)
+                    .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold);
+                
+                if (validSolutions.length > 0) {
+                    let sortedSolutions;
+                    switch (currentColoring) {
+                        case 'impact-high-low':
+                            sortedSolutions = validSolutions.sort((a, b) => b[1] - a[1]);
+                            break;
+                        case 'impact-low-high':
+                            sortedSolutions = validSolutions.sort((a, b) => a[1] - b[1]);
+                            break;
+                        case 'cost-high-low':
+                            sortedSolutions = validSolutions.sort((a, b) => solutionCosts[b[0]] - solutionCosts[a[0]]);
+                            break;
+                        case 'cost-low-high':
+                            sortedSolutions = validSolutions.sort((a, b) => solutionCosts[a[0]] - solutionCosts[b[0]]);
+                            break;
                     }
+                    const topSolution = sortedSolutions[0];
+                    fillColor = colorScale(topSolution[0]);
+                    fillOpacity = 0.7;
+                } else {
+                    fillColor = "none";
+                    fillOpacity = 0;
+                }
 
-                    const rectangle = L.rectangle(cellBounds, {
-                        color: "black",
-                        weight: 0.5,
-                        fillColor: fillColor,
-                        fillOpacity: fillOpacity
-                    }).addTo(gridLayer);
+                const rectangle = L.rectangle(cellBounds, {
+                    color: "black",
+                    weight: 0.5,
+                    fillColor: fillColor,
+                    fillOpacity: fillOpacity
+                }).addTo(gridLayer);
 
-                    rectangle.on('click', () => toggleCellSelection(cell, rectangle));
+                rectangle.on('click', () => toggleCellSelection(cell, rectangle));
 
-                    // Store cell data and rectangle reference
-                    cell.rectangle = rectangle;
-                    cell.bounds = cellBounds;
-                });
+                // Store cell data and rectangle reference
+                cell.rectangle = rectangle;
+                cell.bounds = cellBounds;
             });
+        });
 
-            rankSlider.max = Object.keys(solutionCriteria).length;
-
-            // Update selected cells
-            selectedCells.forEach(cell => {
-                cell.rectangle.setStyle({color: "red", weight: 2});
-            });
-        }
+        // Update selected cells
+        selectedCells.forEach(cell => {
+            cell.rectangle.setStyle({color: "red", weight: 2});
+        });
+    }
 
         function toggleCellSelection(cell, rectangle) {
             if (selectedCells.has(cell)) {

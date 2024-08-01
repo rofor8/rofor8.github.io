@@ -57,9 +57,9 @@
             border: 1px solid black;
             padding: 10px;
             right: 10px;
-            top: 10px;
+            top: 80px;
             width: 230px;
-            max-height: calc(90vh - 20px);
+            max-height: calc(90vh - 90px);
             overflow-y: auto;
             z-index: 1000;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
@@ -166,6 +166,19 @@
         .solution-item:hover {
             background-color: #f0f0f0;
         }
+
+        .leaflet-tile-pane {
+            opacity: 1;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .leaflet-tile-pane.transparent {
+            opacity: 0.3;
+        }
+
+        .current-rank {
+            font-weight: bold;
+            background-color: #e0e0e0;
+        }
     </style>
 </head>
 <body>
@@ -193,8 +206,8 @@
                 </div>
                 <div class="slider-container">
                     <label for="costSlider">Cost Threshold:</label>
-                    <input type="range" id="costSlider" min="0" max="1000" step="1" value="1000">
-                    <div id="costValue" class="slider-value">1000</div>
+                    <input type="range" id="costSlider" min="0" max="100" step="1" value="100">
+                    <div id="costValue" class="slider-value">100</div>
                 </div>
                 <div class="slider-container">
                     <label for="rankSlider">Rank:</label>
@@ -240,12 +253,13 @@
     let map;
     let gridLayer;
     let rasterLayers = {};
-    let selectedCells = new Set();
+    let selectedCells = new Map();
     let gridOrigin = null;
     let gridExtent = null;
     let currentRanking = 'impact';
     let currentRank = 1;
     const GRID_SIZE = 100; // Fixed grid size
+    let isViewingCriteriaRasters = false;
 
     async function fetchJSONData() {
         try {
@@ -347,7 +361,7 @@
         let currentCategory = "Biodiversity and soils";
         let currentSolution = null;
         let currentThreshold = 0;
-        let currentCostThreshold = 1000;
+        let currentCostThreshold = 100;
 
         const thresholdSlider = document.getElementById('thresholdSlider');
         const costSlider = document.getElementById('costSlider');
@@ -416,7 +430,7 @@
                     const validSolutions = Object.entries(cell)
                         .filter(([sol, scores]) => scores.impact >= currentThreshold && scores.cost <= currentCostThreshold);
                     
-                        if (validSolutions.length > 0) {
+                    if (validSolutions.length > 0) {
                         let sortedSolutions;
                         if (currentRanking === 'impact') {
                             sortedSolutions = validSolutions.sort((a, b) => b[1].impact - a[1].impact);
@@ -427,7 +441,7 @@
                         if (currentRank <= sortedSolutions.length) {
                             const rankedSolution = sortedSolutions[currentRank - 1];
                             fillColor = colorScale(rankedSolution[0]);
-                            fillOpacity = 0.7;
+                            fillOpacity = 0.7 * 0.7; // Increase transparency
                         } else {
                             fillColor = "none";
                             fillOpacity = 0;
@@ -444,17 +458,18 @@
                         fillOpacity: fillOpacity
                     }).addTo(gridLayer);
 
-                    rectangle.on('click', () => toggleCellSelection(cell, rectangle));
+                    const key = `${cellBounds[0][1]},${cellBounds[0][0]}`;
+                    rectangle.on('click', () => toggleCellSelection(key, rectangle, cell));
 
                     // Store cell data and rectangle reference
                     cell.rectangle = rectangle;
                     cell.bounds = cellBounds;
-                });
-            });
 
-            // Update selected cells
-            selectedCells.forEach(cell => {
-                cell.rectangle.setStyle({color: "red", weight: 2});
+                    // Reapply selection if the cell was previously selected
+                    if (selectedCells.has(key)) {
+                        rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
+                    }
+                });
             });
 
             // Update rank slider max value
@@ -468,13 +483,17 @@
             rankValue.textContent = rankSlider.value;
         }
 
-        function toggleCellSelection(cell, rectangle) {
-            if (selectedCells.has(cell)) {
-                selectedCells.delete(cell);
-                rectangle.setStyle({color: "black", weight: 0.5});
+        function toggleCellSelection(key, rectangle, cell) {
+            if (selectedCells.has(key)) {
+                selectedCells.delete(key);
+                if (!isViewingCriteriaRasters) {
+                    rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
+                } else {
+                    rectangle.remove();
+                }
             } else {
-                selectedCells.add(cell);
-                rectangle.setStyle({color: "red", weight: 2});
+                selectedCells.set(key, cell);
+                rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
             }
             updateScores();
         }
@@ -510,16 +529,17 @@
 
             let html = `<h3>Scores (${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''})</h3>`;
             html += `<p>Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}</p><ul>`;
-            for (const [solution, scores] of sortedTotals) {
+            sortedTotals.forEach(([solution, scores], index) => {
                 const color = colorScale(solution);
-                html += `<li class="solution-item" data-solution="${solution}">
+                const isCurrentRank = index + 1 === currentRank;
+                html += `<li class="solution-item${isCurrentRank ? ' current-rank' : ''}" data-solution="${solution}">
                     <span style="display: inline-block; width: 20px; height: 20px; background-color: ${color}; margin-right: 5px; vertical-align: middle;"></span>
-                    <span style="font-weight: bold;">${solution}:</span> 
+                    <span style="font-weight: bold;">Rank ${index + 1}: ${solution}</span> 
                     <span style="float: right;">Impact: ${scores.impact.toFixed(2)}</span><br>
                     <span style="float: right;">Cost: £${scores.cost.toFixed(2)}</span><br>
                     <span style="float: right;">Area: ${(scores.area * 100).toFixed(2)}%</span>
                 </li>`;
-            }
+            });
             html += "</ul>";
             infoPanel.html(html);
 
@@ -555,7 +575,6 @@
             currentCategory = d;
             currentSolution = null;
             updateMap(d);
-            selectedCells.clear();
             updateScores();
         });
 
@@ -579,10 +598,17 @@
         }
 
         function displayCriteriaRasters(solution) {
+            isViewingCriteriaRasters = true;
+            // Make the map transparent
+            document.querySelector('.leaflet-tile-pane').classList.add('transparent');
+
             const criteria = solutionCriteria[solution];
             const raster1 = criteriaRasters[criteria[0]];
             const raster2 = criteriaRasters[criteria[1]];
 
+            if (gridLayer) {
+                map.removeLayer(gridLayer);
+            }
             Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
             rasterLayers = {};
 
@@ -621,6 +647,19 @@
                 });
             });
 
+            // Keep selected cells visible
+            rasterLayers['selected'] = L.layerGroup().addTo(map);
+            selectedCells.forEach((cell, key) => {
+                const [lng, lat] = key.split(',').map(Number);
+                const rectangle = L.rectangle([[lat, lng], [lat - cellSizeLat, lng + cellSizeLng]], {
+                    color: "red",
+                    weight: 2,
+                    fillColor: "red",
+                    fillOpacity: 0.3
+                }).addTo(rasterLayers['selected']);
+                rectangle.on('click', () => toggleCellSelection(key, rectangle, cell));
+            });
+
             // Calculate and display criteria areas
             const areas = calculateCriteriaAreas(raster1, raster2);
             updateCriteriaInfo(solution, criteria, areas, criteriaColorScale);
@@ -636,6 +675,10 @@
         }
 
         function backToImpactMap() {
+            isViewingCriteriaRasters = false;
+            // Remove transparency from the map
+            document.querySelector('.leaflet-tile-pane').classList.remove('transparent');
+
             Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
             updateMap(currentCategory);
             updateScores();

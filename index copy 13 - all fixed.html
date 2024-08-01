@@ -250,8 +250,7 @@
 
     function initializeApp() {
         // Initialize the map
-// In the initializeApp function, update the map initialization:
-        map = L.map('map').setView([51.454514, -2.587910], 13);
+        map = L.map('map').setView([51.505, -0.09], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
@@ -296,7 +295,7 @@
                     for (const [solution, criteria] of Object.entries(solutionCriteria)) {
                         const area = calculateOverlapArea(x, y, criteria, gridSize);
                         const weight = challengeCategories[challengeCategory][solution];
-                        cellScores[solution] = area * weight * 100; // Scale up the results
+                        cellScores[solution] = area * weight * 100; // Scale up the result
                     }
                     row.push(cellScores);
                 }
@@ -396,34 +395,22 @@
                         [gridExtent.north - (y + 1) * cellSize.lat, gridExtent.west + (x + 1) * cellSize.lng]
                     ];
 
-                    let fillColor, fillOpacity;
+                    let fillColor;
                     if (solution) {
-                        if (cell[solution] >= currentThreshold && solutionCosts[solution] <= currentCostThreshold) {
-                            fillColor = d3.interpolateBlues(cell[solution] / 100);
-                            fillOpacity = 0.7;
-                        } else {
-                            fillColor = "none";
-                            fillOpacity = 0;
-                        }
+                        fillColor = cell[solution] >= currentThreshold && solutionCosts[solution] <= currentCostThreshold ? d3.interpolateBlues(cell[solution] / 100) : "white";
                     } else {
                         const sortedSolutions = Object.entries(cell)
                             .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold)
                             .sort((a, b) => b[1] - a[1]);
                         const rankedSolution = sortedSolutions[currentRank - 1];
-                        if (rankedSolution) {
-                            fillColor = colorScale(rankedSolution[0]);
-                            fillOpacity = 0.7;
-                        } else {
-                            fillColor = "none";
-                            fillOpacity = 0;
-                        }
+                        fillColor = rankedSolution ? colorScale(rankedSolution[0]) : "white";
                     }
 
                     const rectangle = L.rectangle(cellBounds, {
                         color: "black",
                         weight: 0.5,
                         fillColor: fillColor,
-                        fillOpacity: fillOpacity
+                        fillOpacity: 0.7
                     }).addTo(gridLayer);
 
                     rectangle.on('click', () => toggleCellSelection(cell, rectangle));

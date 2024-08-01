@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UK Urban Planning Map Application</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <title>UK Urban Planning D3 Map Application</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
     <style>
@@ -38,10 +36,21 @@
 
         #mapContainer {
             flex-grow: 1;
-            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
         }
 
         #map {
+            flex-grow: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        #map svg {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
         }
@@ -154,8 +163,8 @@
             }
         }
 
-        .back-button, .reset-grid-button {
-            margin: 10px;
+        #backButton {
+            margin-bottom: 10px;
         }
 
         .solution-item {
@@ -171,7 +180,6 @@
     <div id="app-container">
         <div id="leftSidebar">
             <p class="section-explanation">
-                Select a category and adjust the sliders to view different solutions.
             </p>
             <div class="dropdown">
                 <button class="dropbtn">Biodiversity and soils</button>
@@ -199,6 +207,8 @@
                     <div id="gridSizeValue" class="slider-value">13</div>
                 </div>
             </div>
+            <p class="section-explanation">
+            </p>
         </div>
         
         <div id="mainContent">
@@ -209,7 +219,6 @@
 
         <div id="rightSidebar">
             <p class="section-explanation">
-                Click on grid cells to select them and view impact scores.
             </p>
         </div>
         
@@ -220,12 +229,6 @@
     let solutionCriteria = {};
     let challengeCategories = {};
     let solutionCosts = {};
-    let map;
-    let gridLayer;
-    let rasterLayers = {};
-    let selectedCells = new Set();
-    let gridOrigin = null;
-    let gridExtent = null;
 
     async function fetchJSONData() {
         try {
@@ -249,13 +252,6 @@
     }
 
     function initializeApp() {
-        // Initialize the map
-// In the initializeApp function, update the map initialization:
-        map = L.map('map').setView([51.454514, -2.587910], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
-
         function generateBinaryRaster(width, height, seed) {
             const raster = [];
             const numShapes = 5 + Math.floor(Math.random() * 5);
@@ -296,7 +292,7 @@
                     for (const [solution, criteria] of Object.entries(solutionCriteria)) {
                         const area = calculateOverlapArea(x, y, criteria, gridSize);
                         const weight = challengeCategories[challengeCategory][solution];
-                        cellScores[solution] = area * weight * 100; // Scale up the results
+                        cellScores[solution] = area * weight * 100; // Scale up the result
                     }
                     row.push(cellScores);
                 }
@@ -316,6 +312,11 @@
             return totalValue / criteria.length;
         }
 
+        const svg = d3.select("#map").append("svg")
+            .attr("id", "mapSvg")
+            .attr("width", "100%")
+            .attr("height", "100%");
+
         const customColors = [
             "#4e79a7", "#f28e2c", "#e15759", "#76b7b2", "#59a14f",
             "#edc949", "#af7aa1", "#ff9da7", "#9c755f", "#bab0ab",
@@ -332,6 +333,7 @@
         let currentRank = 1;
         let currentCostThreshold = 1000;
         let currentGridSize = 13;
+        let selectedCells = new Set();
 
         const thresholdSlider = document.getElementById('thresholdSlider');
         const rankSlider = document.getElementById('rankSlider');
@@ -363,92 +365,51 @@
         function updateMap(challengeCategory, solution) {
             const suitabilityScores = calculateSuitabilityScores(currentGridSize, challengeCategory);
 
-            if (gridLayer) {
-                map.removeLayer(gridLayer);
-            }
+            svg.selectAll("rect").remove();
 
-            gridLayer = L.layerGroup().addTo(map);
+            const svgWidth = parseInt(svg.style("width"));
+            const svgHeight = parseInt(svg.style("height"));
+            const cellSize = Math.min(svgWidth, svgHeight) / currentGridSize;
 
-            // If gridOrigin is not set, initialize it to the center of the current map view
-            if (!gridOrigin) {
-                const center = map.getCenter();
-                gridOrigin = {lat: center.lat, lng: center.lng};
-            }
-
-            // Calculate the grid extent based on the current grid size
-            const gridSizeDegrees = 0.1; // Adjust this value to change the overall size of the grid
-            gridExtent = {
-                north: gridOrigin.lat + (gridSizeDegrees / 2),
-                south: gridOrigin.lat - (gridSizeDegrees / 2),
-                east: gridOrigin.lng + (gridSizeDegrees / 2),
-                west: gridOrigin.lng - (gridSizeDegrees / 2)
-            };
-
-            const cellSize = {
-                lat: (gridExtent.north - gridExtent.south) / currentGridSize,
-                lng: (gridExtent.east - gridExtent.west) / currentGridSize
-            };
-
-            suitabilityScores.forEach((row, y) => {
-                row.forEach((cell, x) => {
-                    const cellBounds = [
-                        [gridExtent.north - y * cellSize.lat, gridExtent.west + x * cellSize.lng],
-                        [gridExtent.north - (y + 1) * cellSize.lat, gridExtent.west + (x + 1) * cellSize.lng]
-                    ];
-
-                    let fillColor, fillOpacity;
+            svg.selectAll("rect")
+                .data(suitabilityScores.flat())
+                .enter().append("rect")
+                .attr("x", (d, i) => (i % currentGridSize) * cellSize)
+                .attr("y", (d, i) => Math.floor(i / currentGridSize) * cellSize)
+                .attr("width", cellSize)
+                .attr("height", cellSize)
+                .attr("fill", d => {
                     if (solution) {
-                        if (cell[solution] >= currentThreshold && solutionCosts[solution] <= currentCostThreshold) {
-                            fillColor = d3.interpolateBlues(cell[solution] / 100);
-                            fillOpacity = 0.7;
-                        } else {
-                            fillColor = "none";
-                            fillOpacity = 0;
-                        }
+                        return d[solution] >= currentThreshold && solutionCosts[solution] <= currentCostThreshold ? d3.interpolateBlues(d[solution] / 100) : "white";
                     } else {
-                        const sortedSolutions = Object.entries(cell)
+                        const sortedSolutions = Object.entries(d)
                             .filter(([sol, score]) => score >= currentThreshold && solutionCosts[sol] <= currentCostThreshold)
                             .sort((a, b) => b[1] - a[1]);
                         const rankedSolution = sortedSolutions[currentRank - 1];
-                        if (rankedSolution) {
-                            fillColor = colorScale(rankedSolution[0]);
-                            fillOpacity = 0.7;
-                        } else {
-                            fillColor = "none";
-                            fillOpacity = 0;
-                        }
+                        return rankedSolution ? colorScale(rankedSolution[0]) : "white";
                     }
-
-                    const rectangle = L.rectangle(cellBounds, {
-                        color: "black",
-                        weight: 0.5,
-                        fillColor: fillColor,
-                        fillOpacity: fillOpacity
-                    }).addTo(gridLayer);
-
-                    rectangle.on('click', () => toggleCellSelection(cell, rectangle));
-
-                    // Store cell data and rectangle reference
-                    cell.rectangle = rectangle;
-                    cell.bounds = cellBounds;
-                });
-            });
+                })
+                .attr("opacity", 0.7)
+                .attr("stroke", "black")
+                .attr("stroke-width", 0.5)
+                .on("click", toggleCellSelection);
 
             rankSlider.max = Object.keys(solutionCriteria).length;
 
             // Update selected cells
-            selectedCells.forEach(cell => {
-                cell.rectangle.setStyle({color: "red", weight: 2});
-            });
+            svg.selectAll("rect")
+                .attr("stroke-width", d => selectedCells.has(d) ? 2 : 0.5)
+                .attr("stroke", d => selectedCells.has(d) ? "red" : "black");
         }
 
-        function toggleCellSelection(cell, rectangle) {
-            if (selectedCells.has(cell)) {
-                selectedCells.delete(cell);
-                rectangle.setStyle({color: "black", weight: 0.5});
+        function toggleCellSelection(event, d) {
+            const cellElement = d3.select(this);
+            if (selectedCells.has(d)) {
+                selectedCells.delete(d);
+                cellElement.attr("stroke-width", 0.5).attr("stroke", "black");
             } else {
-                selectedCells.add(cell);
-                rectangle.setStyle({color: "red", weight: 2});
+                selectedCells.add(d);
+                cellElement.attr("stroke-width", 2).attr("stroke", "red");
             }
             updateScores();
         }
@@ -538,58 +499,51 @@
             const raster1 = criteriaRasters[criteria[0]];
             const raster2 = criteriaRasters[criteria[1]];
 
-            Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-            rasterLayers = {};
+            svg.selectAll("rect").remove();
 
-            const cellSize = {
-                lat: (gridExtent.north - gridExtent.south) / raster1.length,
-                lng: (gridExtent.east - gridExtent.west) / raster1[0].length
-            };
+            const svgWidth = parseInt(svg.style("width"));
+            const svgHeight = parseInt(svg.style("height"));
+            const cellSize = Math.min(svgWidth, svgHeight) / raster1.length;
 
             const allCriteria = [...new Set(Object.values(solutionCriteria).flat())];
             const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(allCriteria);
 
-            criteria.forEach((criterion, index) => {
-                const raster = criteriaRasters[criterion];
-                const rasterLayer = L.layerGroup().addTo(map);
-                rasterLayers[criterion] = rasterLayer;
+            svg.selectAll(".raster1")
+                .data(raster1.flat())
+                .enter().append("rect")
+                .attr("class", "raster1")
+                .attr("x", (d, i) => (i % raster1.length) * cellSize)
+                .attr("y", (d, i) => Math.floor(i / raster1.length) * cellSize)
+                .attr("width", cellSize / 2)
+                .attr("height", cellSize)
+                .attr("fill", d => d ? criteriaColorScale(criteria[0]) : "white")
+                .attr("opacity", d => d ? 1 : 0.1);
 
-                raster.forEach((row, y) => {
-                    row.forEach((value, x) => {
-                        if (value) {
-                            const cellBounds = [
-                                [gridExtent.north - y * cellSize.lat, gridExtent.west + x * cellSize.lng],
-                                [gridExtent.north - (y + 1) * cellSize.lat, gridExtent.west + (x + 1) * cellSize.lng]
-                            ];
-                            L.rectangle(cellBounds, {
-                                color: "none",
-                                fillColor: criteriaColorScale(criterion),
-                                fillOpacity: 0.5
-                            }).addTo(rasterLayer);
-                        }
-                    });
-                });
-            });
+            svg.selectAll(".raster2")
+                .data(raster2.flat())
+                .enter().append("rect")
+                .attr("class", "raster2")
+                .attr("x", (d, i) => (i % raster2.length) * cellSize + cellSize / 2)
+                .attr("y", (d, i) => Math.floor(i / raster2.length) * cellSize)
+                .attr("width", cellSize / 2)
+                .attr("height", cellSize)
+                .attr("fill", d => d ? criteriaColorScale(criteria[1]) : "white")
+                .attr("opacity", d => d ? 1 : 0.1);
 
             // Calculate and display criteria areas
             const areas = calculateCriteriaAreas(raster1, raster2);
             updateCriteriaInfo(solution, criteria, areas, criteriaColorScale);
 
             // Add a "Back to Impact Map" button
-            const backButton = L.control({position: 'topright'});
-            backButton.onAdd = function() {
-                const div = L.DomUtil.create('div', 'back-button');
-                div.innerHTML = '<button onclick="backToImpactMap()">Back to Impact Map</button>';
-                return div;
-            };
-            backButton.addTo(map);
-        }
-
-        function backToImpactMap() {
-            Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-            updateMap(currentCategory, currentSolution);
-            updateScores();
-            map.removeControl(document.querySelector('.leaflet-control-container').querySelector('.back-button'));
+            d3.select("#mapContainer")
+                .insert("button", ":first-child")
+                .attr("id", "backButton")
+                .text("Back to Impact Map")
+                .on("click", () => {
+                    d3.select("#backButton").remove();
+                    updateMap(currentCategory, currentSolution);
+                    updateScores();
+                });
         }
 
         function updateCriteriaInfo(solution, criteria, areas, colorScale) {
@@ -617,22 +571,6 @@
             `);
         }
 
-        function resetGridPosition() {
-            const center = map.getCenter();
-            gridOrigin = {lat: center.lat, lng: center.lng};
-            updateMap(currentCategory, currentSolution);
-        }
-
-        function addResetGridButton() {
-            const resetButton = L.control({position: 'bottomleft'});
-            resetButton.onAdd = function() {
-                const div = L.DomUtil.create('div', 'reset-grid-button');
-                div.innerHTML = '<button onclick="resetGridPosition()">Reset Grid Position</button>';
-                return div;
-            };
-            resetButton.addTo(map);
-        }
-
         // Set the default category in the dropdown
         d3.select("#leftSidebar .dropbtn:first-child").text(currentCategory);
 
@@ -644,13 +582,6 @@
 
         // Initial map render with the default category
         updateMap(currentCategory);
-
-        // Add reset grid button
-        addResetGridButton();
-
-        // Make functions global so they can be called from HTML
-        window.backToImpactMap = backToImpactMap;
-        window.resetGridPosition = resetGridPosition;
     }
 
     // Call the fetch function when the script loads

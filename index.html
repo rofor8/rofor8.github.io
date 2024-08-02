@@ -441,6 +441,17 @@
             rankSlider.max = maxRank;
             rankSlider.value = Math.min(currentRank, maxRank);
             rankValue.textContent = rankSlider.value;
+
+            // Reapply selection highlights
+            selectedCells.forEach((cellData, key) => {
+                const [lat, lng] = key.split(',').map(Number);
+                const rectangle = gridLayer.getLayers().find(layer => 
+                    layer.getBounds().getNorth() === lat && layer.getBounds().getWest() === lng
+                );
+                if (rectangle) {
+                    rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
+                }
+            });
         }
 
         function toggleCellSelection(key, rectangle, cell) {
@@ -462,9 +473,9 @@
             if (selectedCells.size === 0) {
                 html += "<p>No cells selected</p>";
             } else {
-                const totals = {};
+                const rankTotals = {};
                 selectedCells.forEach(({cell}) => {
-                    Object.entries(cell)
+                    let validSolutions = Object.entries(cell)
                         .filter(([sol, scores]) => {
                             if (currentRanking === 'impact') {
                                 return scores.impact > 0 && scores.impact >= currentThreshold;
@@ -472,40 +483,63 @@
                                 return scores.cost > 0 && scores.cost <= currentThreshold;
                             }
                         })
-                        .forEach(([solution, scores]) => {
-                            if (!totals[solution]) {
-                                totals[solution] = { impact: 0, cost: 0 };
-                            }
-                            totals[solution].impact += scores.impact;
-                            totals[solution].cost += scores.cost;
-                        });
+                        .sort((a, b) => 
+                            currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
+                        );
+
+                    validSolutions.forEach(([solution, scores], index) => {
+                        const rank = index + 1;
+                        if (!rankTotals[rank]) {
+                            rankTotals[rank] = {};
+                        }
+                        if (!rankTotals[rank][solution]) {
+                            rankTotals[rank][solution] = { impact: 0, cost: 0, count: 0 };
+                        }
+                        rankTotals[rank][solution].impact += scores.impact;
+                        rankTotals[rank][solution].cost += scores.cost;
+                        rankTotals[rank][solution].count++;
+                    });
                 });
 
-                let sortedTotals = Object.entries(totals).sort((a, b) => 
-                    currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-                );
+                Object.entries(rankTotals).forEach(([rank, solutions]) => {
+                    html += `<h4>Rank ${rank}</h4>`;
+                    html += `<table>
+                                <tr>
+                                    <th>Solution</th>
+                                    <th>Impact</th>
+                                    <th>Cost</th>
+                                    <th>Cells</th>
+                                </tr>`;
+                    
+                    let rankTotalImpact = 0;
+                    let rankTotalCost = 0;
+                    let rankTotalCells = 0;
 
-                html += `<table>
-                            <tr>
-                                <th>Rank</th>
-                                <th>Solution</th>
-                                <th>Impact</th>
-                                <th>Cost</th>
+                    Object.entries(solutions).forEach(([solution, scores]) => {
+                        const color = colorScale(solution);
+                        html += `<tr class="${rank == currentRank ? 'current-rank' : ''}" data-solution="${solution}">
+                                    <td>
+                                        <span style="display: inline-block; width: 10px; height: 10px; background-color: ${color}; margin-right: 5px;"></span>
+                                        ${solution}
+                                    </td>
+                                    <td>${scores.impact.toFixed(0)}</td>
+                                    <td>£${scores.cost.toFixed(0)}</td>
+                                    <td>${scores.count}</td>
+                                </tr>`;
+                        
+                        rankTotalImpact += scores.impact;
+                        rankTotalCost += scores.cost;
+                        rankTotalCells += scores.count;
+                    });
+
+                    html += `<tr class="rank-total">
+                                <td><strong>Rank ${rank} Total</strong></td>
+                                <td><strong>${rankTotalImpact.toFixed(0)}</strong></td>
+                                <td><strong>£${rankTotalCost.toFixed(0)}</strong></td>
+                                <td><strong>${rankTotalCells}</strong></td>
                             </tr>`;
-                sortedTotals.forEach(([solution, scores], index) => {
-                    const color = colorScale(solution);
-                    const isCurrentRank = index + 1 === currentRank;
-                    html += `<tr class="${isCurrentRank ? 'current-rank' : ''}" data-solution="${solution}">
-                                <td>${index + 1}</td>
-                                <td>
-                                    <span style="display: inline-block; width: 10px; height: 10px; background-color: ${color}; margin-right: 5px;"></span>
-                                    ${solution}
-                                </td>
-                                <td>${scores.impact.toFixed(0)}</td>
-                                <td>£${scores.cost.toFixed(0)}</td>
-                            </tr>`;
+                    html += "</table>";
                 });
-                html += "</table>";
             }
 
             infoPanel.html(html);
@@ -729,7 +763,7 @@
                     </tr>
                     <tr>
                         <td>
-                            <span style="display: inline-block; width: 10px; height: 10px; background: linear-gradient(to right, ${colorScale(criteria[0])}, ${colorScale(criteria[1])}); margin-right: 5px;"></span>
+<span style="display: inline-block; width: 10px; height: 10px; background: linear-gradient(to right, ${colorScale(criteria[0])}, ${colorScale(criteria[1])}); margin-right: 5px;"></span>
                             Overlap
                         </td>
                         <td>${areas.overlap.toFixed(1)}%</td>

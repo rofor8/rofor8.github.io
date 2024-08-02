@@ -168,7 +168,7 @@
 <body>
     <div id="app-container">
         <div id="controlPanel">
-            <button id="drawToggle" class="toggle-button" onclick="toggleDrawMode()">Enter Draw Mode</button>
+            <button id="drawToggle" class="toggle-button" onclick="toggleDrawMode()">Draw Select Area</button>
             <button id="rankingToggle" class="toggle-button" onclick="toggleRanking()">Rank by: Impact</button>
             <div class="slider-container">
                 <label for="thresholdSlider">Threshold:</label>
@@ -604,13 +604,13 @@
 
             if (isDrawMode) {
                 map.dragging.disable();
-                drawToggle.textContent = 'Exit Draw Mode';
+                drawToggle.textContent = 'Now Drawing';
                 map.on('mousedown', startDrawing);
                 map.on('mousemove', continueDrawing);
                 map.on('mouseup', finishDrawing);
             } else {
                 map.dragging.enable();
-                drawToggle.textContent = 'Enter Draw Mode';
+                drawToggle.textContent = 'Draw Select Area';
                 map.off('mousedown', startDrawing);
                 map.off('mousemove', continueDrawing);
                 map.off('mouseup', finishDrawing);

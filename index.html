@@ -197,240 +197,294 @@
     </div>
 
     <script>
-    let solutionCriteria = {};
-    let challengeCategories = {};
-    let solutionCosts = {
-        "sustainable drainage": 50,
-        "green and blue roofs": 100,
-        "green walls": 80,
-        "rain gardens": 60,
-        "swales": 40,
-        "features for species": 30,
-        "trees in hard landscapes": 70,
-        "street furniture": 20,
-        "traffic-free routes": 90,
-        "allotments": 25,
-        "orchards": 35,
-        "private domestic gardens": 15,
-        "green spaces": 45
-    };
-    let map;
-    let gridLayer;
-    let rasterLayers = {};
-    let selectedCells = new Map();
-    let gridOrigin = null;
-    let gridExtent = null;
-    let currentRanking = 'impact';
-    let currentRank = 1;
-    const GRID_SIZE = 100;
-    let isViewingCriteriaRasters = false;
-    let currentCategory = "Biodiversity and soils";
-    let currentSolution = null;
-    let currentThreshold = 0;
-    let cellSizeLat, cellSizeLng;
-    let drawLayer;
-    let isDrawMode = false;
+let solutionCriteria = {};
+let challengeCategories = {};
+let solutionCosts = {
+    "sustainable drainage": 50,
+    "green and blue roofs": 100,
+    "green walls": 80,
+    "rain gardens": 60,
+    "swales": 40,
+    "features for species": 30,
+    "trees in hard landscapes": 70,
+    "street furniture": 20,
+    "traffic-free routes": 90,
+    "allotments": 25,
+    "orchards": 35,
+    "private domestic gardens": 15,
+    "green spaces": 45
+};
+let map;
+let gridLayer;
+let rasterLayers = {};
+let selectedCells = new Map();
+let gridOrigin = null;
+let gridExtent = null;
+let currentRanking = 'impact';
+let currentRank = 1;
+const GRID_SIZE = 100;
+let isViewingCriteriaRasters = false;
+let currentCategory = "Biodiversity and soils";
+let currentSolution = null;
+let currentThreshold = 0;
+let cellSizeLat, cellSizeLng;
+let drawLayer;
+let isDrawMode = false;
 
-    async function fetchJSONData() {
-        try {
-            const [solutionCriteriaResponse, challengeCategoriesResponse] = await Promise.all([
-                fetch('solutionCriteria.json'),
-                fetch('challengeCategories.json')
-            ]);
+async function fetchJSONData() {
+    try {
+        const [solutionCriteriaResponse, challengeCategoriesResponse] = await Promise.all([
+            fetch('solutionCriteria.json'),
+            fetch('challengeCategories.json')
+        ]);
 
-            solutionCriteria = await solutionCriteriaResponse.json();
-            challengeCategories = await challengeCategoriesResponse.json();
+        solutionCriteria = await solutionCriteriaResponse.json();
+        challengeCategories = await challengeCategoriesResponse.json();
 
-            initializeApp();
-        } catch (error) {
-            console.error('Error loading JSON data:', error);
+        initializeApp();
+    } catch (error) {
+        console.error('Error loading JSON data:', error);
+    }
+}
+
+function initializeApp() {
+    if (map) {
+        map.remove(); // Remove existing map if it exists
+    }
+    map = L.map('map').setView([51.454514, -2.587910], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    function generateBinaryRaster(width, height, seed) {
+        const raster = [];
+        const numShapes = 5 + Math.floor(Math.random() * 5);
+
+        for (let y = 0; y < height; y++) {
+            raster.push(new Array(width).fill(0));
         }
+
+        for (let i = 0; i < numShapes; i++) {
+            const centerX = Math.floor(Math.random() * width);
+            const centerY = Math.floor(Math.random() * height);
+            const maxRadius = Math.min(20, Math.min(width, height) / 5);
+            const radius = 5 + Math.floor(Math.random() * maxRadius);
+
+            for (let y = Math.max(0, centerY - radius); y < Math.min(height, centerY + radius); y++) {
+                for (let x = Math.max(0, centerX - radius); x < Math.min(width, centerX + radius); x++) {
+                    if (Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2) <= Math.pow(radius, 2)) {
+                        raster[y][x] = 1;
+                    }
+                }
+            }
+        }
+
+        return raster;
     }
 
-    function initializeApp() {
-        map = L.map('map').setView([51.454514, -2.587910], 16);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+    const criteriaRasters = {};
+    Object.values(solutionCriteria).flat().forEach((criterion, index) => {
+        criteriaRasters[criterion] = generateBinaryRaster(100, 100, index);
+    });
 
-        function generateBinaryRaster(width, height, seed) {
-            const raster = [];
-            const numShapes = 5 + Math.floor(Math.random() * 5);
-
-            for (let y = 0; y < height; y++) {
-                raster.push(new Array(width).fill(0));
-            }
-
-            for (let i = 0; i < numShapes; i++) {
-                const centerX = Math.floor(Math.random() * width);
-                const centerY = Math.floor(Math.random() * height);
-                const maxRadius = Math.min(20, Math.min(width, height) / 5);
-                const radius = 5 + Math.floor(Math.random() * maxRadius);
-
-                for (let y = Math.max(0, centerY - radius); y < Math.min(height, centerY + radius); y++) {
-                    for (let x = Math.max(0, centerX - radius); x < Math.min(width, centerX + radius); x++) {
-                        if (Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2) <= Math.pow(radius, 2)) {
-                            raster[y][x] = 1;
-                        }
-                    }
+    function calculateSuitabilityScores(gridSize, challengeCategory) {
+        const grid = [];
+        for (let y = 0; y < gridSize; y++) {
+            const row = [];
+            for (let x = 0; x < gridSize; x++) {
+                const cellScores = {};
+                for (const [solution, criteria] of Object.entries(solutionCriteria)) {
+                    const area = calculateOverlapArea(x, y, criteria, gridSize);
+                    const weight = challengeCategories[challengeCategory][solution];
+                    cellScores[solution] = {
+                        impact: area * weight * 100,
+                        cost: area * solutionCosts[solution],
+                        area: area
+                    };
                 }
+                row.push(cellScores);
             }
-
-            return raster;
+            grid.push(row);
         }
+        return grid;
+    }
 
-        const criteriaRasters = {};
-        Object.values(solutionCriteria).flat().forEach((criterion, index) => {
-            criteriaRasters[criterion] = generateBinaryRaster(100, 100, index);
+    function calculateOverlapArea(x, y, criteria, gridSize) {
+        let totalValue = 0;
+        criteria.forEach(criterion => {
+            const raster = criteriaRasters[criterion];
+            const rasterX = Math.floor(x / gridSize * raster.length);
+            const rasterY = Math.floor(y / gridSize * raster[0].length);
+            totalValue += raster[rasterY][rasterX];
         });
+        return totalValue / criteria.length;
+    }
 
-        function calculateSuitabilityScores(gridSize, challengeCategory) {
-            const grid = [];
-            for (let y = 0; y < gridSize; y++) {
-                const row = [];
-                for (let x = 0; x < gridSize; x++) {
-                    const cellScores = {};
-                    for (const [solution, criteria] of Object.entries(solutionCriteria)) {
-                        const area = calculateOverlapArea(x, y, criteria, gridSize);
-                        const weight = challengeCategories[challengeCategory][solution];
-                        cellScores[solution] = {
-                            impact: area * weight * 100,
-                            cost: area * solutionCosts[solution],
-                            area: area
-                        };
-                    }
-                    row.push(cellScores);
-                }
-                grid.push(row);
-            }
-            return grid;
+    const customColors = [
+        "#4e79a7", "#f28e2c", "#e15759", "#76b7b2", "#59a14f",
+        "#edc949", "#af7aa1", "#ff9da7", "#9c755f", "#bab0ab",
+        "#4e79a7", "#f28e2c", "#e15759"
+    ];
+
+    const colorScale = d3.scaleOrdinal()
+        .domain(Object.keys(solutionCriteria))
+        .range(customColors);
+
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    const rankSlider = document.getElementById('rankSlider');
+    const thresholdValue = document.getElementById('thresholdValue');
+    const rankValue = document.getElementById('rankValue');
+
+    thresholdSlider.addEventListener('input', updateSliders);
+    rankSlider.addEventListener('input', updateSliders);
+
+    function updateSliders() {
+        currentThreshold = parseInt(thresholdSlider.value);
+        currentRank = parseInt(rankSlider.value);
+        thresholdValue.textContent = currentThreshold;
+        rankValue.textContent = currentRank;
+        updateMap(currentCategory);
+        updateScores();
+    }
+
+    function updateMap(challengeCategory) {
+        const suitabilityScores = calculateSuitabilityScores(GRID_SIZE, challengeCategory);
+
+        if (gridLayer) {
+            map.removeLayer(gridLayer);
         }
 
-        function calculateOverlapArea(x, y, criteria, gridSize) {
-            let totalValue = 0;
-            criteria.forEach(criterion => {
-                const raster = criteriaRasters[criterion];
-                const rasterX = Math.floor(x / gridSize * raster.length);
-                const rasterY = Math.floor(y / gridSize * raster[0].length);
-                totalValue += raster[rasterY][rasterX];
-            });
-            return totalValue / criteria.length;
+        gridLayer = L.layerGroup().addTo(map);
+
+        if (!gridOrigin) {
+            gridOrigin = map.getCenter();
         }
 
-        const customColors = [
-            "#4e79a7", "#f28e2c", "#e15759", "#76b7b2", "#59a14f",
-            "#edc949", "#af7aa1", "#ff9da7", "#9c755f", "#bab0ab",
-            "#4e79a7", "#f28e2c", "#e15759"
-        ];
+        const mapBounds = map.getBounds();
+        const mapCenter = map.getCenter();
+        
+        const gridSizeMeters = 2000;
 
-        const colorScale = d3.scaleOrdinal()
-            .domain(Object.keys(solutionCriteria))
-            .range(customColors);
+        const latDegreeSize = 111000;
+        const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180);
 
-        const thresholdSlider = document.getElementById('thresholdSlider');
-        const rankSlider = document.getElementById('rankSlider');
-        const thresholdValue = document.getElementById('thresholdValue');
-        const rankValue = document.getElementById('rankValue');
+        const cellSizeMeters = gridSizeMeters / GRID_SIZE;
+        cellSizeLat = cellSizeMeters / latDegreeSize;
+        cellSizeLng = cellSizeMeters / lngDegreeSize;
 
-        thresholdSlider.addEventListener('input', updateSliders);
-        rankSlider.addEventListener('input', updateSliders);
+        gridExtent = {
+            north: gridOrigin.lat + (gridSizeMeters / latDegreeSize) / 2,
+            south: gridOrigin.lat - (gridSizeMeters / latDegreeSize) / 2,
+            east: gridOrigin.lng + (gridSizeMeters / lngDegreeSize) / 2,
+            west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
+        };
 
-        function updateSliders() {
-            currentThreshold = parseInt(thresholdSlider.value);
-            currentRank = parseInt(rankSlider.value);
-            thresholdValue.textContent = currentThreshold;
-            rankValue.textContent = currentRank;
-            updateMap(currentCategory);
-            updateScores();
-        }
+        suitabilityScores.forEach((row, y) => {
+            row.forEach((cell, x) => {
+                const cellBounds = [
+                    [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                    [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+                ];
 
-        function updateMap(challengeCategory) {
-            const suitabilityScores = calculateSuitabilityScores(GRID_SIZE, challengeCategory);
-
-            if (gridLayer) {
-                map.removeLayer(gridLayer);
-            }
-
-            gridLayer = L.layerGroup().addTo(map);
-
-            if (!gridOrigin) {
-                gridOrigin = map.getCenter();
-            }
-
-            const mapBounds = map.getBounds();
-            const mapCenter = map.getCenter();
-            
-            const gridSizeMeters = 2000;
-
-            const latDegreeSize = 111000;
-            const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180);
-
-            const cellSizeMeters = gridSizeMeters / GRID_SIZE;
-            cellSizeLat = cellSizeMeters / latDegreeSize;
-            cellSizeLng = cellSizeMeters / lngDegreeSize;
-
-            gridExtent = {
-                north: gridOrigin.lat + (gridSizeMeters / latDegreeSize) / 2,
-                south: gridOrigin.lat - (gridSizeMeters / latDegreeSize) / 2,
-                east: gridOrigin.lng + (gridSizeMeters / lngDegreeSize) / 2,
-                west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
-            };
-
-            suitabilityScores.forEach((row, y) => {
-                row.forEach((cell, x) => {
-                    const cellBounds = [
-                        [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                        [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                    ];
-
-                    let fillColor, fillOpacity;
-                    const validSolutions = Object.entries(cell)
-                        .filter(([sol, scores]) => {
-                            if (currentRanking === 'impact') {
-                                return scores.impact > 0 && scores.impact >= currentThreshold;
-                            } else {
-                                return scores.cost > 0 && scores.cost <= currentThreshold;
-                            }
-                        });
-                    
-                    if (validSolutions.length > 0) {
-                        let sortedSolutions = validSolutions.sort((a, b) => 
-                        currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-                        );
-
-                        if (currentRank <= sortedSolutions.length) {
-                            const rankedSolution = sortedSolutions[currentRank - 1];
-                            fillColor = colorScale(rankedSolution[0]);
-                            fillOpacity = 0.7 * 0.7;
+                let fillColor, fillOpacity;
+                const validSolutions = Object.entries(cell)
+                    .filter(([sol, scores]) => {
+                        if (currentRanking === 'impact') {
+                            return scores.impact > 0 && scores.impact >= currentThreshold;
                         } else {
-                            fillColor = "none";
-                            fillOpacity = 0;
+                            return scores.cost > 0 && scores.cost <= currentThreshold;
                         }
+                    });
+                
+                if (validSolutions.length > 0) {
+                    let sortedSolutions = validSolutions.sort((a, b) => 
+                    currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
+                    );
+
+                    if (currentRank <= sortedSolutions.length) {
+                        const rankedSolution = sortedSolutions[currentRank - 1];
+                        fillColor = colorScale(rankedSolution[0]);
+                        fillOpacity = 0.7 * 0.7;
                     } else {
                         fillColor = "none";
                         fillOpacity = 0;
                     }
+                } else {
+                    fillColor = "none";
+                    fillOpacity = 0;
+                }
 
-                    const rectangle = L.rectangle(cellBounds, {
-                        color: "black",
-                        weight: 0.5,
-                        fillColor: fillColor,
-                        fillOpacity: fillOpacity
-                    }).addTo(gridLayer);
+                const rectangle = L.rectangle(cellBounds, {
+                    color: "black",
+                    weight: 0.5,
+                    fillColor: fillColor,
+                    fillOpacity: fillOpacity
+                }).addTo(gridLayer);
 
-                    rectangle.cell = cell;  // Store cell data with the rectangle
+                rectangle.cell = cell;  // Store cell data with the rectangle
 
-                    const key = `${cellBounds[0][1]},${cellBounds[0][0]}`;
-                    rectangle.on('click', () => toggleCellSelection(key, rectangle, cell));
+                const key = `${cellBounds[0][1]},${cellBounds[0][0]}`;
+                rectangle.on('click', () => toggleCellSelection(key, rectangle, cell));
 
-                    if (selectedCells.has(key)) {
-                        rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
-                    }
-                });
+                if (selectedCells.has(key)) {
+                    rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
+                }
             });
+        });
 
-            const maxRank = Math.max(...suitabilityScores.flat().map(cell => 
-                Object.entries(cell)
+        const maxRank = Math.max(...suitabilityScores.flat().map(cell => 
+            Object.entries(cell)
+                .filter(([sol, scores]) => {
+                    if (currentRanking === 'impact') {
+                        return scores.impact > 0 && scores.impact >= currentThreshold;
+                    } else {
+                        return scores.cost > 0 && scores.cost <= currentThreshold;
+                    }
+                })
+                .length
+        ));
+        rankSlider.max = maxRank;
+        rankSlider.value = Math.min(currentRank, maxRank);
+        rankValue.textContent = rankSlider.value;
+
+        // Reapply selection highlights
+        selectedCells.forEach((cellData, key) => {
+            const [lat, lng] = key.split(',').map(Number);
+            const rectangle = gridLayer.getLayers().find(layer => 
+                layer.getBounds().getNorth() === lat && layer.getBounds().getWest() === lng
+            );
+            if (rectangle) {
+                rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
+            }
+        });
+
+        updateSolutionCountGraph();
+        updateScores();
+    }
+
+    function toggleCellSelection(key, rectangle, cell) {
+        if (selectedCells.has(key)) {
+            selectedCells.delete(key);
+            rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
+        } else {
+            selectedCells.set(key, {cell: cell, rectangle: rectangle});
+            rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
+        }
+        updateScores();
+        updateSolutionCountGraph();
+    }
+
+    function updateScores() {
+        const infoPanel = d3.select("#infoPanel");
+
+        let html = `<h3>${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''} selected</h3>`;
+
+        if (selectedCells.size === 0) {
+            html += "<p>No cells selected</p>";
+        } else {
+            const rankTotals = {};
+            selectedCells.forEach(({cell}) => {
+                let validSolutions = Object.entries(cell)
                     .filter(([sol, scores]) => {
                         if (currentRanking === 'impact') {
                             return scores.impact > 0 && scores.impact >= currentThreshold;
@@ -438,163 +492,116 @@
                             return scores.cost > 0 && scores.cost <= currentThreshold;
                         }
                     })
-                    .length
-            ));
-            rankSlider.max = maxRank;
-            rankSlider.value = Math.min(currentRank, maxRank);
-            rankValue.textContent = rankSlider.value;
+                    .sort((a, b) => {
+                        if (currentRanking === 'impact') {
+                            const weightA = challengeCategories[currentCategory][a[0]];
+                            const weightB = challengeCategories[currentCategory][b[0]];
+                            return (b[1].impact * weightB) - (a[1].impact * weightA);
+                        } else {
+                            return a[1].cost - b[1].cost;
+                        }
+                    });
 
-            // Reapply selection highlights
-            selectedCells.forEach((cellData, key) => {
-                const [lat, lng] = key.split(',').map(Number);
-                const rectangle = gridLayer.getLayers().find(layer => 
-                    layer.getBounds().getNorth() === lat && layer.getBounds().getWest() === lng
-                );
-                if (rectangle) {
-                    rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
+                validSolutions.forEach(([solution, scores], index) => {
+                    const rank = index + 1;
+                    if (!rankTotals[rank]) {
+                        rankTotals[rank] = {};
+                    }
+                    if (!rankTotals[rank][solution]) {
+                        rankTotals[rank][solution] = { impact: 0, cost: 0, count: 0 };
+                    }
+                    const weight = challengeCategories[currentCategory][solution];
+                    rankTotals[rank][solution].impact += scores.impact * weight;
+                    rankTotals[rank][solution].cost += scores.cost;
+                    rankTotals[rank][solution].count++;
+                });
+            });
+
+            Object.entries(rankTotals).forEach(([rank, solutions]) => {
+                html += `<h4>Rank ${rank}</h4>`;
+                html += `<table>
+                            <tr>
+                                <th>Solution</th>
+                                <th>Impact</th>
+                                <th>Cost</th>
+                                <th>Cells</th>
+                            </tr>`;
+                
+                let rankTotalImpact = 0;
+                let rankTotalCost = 0;
+                let rankTotalCells = 0;
+
+                Object.entries(solutions).forEach(([solution, scores]) => {
+                    const color = colorScale(solution);
+                    html += `<tr class="${rank == currentRank ? 'current-rank' : ''}" data-solution="${solution}">
+                                <td>
+                                    <span style="display: inline-block; width: 10px; height: 10px; background-color: ${color}; margin-right: 5px;"></span>
+                                    ${solution}
+                                </td>
+                                <td>${scores.impact.toFixed(0)}</td>
+                                <td>£${scores.cost.toFixed(0)}</td>
+                                <td>${scores.count}</td>
+                            </tr>`;
+                    
+                    rankTotalImpact += scores.impact;
+                    rankTotalCost += scores.cost;
+                    rankTotalCells += scores.count;
+                });
+
+                html += `<tr class="rank-total ${rank == currentRank ? 'current-rank' : ''}">
+                            <td><strong>Rank ${rank} Total</strong></td>
+                            <td><strong>${rankTotalImpact.toFixed(0)}</strong></td>
+                            <td><strong>£${rankTotalCost.toFixed(0)}</strong></td>
+                            <td><strong>${rankTotalCells}</strong></td>
+                        </tr>`;
+                html += "</table>";
+            });
+        }
+
+        infoPanel.html(html);
+
+        infoPanel.selectAll("tr")
+            .on("click", function() {
+                const solution = d3.select(this).attr("data-solution");
+                if (solution) {
+                    displayCriteriaRasters(solution);
                 }
             });
 
-            updateSolutionCountGraph();
-            updateScores();
+        updateCriteriaOverlapGraph();
+    }
+
+    function toggleRanking() {
+        currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
+        const toggleButton = document.getElementById('rankingToggle');
+        toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
+        toggleButton.classList.toggle('active');
+
+        const categoryDropdown = document.getElementById('categoryDropdown');
+        categoryDropdown.style.display = currentRanking === 'impact' ? 'block' : 'none';
+
+        if (currentRanking === 'impact') {
+            thresholdSlider.value = 0;
+            thresholdSlider.max = 100;
+        } else {
+            thresholdSlider.value = Math.max(...Object.values(solutionCosts));
+            thresholdSlider.max = Math.max(...Object.values(solutionCosts)) * 100;
         }
+        currentThreshold = parseInt(thresholdSlider.value);
+        thresholdValue.textContent = currentThreshold;
 
-        function toggleCellSelection(key, rectangle, cell) {
-            if (selectedCells.has(key)) {
-                selectedCells.delete(key);
-                rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
-            } else {
-                selectedCells.set(key, {cell: cell, rectangle: rectangle});
-                rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
-            }
-            updateScores();
-                updateSolutionCountGraph(); // Add this line
-        }
+        updateMap(currentCategory);
+        updateScores();
+    }
 
-        function updateScores() {
-            const infoPanel = d3.select("#infoPanel");
-
-            let html = `<h3>${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''} selected</h3>`;
-
-            if (selectedCells.size === 0) {
-                html += "<p>No cells selected</p>";
-            } else {
-                const rankTotals = {};
-                selectedCells.forEach(({cell}) => {
-                    let validSolutions = Object.entries(cell)
-                        .filter(([sol, scores]) => {
-                            if (currentRanking === 'impact') {
-                                return scores.impact > 0 && scores.impact >= currentThreshold;
-                            } else {
-                                return scores.cost > 0 && scores.cost <= currentThreshold;
-                            }
-                        })
-                        .sort((a, b) => 
-                            currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-                        );
-
-                    validSolutions.forEach(([solution, scores], index) => {
-                        const rank = index + 1;
-                        if (!rankTotals[rank]) {
-                            rankTotals[rank] = {};
-                        }
-                        if (!rankTotals[rank][solution]) {
-                            rankTotals[rank][solution] = { impact: 0, cost: 0, count: 0 };
-                        }
-                        rankTotals[rank][solution].impact += scores.impact;
-                        rankTotals[rank][solution].cost += scores.cost;
-                        rankTotals[rank][solution].count++;
-                    });
-                });
-
-                Object.entries(rankTotals).forEach(([rank, solutions]) => {
-                    html += `<h4>Rank ${rank}</h4>`;
-                    html += `<table>
-                                <tr>
-                                    <th>Solution</th>
-                                    <th>Impact</th>
-                                    <th>Cost</th>
-                                    <th>Cells</th>
-                                </tr>`;
-                    
-                    let rankTotalImpact = 0;
-                    let rankTotalCost = 0;
-                    let rankTotalCells = 0;
-
-                    Object.entries(solutions).forEach(([solution, scores]) => {
-                        const color = colorScale(solution);
-                        html += `<tr class="${rank == currentRank ? 'current-rank' : ''}" data-solution="${solution}">
-                                    <td>
-                                        <span style="display: inline-block; width: 10px; height: 10px; background-color: ${color}; margin-right: 5px;"></span>
-                                        ${solution}
-                                    </td>
-                                    <td>${scores.impact.toFixed(0)}</td>
-                                    <td>£${scores.cost.toFixed(0)}</td>
-                                    <td>${scores.count}</td>
-                                </tr>`;
-                        
-                        rankTotalImpact += scores.impact;
-                        rankTotalCost += scores.cost;
-                        rankTotalCells += scores.count;
-                    });
-
-                    html += `<tr class="rank-total ${rank == currentRank ? 'current-rank' : ''}">
-                                <td><strong>Rank ${rank} Total</strong></td>
-                                <td><strong>${rankTotalImpact.toFixed(0)}</strong></td>
-                                <td><strong>£${rankTotalCost.toFixed(0)}</strong></td>
-                                <td><strong>${rankTotalCells}</strong></td>
-                            </tr>`;
-                    html += "</table>";
-                });
-            }
-
-            infoPanel.html(html);
-
-            infoPanel.selectAll("tr")
-                .on("click", function() {
-                    const solution = d3.select(this).attr("data-solution");
-                    if (solution) {
-                        displayCriteriaRasters(solution);
-                    }
-                });
-
-            updateCriteriaOverlapGraph();
-        }
-
-        function toggleRanking() {
-            currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
-            const toggleButton = document.getElementById('rankingToggle');
-            toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
-            toggleButton.classList.toggle('active');
-
-            const categoryDropdown = document.getElementById('categoryDropdown');
-            categoryDropdown.style.display = currentRanking === 'impact' ? 'block' : 'none';
-
-            if (currentRanking === 'impact') {
-                thresholdSlider.value = 0;
-                thresholdSlider.max = 100;
-            } else {
-                thresholdSlider.value = Math.max(...Object.values(solutionCosts));
-                thresholdSlider.max = Math.max(...Object.values(solutionCosts)) * 100;
-            }
-            currentThreshold = parseInt(thresholdSlider.value);
-            thresholdValue.textContent = currentThreshold;
-
-            updateMap(currentCategory);
-            updateScores();
-        }
-
-        function createButtons(containerId, dataArray, buttonClass, clickHandler) {
-            const container = d3.select(`#${containerId}`);
-            container.selectAll("button")
-                .data(dataArray)
-                .enter().append("button")
-                .attr("class", buttonClass)
-                .text(d => d)
-                .on("click", clickHandler);
-        }
-
-        createButtons("categoryButtons", Object.keys(challengeCategories), "category-button", function(event, d) {
+    function createButtons(containerId, dataArray, buttonClass) {
+    const container = d3.select(`#${containerId}`);
+    container.selectAll("button")
+        .data(dataArray)
+        .enter().append("button")
+        .attr("class", buttonClass)
+        .text(d => d)
+        .on("click", function(event, d) {
             d3.selectAll(".category-button").classed("active", false);
             d3.select(this).classed("active", true);
             d3.select("#categoryDropdown .dropbtn").text(d);
@@ -604,348 +611,448 @@
             updateMap(currentCategory);
             updateScores();
         });
-
-        function toggleDrawMode() {
-            isDrawMode = !isDrawMode;
-            const drawToggle = document.getElementById('drawToggle');
-            drawToggle.classList.toggle('active');
-
-            if (isDrawMode) {
-                map.dragging.disable();
-                drawToggle.textContent = 'Now Drawing';
-                map.on('mousedown', startDrawing);
-                map.on('mousemove', continueDrawing);
-                map.on('mouseup', finishDrawing);
-            } else {
-                map.dragging.enable();
-                drawToggle.textContent = 'Draw Select Area';
-                map.off('mousedown', startDrawing);
-                map.off('mousemove', continueDrawing);
-                map.off('mouseup', finishDrawing);
-            }
-        }
-
-        let drawingPath = [];
-
-        function startDrawing(e) {
-            drawingPath = [e.latlng];
-            if (drawLayer) {
-                map.removeLayer(drawLayer);
-            }
-            drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
-        }
-
-        function continueDrawing(e) {
-            if (isDrawMode && drawingPath.length > 0) {
-                drawingPath.push(e.latlng);
-                drawLayer.setLatLngs(drawingPath);
-            }
-        }
-
-        function finishDrawing(e) {
-            if (isDrawMode) {
-                drawingPath.push(drawingPath[0]);  // Close the polygon
-                drawLayer.setLatLngs(drawingPath);
-                selectCellsInShape(drawLayer);
-                toggleDrawMode();
-            }
-        }
-
-        function selectCellsInShape(shape) {
-            clearSelection();
-            gridLayer.eachLayer(function(layer) {
-                if (shape.getBounds().contains(layer.getBounds().getCenter())) {
-                    const key = `${layer.getBounds().getNorth()},${layer.getBounds().getWest()}`;
-                    toggleCellSelection(key, layer, layer.cell);
-                }
-            });
-        }
-
-        function clearSelection() {
-            selectedCells.forEach(({rectangle}) => {
-                rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
-            });
-            selectedCells.clear();
-            if (drawLayer) {
-                map.removeLayer(drawLayer);
-            }
-            updateScores();
-        }
-
-        function displayCriteriaRasters(solution) {
-            isViewingCriteriaRasters = true;
-            document.querySelector('.leaflet-tile-pane').classList.add('transparent');
-
-            const criteria = solutionCriteria[solution];
-            const raster1 = criteriaRasters[criteria[0]];
-            const raster2 = criteriaRasters[criteria[1]];
-
-            if (gridLayer) {
-                map.removeLayer(gridLayer);
-            }
-            Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-            rasterLayers = {};
-
-            const allCriteria = [...new Set(Object.values(solutionCriteria).flat())];
-            const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(allCriteria);
-
-            criteria.forEach((criterion, index) => {
-                const raster = criteriaRasters[criterion];
-                const rasterLayer = L.layerGroup().addTo(map);
-                rasterLayers[criterion] = rasterLayer;
-
-                raster.forEach((row, y) => {
-                    row.forEach((value, x) => {
-                        if (value) {
-                            const cellBounds = [
-                                [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                                [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                            ];
-                            L.rectangle(cellBounds, {
-                                color: "none",
-                                fillColor: criteriaColorScale(criterion),
-                                fillOpacity: 0.5
-                            }).addTo(rasterLayer);
-                        }
-                    });
-                });
-            });
-
-            rasterLayers['selected'] = L.layerGroup().addTo(map);
-            selectedCells.forEach(({cell}, key) => {
-                const [lng, lat] = key.split(',').map(Number);
-                const rectangle = L.rectangle([[lat, lng], [lat - cellSizeLat, lng + cellSizeLng]], {
-                    color: "red",
-                    weight: 2,
-                    fillColor: "red",
-                    fillOpacity: 0.3
-                }).addTo(rasterLayers['selected']);
-                rectangle.on('click', () => toggleCellSelection(key, rectangle, cell));
-            });
-
-            const areas = calculateCriteriaAreas(raster1, raster2);
-            updateCriteriaInfo(solution, criteria, areas, criteriaColorScale);
-        }
-
-        function calculateCriteriaAreas(raster1, raster2) {
-            let area1 = 0, area2 = 0, overlapArea = 0;
-            const totalCells = raster1.length * raster1[0].length;
-
-            for (let y = 0; y < raster1.length; y++) {
-                for (let x = 0; x < raster1[0].length; x++) {
-                    if (raster1[y][x]) area1++;
-                    if (raster2[y][x]) area2++;
-                    if (raster1[y][x] && raster2[y][x]) overlapArea++;
-                }
-            }
-
-            return {
-                criteria1: (area1 / totalCells) * 100,
-                criteria2: (area2 / totalCells) * 100,
-                overlap: (overlapArea / totalCells) * 100
-            };
-        }
-
-        function updateCriteriaInfo(solution, criteria, areas, colorScale) {
-            const infoPanel = d3.select("#infoPanel");
-            infoPanel.html(`
-                <h3>${solution}</h3>
-                <table>
-                    <tr>
-                        <th>Criterion</th>
-                        <th>Coverage</th>
-                    </tr>
-                    <tr>
-                        <td>
-                            <span style="display: inline-block; width: 10px; height: 10px; background-color: ${colorScale(criteria[0])}; margin-right: 5px;"></span>
-                            ${criteria[0]}
-                        </td>
-                        <td>${areas.criteria1.toFixed(1)}%</td>
-                    </tr>
-                    <tr>
-                        <td>
-<span style="display: inline-block; width: 10px; height: 10px; background-color: ${colorScale(criteria[1])}; margin-right: 5px;"></span>
-                            ${criteria[1]}
-                        </td>
-                        <td>${areas.criteria2.toFixed(1)}%</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <span style="display: inline-block; width: 10px; height: 10px; background: linear-gradient(to right, ${colorScale(criteria[0])}, ${colorScale(criteria[1])}); margin-right: 5px;"></span>
-                            Overlap
-                        </td>
-                        <td>${areas.overlap.toFixed(1)}%</td>
-                    </tr>
-                </table>
-                <p>Cost: £${solutionCosts[solution]}/m²</p>
-                <button class="back-to-map-button" onclick="backToImpactMap()">Back to Map</button>
-            `);
-        }
-
-        function backToImpactMap() {
-            isViewingCriteriaRasters = false;
-            document.querySelector('.leaflet-tile-pane').classList.remove('transparent');
-
-            Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-            updateMap(currentCategory);
-            updateScores();
-        }
-
-        function resetGridPosition() {
-            gridOrigin = map.getCenter();
-            updateMap(currentCategory);
-        }
-
-        function addResetGridButton() {
-            const resetButton = L.control({position: 'bottomleft'});
-            resetButton.onAdd = function() {
-                const div = L.DomUtil.create('div', 'reset-grid-button');
-                div.innerHTML = '<button onclick="resetGridPosition()">Reset Grid Position</button>';
-                return div;
-            };
-            resetButton.addTo(map);
-        }
-
-        function updateCriteriaOverlapGraph() {
-            const criteriaOverlap = {};
-            selectedCells.forEach(({cell}) => {
-                Object.entries(solutionCriteria).forEach(([solution, criteria]) => {
-                    criteria.forEach(criterion => {
-                        if (!criteriaOverlap[criterion]) criteriaOverlap[criterion] = 0;
-                        criteriaOverlap[criterion] += cell[solution].area;
-                    });
-                });
-            });
-
-            const svg = d3.select("#criteriaOverlapGraph");
-            svg.selectAll("*").remove();
-
-            const margin = {top: 20, right: 20, bottom: 30, left: 40};
-            const width = 260 - margin.left - margin.right;
-            const height = 200 - margin.top - margin.bottom;
-
-            const g = svg.append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
-
-            const x = d3.scaleBand()
-                .rangeRound([0, width])
-                .padding(0.1)
-                .domain(Object.keys(criteriaOverlap));
-
-            const y = d3.scaleLinear()
-                .rangeRound([height, 0])
-                .domain([0, d3.max(Object.values(criteriaOverlap))]);
-
-            g.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x))
-                .selectAll("text")
-                .attr("transform", "rotate(-45)")
-                .style("text-anchor", "end");
-
-            g.append("g")
-                .call(d3.axisLeft(y));
-
-            g.selectAll(".bar")
-                .data(Object.entries(criteriaOverlap))
-                .enter().append("rect")
-                .attr("class", "bar")
-                .attr("x", d => x(d[0]))
-                .attr("y", d => y(d[1]))
-                .attr("width", x.bandwidth())
-                .attr("height", d => height - y(d[1]))
-                .attr("fill", d => colorScale(d[0]));
-        }
-
-        function updateSolutionCountGraph() {
-    const solutionCount = {};
-
-    selectedCells.forEach(({cell}) => {
-        let validSolutions = Object.entries(cell)
-            .filter(([sol, scores]) => {
-                if (currentRanking === 'impact') {
-                    return scores.impact > 0 && scores.impact >= currentThreshold;
-                } else {
-                    return scores.cost > 0 && scores.cost <= currentThreshold;
-                }
-            })
-            .sort((a, b) => 
-                currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-            );
-
-        if (validSolutions.length >= currentRank) {
-            const visibleSolution = validSolutions[currentRank - 1][0];
-            if (!solutionCount[visibleSolution]) solutionCount[visibleSolution] = 0;
-            solutionCount[visibleSolution]++;
-        }
-    });
-
-    const svg = d3.select("#solutionCountGraph");
-    svg.selectAll("*").remove();
-
-    const margin = {top: 20, right: 20, bottom: 30, left: 40};
-    const width = 260 - margin.left - margin.right;
-    const height = 200 - margin.top - margin.bottom;
-
-    const g = svg.append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
-
-    const x = d3.scaleBand()
-        .rangeRound([0, width])
-        .padding(0.1)
-        .domain(Object.keys(solutionCount));
-
-    const y = d3.scaleLinear()
-        .rangeRound([height, 0])
-        .domain([0, d3.max(Object.values(solutionCount)) || 1]);
-
-    g.append("g")
-        .attr("transform", `translate(0,${height})`)
-        .call(d3.axisBottom(x))
-        .selectAll("text")
-        .attr("transform", "rotate(-45)")
-        .style("text-anchor", "end");
-
-    g.append("g")
-        .call(d3.axisLeft(y));
-
-    g.selectAll(".bar")
-        .data(Object.entries(solutionCount))
-        .enter().append("rect")
-        .attr("class", "bar")
-        .attr("x", d => x(d[0]))
-        .attr("y", d => y(d[1]))
-        .attr("width", x.bandwidth())
-        .attr("height", d => height - y(d[1]))
-        .attr("fill", d => colorScale(d[0]));
-
-    svg.append("text")
-        .attr("x", (width / 2) + margin.left)
-        .attr("y", margin.top / 2)
-        .attr("text-anchor", "middle")
-        .style("font-size", "16px")
-        .text(`Visible Solutions (Rank ${currentRank}) in Selected Cells`);
 }
 
-        d3.select("#categoryDropdown .dropbtn").text(currentCategory);
+    function toggleDrawMode() {
+        isDrawMode = !isDrawMode;
+        const drawToggle = document.getElementById('drawToggle');
+        drawToggle.classList.toggle('active');
 
-        d3.select("#categoryButtons")
-            .selectAll("button")
-            .filter(d => d === currentCategory)
-            .classed("active", true);
-
-        updateMap(currentCategory);
-        updateScores();
-        addResetGridButton();
-
-        window.toggleRanking = toggleRanking;
-        window.clearSelection = clearSelection;
-        window.toggleDrawMode = toggleDrawMode;
-        window.backToImpactMap = backToImpactMap;
-        window.resetGridPosition = resetGridPosition;
+        if (isDrawMode) {
+            map.dragging.disable();
+            drawToggle.textContent = 'Now Drawing';
+            map.on('mousedown', startDrawing);
+            map.on('mousemove', continueDrawing);
+            map.on('mouseup', finishDrawing);
+        } else {
+            map.dragging.enable();
+            drawToggle.textContent = 'Draw Select Area';
+            map.off('mousedown', startDrawing);
+            map.off('mousemove', continueDrawing);
+            map.off('mouseup', finishDrawing);
+        }
     }
 
+    let drawingPath = [];
+
+    function startDrawing(e) {
+        drawingPath = [e.latlng];
+        if (drawLayer) {
+            map.removeLayer(drawLayer);
+        }
+        drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
+    }
+
+    function continueDrawing(e) {
+        if (isDrawMode && drawingPath.length > 0) {
+            drawingPath.push(e.latlng);
+            drawLayer.setLatLngs(drawingPath);
+        }
+    }
+
+    function finishDrawing(e) {
+        if (isDrawMode) {
+            drawingPath.push(drawingPath[0]);  // Close the polygon
+            drawLayer.setLatLngs(drawingPath);
+            selectCellsInShape(drawLayer);
+            toggleDrawMode();
+        }
+    }
+
+    function selectCellsInShape(shape) {
+        clearSelection();
+        gridLayer.eachLayer(function(layer) {
+            if (shape.getBounds().contains(layer.getBounds().getCenter())) {
+                const key = `${layer.getBounds().getNorth()},${layer.getBounds().getWest()}`;
+                toggleCellSelection(key, layer, layer.cell);
+            }
+        });
+    }
+
+    function clearSelection() {
+        selectedCells.forEach(({rectangle}) => {
+            rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
+        });
+        selectedCells.clear();
+        if (drawLayer) {
+            map.removeLayer(drawLayer);
+        }
+        updateScores();
+    }
+
+    function displayCriteriaRasters(solution) {
+        isViewingCriteriaRasters = true;
+        document.querySelector('.leaflet-tile-pane').classList.add('transparent');
+
+        const criteria = solutionCriteria[solution];
+        const raster1 = criteriaRasters[criteria[0]];
+        const raster2 = criteriaRasters[criteria[1]];
+
+        if (gridLayer) {
+            map.removeLayer(gridLayer);
+        }
+        Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
+        rasterLayers = {};
+
+        const allCriteria = [...new Set(Object.values(solutionCriteria).flat())];
+        const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(allCriteria);
+
+        criteria.forEach((criterion, index) => {
+            const raster = criteriaRasters[criterion];
+            const rasterLayer = L.layerGroup().addTo(map);
+            rasterLayers[criterion] = rasterLayer;
+
+            raster.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        const cellBounds = [
+                            [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                            [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+                        ];
+                        L.rectangle(cellBounds, {
+                            color: "none",
+                            fillColor: criteriaColorScale(criterion),
+                            fillOpacity: 0.5
+                        }).addTo(rasterLayer);
+                    }
+                });
+            });
+        });
+
+        rasterLayers['selected'] = L.layerGroup().addTo(map);
+        selectedCells.forEach(({cell}, key) => {
+            const [lng, lat] = key.split(',').map(Number);
+            const rectangle = L.rectangle([[lat, lng], [lat - cellSizeLat, lng + cellSizeLng]], {
+                color: "red",
+                weight: 2,
+                fillColor: "red",
+                fillOpacity: 0.3
+            }).addTo(rasterLayers['selected']);
+            rectangle.on('click', () => toggleCellSelection(key, rectangle, cell));
+        });
+
+        const areas = calculateCriteriaAreas(raster1, raster2);
+        updateCriteriaInfo(solution, criteria, areas, criteriaColorScale);
+    }
+
+    function calculateCriteriaAreas(raster1, raster2) {
+        let area1 = 0, area2 = 0, overlapArea = 0;
+        const totalCells = raster1.length * raster1[0].length;
+
+        for (let y = 0; y < raster1.length; y++) {
+            for (let x = 0; x < raster1[0].length; x++) {
+                if (raster1[y][x]) area1++;
+                if (raster2[y][x]) area2++;
+                if (raster1[y][x] && raster2[y][x]) overlapArea++;
+            }
+        }
+
+        return {
+            criteria1: (area1 / totalCells) * 100,
+            criteria2: (area2 / totalCells) * 100,
+            overlap: (overlapArea / totalCells) * 100
+        };
+    }
+
+    function updateCriteriaInfo(solution, criteria, areas, colorScale) {
+        const infoPanel = d3.select("#infoPanel");
+        infoPanel.html(`
+            <h3>${solution}</h3>
+            <table>
+                <tr>
+                    <th>Criterion</th>
+                    <th>Coverage</th>
+                </tr>
+                <tr>
+                    <td>
+                        <span style="display: inline-block; width: 10px; height: 10px; background-color: ${colorScale(criteria[0])}; margin-right: 5px;"></span>
+                        ${criteria[0]}
+                    </td>
+                    <td>${areas.criteria1.toFixed(1)}%</td>
+                </tr>
+                <tr>
+                    <td>
+                        <span style="display: inline-block; width: 10px; height: 10px; background-color: ${colorScale(criteria[1])}; margin-right: 5px;"></span>
+                        ${criteria[1]}
+                    </td>
+                    <td>${areas.criteria2.toFixed(1)}%</td>
+                </tr>
+                <tr>
+                    <td>
+                        <span style="display: inline-block; width: 10px; height: 10px; background: linear-gradient(to right, ${colorScale(criteria[0])}, ${colorScale(criteria[1])}); margin-right: 5px;"></span>
+                        Overlap
+                    </td>
+                    <td>${areas.overlap.toFixed(1)}%</td>
+                </tr>
+            </table>
+            <p>Cost: £${solutionCosts[solution]}/m²</p>
+            <button class="back-to-map-button" onclick="backToImpactMap()">Back to Map</button>
+        `);
+    }
+
+    function backToImpactMap() {
+        isViewingCriteriaRasters = false;
+        document.querySelector('.leaflet-tile-pane').classList.remove('transparent');
+
+        Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
+        updateMap(currentCategory);
+        updateScores();
+    }
+
+    function resetGridPosition() {
+        gridOrigin = map.getCenter();
+        updateMap(currentCategory);
+    }
+
+    function addResetGridButton() {
+        const resetButton = L.control({position: 'bottomleft'});
+        resetButton.onAdd = function() {
+            const div = L.DomUtil.create('div', 'reset-grid-button');
+            div.innerHTML = '<button onclick="resetGridPosition()">Reset Grid Position</button>';
+            return div;
+        };
+        resetButton.addTo(map);
+    }
+
+    function updateCriteriaOverlapGraph() {
+        const criteriaOverlap = {};
+        selectedCells.forEach(({cell}) => {
+            Object.entries(solutionCriteria).forEach(([solution, criteria]) => {
+                criteria.forEach(criterion => {
+                    if (!criteriaOverlap[criterion]) criteriaOverlap[criterion] = 0;
+                    criteriaOverlap[criterion] += cell[solution].area * challengeCategories[currentCategory][solution];
+                });
+            });
+        });
+
+        const svg = d3.select("#criteriaOverlapGraph");
+        svg.selectAll("*").remove();
+
+        const margin = {top: 20, right: 20, bottom: 30, left: 40};
+        const width = 260 - margin.left - margin.right;
+        const height = 200 - margin.top - margin.bottom;
+
+        const g = svg.append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleBand()
+            .rangeRound([0, width])
+            .padding(0.1)
+            .domain(Object.keys(criteriaOverlap));
+
+        const y = d3.scaleLinear()
+            .rangeRound([height, 0])
+            .domain([0, d3.max(Object.values(criteriaOverlap))]);
+
+        g.append("g")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(x))
+            .selectAll("text")
+            .attr("transform", "rotate(-45)")
+            .style("text-anchor", "end");
+
+        g.append("g")
+            .call(d3.axisLeft(y));
+
+        g.selectAll(".bar")
+            .data(Object.entries(criteriaOverlap))
+            .enter().append("rect")
+            .attr("class", "bar")
+            .attr("x", d => x(d[0]))
+            .attr("y", d => y(d[1]))
+            .attr("width", x.bandwidth())
+            .attr("height", d => height - y(d[1]))
+            .attr("fill", d => colorScale(d[0]));
+    }
+
+    function updateSolutionCountGraph() {
+        const solutionCount = {};
+
+        selectedCells.forEach(({cell}) => {
+            let validSolutions = Object.entries(cell)
+                .filter(([sol, scores]) => {
+                    if (currentRanking === 'impact') {
+                        return scores.impact > 0 && scores.impact >= currentThreshold;
+                    } else {
+                        return scores.cost > 0 && scores.cost <= currentThreshold;
+                    }
+                })
+                .sort((a, b) => {
+                    if (currentRanking === 'impact') {
+                        const weightA = challengeCategories[currentCategory][a[0]];
+                        const weightB = challengeCategories[currentCategory][b[0]];
+                        return (b[1].impact * weightB) - (a[1].impact * weightA);
+                    } else {
+                        return a[1].cost - b[1].cost;
+                    }
+                });
+
+            if (validSolutions.length >= currentRank) {
+                const visibleSolution = validSolutions[currentRank - 1][0];
+                if (!solutionCount[visibleSolution]) solutionCount[visibleSolution] = 0;
+                solutionCount[visibleSolution]++;
+            }
+        });
+
+        const svg = d3.select("#solutionCountGraph");
+        svg.selectAll("*").remove();
+
+        const margin = {top: 20, right: 20, bottom: 30, left: 40};
+        const width = 260 - margin.left - margin.right;
+        const height = 200 - margin.top - margin.bottom;
+
+        const g = svg.append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleBand()
+            .rangeRound([0, width])
+            .padding(0.1)
+            .domain(Object.keys(solutionCount));
+
+        const y = d3.scaleLinear()
+            .rangeRound([height, 0])
+            .domain([0, d3.max(Object.values(solutionCount)) || 1]);
+
+        g.append("g")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(x))
+            .selectAll("text")
+            .attr("transform", "rotate(-45)")
+            .style("text-anchor", "end");
+
+        g.append("g")
+            .call(d3.axisLeft(y));
+
+        g.selectAll(".bar")
+            .data(Object.entries(solutionCount))
+            .enter().append("rect")
+            .attr("class", "bar")
+            .attr("x", d => x(d[0]))
+            .attr("y", d => y(d[1]))
+            .attr("width", x.bandwidth())
+            .attr("height", d => height - y(d[1]))
+            .attr("fill", d => colorScale(d[0]));
+
+            svg.append("text")
+            .attr("x", (width / 2) + margin.left)
+            .attr("y", margin.top / 2)
+            .attr("text-anchor", "middle")
+            .style("font-size", "16px")
+            .text(`Visible Solutions (Rank ${currentRank}) in Selected Cells`);
+    }
+
+    d3.select("#categoryDropdown .dropbtn").text(currentCategory);
+
+    d3.select("#categoryButtons")
+        .selectAll("button")
+        .filter(d => d === currentCategory)
+        .classed("active", true);
+
+    updateMap(currentCategory);
+    updateScores();
+    addResetGridButton();
+
+    window.toggleRanking = toggleRanking;
+    window.clearSelection = clearSelection;
+    window.toggleDrawMode = toggleDrawMode;
+    window.backToImpactMap = backToImpactMap;
+    window.resetGridPosition = resetGridPosition;
+
+    createButtons("categoryButtons", Object.keys(challengeCategories), "category-button");
+
+}
+
+fetchJSONData();
+
+// Global functions that need to be accessible from HTML
+function toggleRanking() {
+    currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
+    const toggleButton = document.getElementById('rankingToggle');
+    toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
+    toggleButton.classList.toggle('active');
+
+    const categoryDropdown = document.getElementById('categoryDropdown');
+    categoryDropdown.style.display = currentRanking === 'impact' ? 'block' : 'none';
+
+    if (currentRanking === 'impact') {
+        thresholdSlider.value = 0;
+        thresholdSlider.max = 100;
+    } else {
+        thresholdSlider.value = Math.max(...Object.values(solutionCosts));
+        thresholdSlider.max = Math.max(...Object.values(solutionCosts)) * 100;
+    }
+    currentThreshold = parseInt(thresholdSlider.value);
+    thresholdValue.textContent = currentThreshold;
+
+    updateMap(currentCategory);
+    updateScores();
+}
+
+function clearSelection() {
+    selectedCells.forEach(({rectangle}) => {
+        rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
+    });
+    selectedCells.clear();
+    if (drawLayer) {
+        map.removeLayer(drawLayer);
+    }
+    updateScores();
+    updateSolutionCountGraph();
+}
+
+function toggleDrawMode() {
+    isDrawMode = !isDrawMode;
+    const drawToggle = document.getElementById('drawToggle');
+    drawToggle.classList.toggle('active');
+
+    if (isDrawMode) {
+        map.dragging.disable();
+        drawToggle.textContent = 'Now Drawing';
+        map.on('mousedown', startDrawing);
+        map.on('mousemove', continueDrawing);
+        map.on('mouseup', finishDrawing);
+    } else {
+        map.dragging.enable();
+        drawToggle.textContent = 'Draw Select Area';
+        map.off('mousedown', startDrawing);
+        map.off('mousemove', continueDrawing);
+        map.off('mouseup', finishDrawing);
+    }
+}
+
+function backToImpactMap() {
+    isViewingCriteriaRasters = false;
+    document.querySelector('.leaflet-tile-pane').classList.remove('transparent');
+
+    Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
+    updateMap(currentCategory);
+    updateScores();
+}
+
+function resetGridPosition() {
+    gridOrigin = map.getCenter();
+    updateMap(currentCategory);
+}
+
+// Event listeners for sliders
+document.getElementById('thresholdSlider').addEventListener('input', function() {
+    currentThreshold = parseInt(this.value);
+    document.getElementById('thresholdValue').textContent = currentThreshold;
+    updateMap(currentCategory);
+    updateScores();
+});
+
+document.getElementById('rankSlider').addEventListener('input', function() {
+    currentRank = parseInt(this.value);
+    document.getElementById('rankValue').textContent = currentRank;
+    updateMap(currentCategory);
+    updateScores();
+});
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', function() {
     fetchJSONData();
+});
     </script>
 </body>
 </html>

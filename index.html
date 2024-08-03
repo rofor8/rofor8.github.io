@@ -169,7 +169,7 @@
     <div id="app-container">
         <div id="controlPanel">
             <button id="drawToggle" class="toggle-button" onclick="toggleDrawMode()">Draw Select Area</button>
-            <button id="rankingToggle" class="toggle-button" onclick="toggleRanking()">Rank by: Impact</button>
+            <button id="rankingToggle" class="toggle-button" onclick="toggleRanking()">Ranked by: Impact</button>
             <div class="slider-container">
                 <label for="thresholdSlider">Threshold:</label>
                 <input type="range" id="thresholdSlider" min="0" max="100" step="1" value="0">
@@ -185,6 +185,8 @@
                 <div id="categoryButtons" class="dropdown-content"></div>
             </div>
             <button class="clear-selection-button" onclick="clearSelection()">Clear Selection</button>
+            <svg id="criteriaOverlapGraph" width="260" height="200"></svg>
+            <svg id="solutionCountGraph" width="260" height="200"></svg>
         </div>
         
         <div id="mapContainer">
@@ -393,7 +395,7 @@
                     
                     if (validSolutions.length > 0) {
                         let sortedSolutions = validSolutions.sort((a, b) => 
-                            currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
+                        currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
                         );
 
                         if (currentRank <= sortedSolutions.length) {
@@ -452,6 +454,9 @@
                     rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
                 }
             });
+
+            updateSolutionCountGraph();
+            updateScores();
         }
 
         function toggleCellSelection(key, rectangle, cell) {
@@ -532,7 +537,7 @@
                         rankTotalCells += scores.count;
                     });
 
-                    html += `<tr class="rank-total">
+                    html += `<tr class="rank-total ${rank == currentRank ? 'current-rank' : ''}">
                                 <td><strong>Rank ${rank} Total</strong></td>
                                 <td><strong>${rankTotalImpact.toFixed(0)}</strong></td>
                                 <td><strong>£${rankTotalCost.toFixed(0)}</strong></td>
@@ -551,12 +556,14 @@
                         displayCriteriaRasters(solution);
                     }
                 });
+
+            updateCriteriaOverlapGraph();
         }
 
         function toggleRanking() {
             currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
             const toggleButton = document.getElementById('rankingToggle');
-            toggleButton.textContent = `Rank by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
+            toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
             toggleButton.classList.toggle('active');
 
             const categoryDropdown = document.getElementById('categoryDropdown');
@@ -756,14 +763,14 @@
                     </tr>
                     <tr>
                         <td>
-                            <span style="display: inline-block; width: 10px; height: 10px; background-color: ${colorScale(criteria[1])}; margin-right: 5px;"></span>
+<span style="display: inline-block; width: 10px; height: 10px; background-color: ${colorScale(criteria[1])}; margin-right: 5px;"></span>
                             ${criteria[1]}
                         </td>
                         <td>${areas.criteria2.toFixed(1)}%</td>
                     </tr>
                     <tr>
                         <td>
-<span style="display: inline-block; width: 10px; height: 10px; background: linear-gradient(to right, ${colorScale(criteria[0])}, ${colorScale(criteria[1])}); margin-right: 5px;"></span>
+                            <span style="display: inline-block; width: 10px; height: 10px; background: linear-gradient(to right, ${colorScale(criteria[0])}, ${colorScale(criteria[1])}); margin-right: 5px;"></span>
                             Overlap
                         </td>
                         <td>${areas.overlap.toFixed(1)}%</td>
@@ -796,6 +803,112 @@
                 return div;
             };
             resetButton.addTo(map);
+        }
+
+        function updateCriteriaOverlapGraph() {
+            const criteriaOverlap = {};
+            selectedCells.forEach(({cell}) => {
+                Object.entries(solutionCriteria).forEach(([solution, criteria]) => {
+                    criteria.forEach(criterion => {
+                        if (!criteriaOverlap[criterion]) criteriaOverlap[criterion] = 0;
+                        criteriaOverlap[criterion] += cell[solution].area;
+                    });
+                });
+            });
+
+            const svg = d3.select("#criteriaOverlapGraph");
+            svg.selectAll("*").remove();
+
+            const margin = {top: 20, right: 20, bottom: 30, left: 40};
+            const width = 260 - margin.left - margin.right;
+            const height = 200 - margin.top - margin.bottom;
+
+            const g = svg.append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            const x = d3.scaleBand()
+                .rangeRound([0, width])
+                .padding(0.1)
+                .domain(Object.keys(criteriaOverlap));
+
+            const y = d3.scaleLinear()
+                .rangeRound([height, 0])
+                .domain([0, d3.max(Object.values(criteriaOverlap))]);
+
+            g.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            g.append("g")
+                .call(d3.axisLeft(y));
+
+            g.selectAll(".bar")
+                .data(Object.entries(criteriaOverlap))
+                .enter().append("rect")
+                .attr("class", "bar")
+                .attr("x", d => x(d[0]))
+                .attr("y", d => y(d[1]))
+                .attr("width", x.bandwidth())
+                .attr("height", d => height - y(d[1]))
+                .attr("fill", d => colorScale(d[0]));
+        }
+
+        function updateSolutionCountGraph() {
+            const solutionCount = {};
+            gridLayer.eachLayer(layer => {
+                const cell = layer.cell;
+                Object.entries(cell).forEach(([solution, scores]) => {
+                    if (currentRanking === 'impact' && scores.impact >= currentThreshold) {
+                        if (!solutionCount[solution]) solutionCount[solution] = 0;
+                        solutionCount[solution]++;
+                    } else if (currentRanking === 'cost' && scores.cost <= currentThreshold) {
+                        if (!solutionCount[solution]) solutionCount[solution] = 0;
+                        solutionCount[solution]++;
+                    }
+                });
+            });
+
+            const svg = d3.select("#solutionCountGraph");
+            svg.selectAll("*").remove();
+
+            const margin = {top: 20, right: 20, bottom: 30, left: 40};
+            const width = 260 - margin.left - margin.right;
+            const height = 200 - margin.top - margin.bottom;
+
+            const g = svg.append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            const x = d3.scaleBand()
+                .rangeRound([0, width])
+                .padding(0.1)
+                .domain(Object.keys(solutionCount));
+
+            const y = d3.scaleLinear()
+                .rangeRound([height, 0])
+                .domain([0, d3.max(Object.values(solutionCount))]);
+
+            g.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            g.append("g")
+                .call(d3.axisLeft(y));
+
+            g.selectAll(".bar")
+                .data(Object.entries(solutionCount))
+                .enter().append("rect")
+                .attr("class", "bar")
+                .attr("x", d => x(d[0]))
+                .attr("y", d => y(d[1]))
+                .attr("width", x.bandwidth())
+                .attr("height", d => height - y(d[1]))
+                .attr("fill", d => colorScale(d[0]));
         }
 
         d3.select("#categoryDropdown .dropbtn").text(currentCategory);

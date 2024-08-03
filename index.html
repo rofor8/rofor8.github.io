@@ -248,8 +248,10 @@ async function fetchJSONData() {
 }
 
 function initializeApp() {
+    console.log('Initializing app');
     if (map) {
-        map.remove(); // Remove existing map if it exists
+        console.log('Removing existing map');
+        map.remove();
     }
     map = L.map('map').setView([51.454514, -2.587910], 16);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -463,100 +465,116 @@ function initializeApp() {
     }
 
     function toggleCellSelection(key, rectangle, cell) {
-        if (selectedCells.has(key)) {
-            selectedCells.delete(key);
-            rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
+    if (selectedCells.has(key)) {
+        selectedCells.delete(key);
+        if (isViewingCriteriaRasters) {
+            rasterLayers['selected'].removeLayer(rectangle);
         } else {
-            selectedCells.set(key, {cell: cell, rectangle: rectangle});
+            rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
+        }
+    } else {
+        selectedCells.set(key, {cell: cell, rectangle: rectangle});
+        if (isViewingCriteriaRasters) {
+            const [lat, lng] = key.split(',').map(Number);
+            L.rectangle([[lat, lng], [lat - cellSizeLat, lng + cellSizeLng]], {
+                color: "red",
+                weight: 2,
+                fillColor: "red",
+                fillOpacity: 0.3
+            }).addTo(rasterLayers['selected']);
+        } else {
             rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
         }
-        updateScores();
-        updateSolutionCountGraph();
     }
+    updateScores();
+    updateSolutionCountGraph();
+}
 
     function updateScores() {
         const infoPanel = d3.select("#infoPanel");
 
-        let html = `<h3>${selectedCells.size} cell${selectedCells.size > 1 ? 's' : ''} selected</h3>`;
+        let html = `<h3>${selectedCells.size} cell${selectedCells.size !== 1 ? 's' : ''} selected</h3>`;
 
         if (selectedCells.size === 0) {
-            html += "<p>No cells selected</p>";
-        } else {
-            const rankTotals = {};
-            selectedCells.forEach(({cell}) => {
-                let validSolutions = Object.entries(cell)
-                    .filter(([sol, scores]) => {
-                        if (currentRanking === 'impact') {
-                            return scores.impact > 0 && scores.impact >= currentThreshold;
-                        } else {
-                            return scores.cost > 0 && scores.cost <= currentThreshold;
-                        }
-                    })
-                    .sort((a, b) => {
-                        if (currentRanking === 'impact') {
-                            const weightA = challengeCategories[currentCategory][a[0]];
-                            const weightB = challengeCategories[currentCategory][b[0]];
-                            return (b[1].impact * weightB) - (a[1].impact * weightA);
-                        } else {
-                            return a[1].cost - b[1].cost;
-                        }
-                    });
-
-                validSolutions.forEach(([solution, scores], index) => {
-                    const rank = index + 1;
-                    if (!rankTotals[rank]) {
-                        rankTotals[rank] = {};
-                    }
-                    if (!rankTotals[rank][solution]) {
-                        rankTotals[rank][solution] = { impact: 0, cost: 0, count: 0 };
-                    }
-                    const weight = challengeCategories[currentCategory][solution];
-                    rankTotals[rank][solution].impact += scores.impact * weight;
-                    rankTotals[rank][solution].cost += scores.cost;
-                    rankTotals[rank][solution].count++;
-                });
-            });
-
-            Object.entries(rankTotals).forEach(([rank, solutions]) => {
-                html += `<h4>Rank ${rank}</h4>`;
-                html += `<table>
-                            <tr>
-                                <th>Solution</th>
-                                <th>Impact</th>
-                                <th>Cost</th>
-                                <th>Cells</th>
-                            </tr>`;
-                
-                let rankTotalImpact = 0;
-                let rankTotalCost = 0;
-                let rankTotalCells = 0;
-
-                Object.entries(solutions).forEach(([solution, scores]) => {
-                    const color = colorScale(solution);
-                    html += `<tr class="${rank == currentRank ? 'current-rank' : ''}" data-solution="${solution}">
-                                <td>
-                                    <span style="display: inline-block; width: 10px; height: 10px; background-color: ${color}; margin-right: 5px;"></span>
-                                    ${solution}
-                                </td>
-                                <td>${scores.impact.toFixed(0)}</td>
-                                <td>£${scores.cost.toFixed(0)}</td>
-                                <td>${scores.count}</td>
-                            </tr>`;
-                    
-                    rankTotalImpact += scores.impact;
-                    rankTotalCost += scores.cost;
-                    rankTotalCells += scores.count;
-                });
-
-                html += `<tr class="rank-total ${rank == currentRank ? 'current-rank' : ''}">
-                            <td><strong>Rank ${rank} Total</strong></td>
-                            <td><strong>${rankTotalImpact.toFixed(0)}</strong></td>
-                            <td><strong>£${rankTotalCost.toFixed(0)}</strong></td>
-                            <td><strong>${rankTotalCells}</strong></td>
-                        </tr>`;
-                html += "</table>";
-            });
+            html += "<p>No cells selected. Select cells on the map to see scores.</p>";
+            infoPanel.html(html);
+            return; // Exit the function early
         }
+
+        const rankTotals = {};
+        selectedCells.forEach(({cell}) => {
+            let validSolutions = Object.entries(cell)
+                .filter(([sol, scores]) => {
+                    if (currentRanking === 'impact') {
+                        return scores.impact > 0 && scores.impact >= currentThreshold;
+                    } else {
+                        return scores.cost > 0 && scores.cost <= currentThreshold;
+                    }
+                })
+                .sort((a, b) => {
+                    if (currentRanking === 'impact') {
+                        const weightA = challengeCategories[currentCategory][a[0]];
+                        const weightB = challengeCategories[currentCategory][b[0]];
+                        return (b[1].impact * weightB) - (a[1].impact * weightA);
+                    } else {
+                        return a[1].cost - b[1].cost;
+                    }
+                });
+
+            validSolutions.forEach(([solution, scores], index) => {
+                const rank = index + 1;
+                if (!rankTotals[rank]) {
+                    rankTotals[rank] = {};
+                }
+                if (!rankTotals[rank][solution]) {
+                    rankTotals[rank][solution] = { impact: 0, cost: 0, count: 0 };
+                }
+                const weight = challengeCategories[currentCategory][solution];
+                rankTotals[rank][solution].impact += scores.impact * weight;
+                rankTotals[rank][solution].cost += scores.cost;
+                rankTotals[rank][solution].count++;
+            });
+        });
+
+        Object.entries(rankTotals).forEach(([rank, solutions]) => {
+            html += `<h4>Rank ${rank}</h4>`;
+            html += `<table>
+                        <tr>
+                            <th>Solution</th>
+                            <th>Impact</th>
+                            <th>Cost</th>
+                            <th>Cells</th>
+                        </tr>`;
+            
+            let rankTotalImpact = 0;
+            let rankTotalCost = 0;
+            let rankTotalCells = 0;
+
+            Object.entries(solutions).forEach(([solution, scores]) => {
+                const color = colorScale(solution);
+                html += `<tr class="${rank == currentRank ? 'current-rank' : ''}" data-solution="${solution}">
+                            <td>
+                                <span style="display: inline-block; width: 10px; height: 10px; background-color: ${color}; margin-right: 5px;"></span>
+                                ${solution}
+                            </td>
+                            <td>${scores.impact.toFixed(0)}</td>
+                            <td>£${scores.cost.toFixed(0)}</td>
+                            <td>${scores.count}</td>
+                        </tr>`;
+                
+                rankTotalImpact += scores.impact;
+                rankTotalCost += scores.cost;
+                rankTotalCells += scores.count;
+            });
+
+            html += `<tr class="rank-total ${rank == currentRank ? 'current-rank' : ''}">
+                        <td><strong>Rank ${rank} Total</strong></td>
+                        <td><strong>${rankTotalImpact.toFixed(0)}</strong></td>
+                        <td><strong>£${rankTotalCost.toFixed(0)}</strong></td>
+                        <td><strong>${rankTotalCells}</strong></td>
+                    </tr>`;
+            html += "</table>";
+        });
 
         infoPanel.html(html);
 
@@ -595,23 +613,23 @@ function initializeApp() {
     }
 
     function createButtons(containerId, dataArray, buttonClass) {
-    const container = d3.select(`#${containerId}`);
-    container.selectAll("button")
-        .data(dataArray)
-        .enter().append("button")
-        .attr("class", buttonClass)
-        .text(d => d)
-        .on("click", function(event, d) {
-            d3.selectAll(".category-button").classed("active", false);
-            d3.select(this).classed("active", true);
-            d3.select("#categoryDropdown .dropbtn").text(d);
-            currentCategory = d;
-            currentSolution = null;
+        const container = d3.select(`#${containerId}`);
+        container.selectAll("button")
+            .data(dataArray)
+            .enter().append("button")
+            .attr("class", buttonClass)
+            .text(d => d)
+            .on("click", function(event, d) {
+                d3.selectAll(".category-button").classed("active", false);
+                d3.select(this).classed("active", true);
+                d3.select("#categoryDropdown .dropbtn").text(d);
+                currentCategory = d;
+                currentSolution = null;
 
-            updateMap(currentCategory);
-            updateScores();
-        });
-}
+                updateMap(currentCategory);
+                updateScores();
+            });
+    }
 
     function toggleDrawMode() {
         isDrawMode = !isDrawMode;
@@ -630,6 +648,10 @@ function initializeApp() {
             map.off('mousedown', startDrawing);
             map.off('mousemove', continueDrawing);
             map.off('mouseup', finishDrawing);
+            if (drawLayer) {
+                map.removeLayer(drawLayer);
+                drawLayer = null;
+            }
         }
     }
 
@@ -653,20 +675,31 @@ function initializeApp() {
     function finishDrawing(e) {
         if (isDrawMode) {
             drawingPath.push(drawingPath[0]);  // Close the polygon
-            drawLayer.setLatLngs(drawingPath);
-            selectCellsInShape(drawLayer);
-            toggleDrawMode();
+            if (drawLayer) {
+                drawLayer.setLatLngs(drawingPath);
+                selectCellsInShape(drawLayer);
+            }
+            toggleDrawMode(); // Turn off draw mode
         }
     }
 
     function selectCellsInShape(shape) {
-        clearSelection();
+        if (!gridLayer) return;
+
         gridLayer.eachLayer(function(layer) {
-            if (shape.getBounds().contains(layer.getBounds().getCenter())) {
-                const key = `${layer.getBounds().getNorth()},${layer.getBounds().getWest()}`;
-                toggleCellSelection(key, layer, layer.cell);
+            if (layer instanceof L.Rectangle) {
+                const bounds = layer.getBounds();
+                const center = bounds.getCenter();
+                if (shape.getBounds().contains(center)) {
+                    const key = `${bounds.getNorth()},${bounds.getWest()}`;
+                    toggleCellSelection(key, layer, layer.cell);
+                }
             }
         });
+
+        updateScores();
+        updateSolutionCountGraph();
+        updateCriteriaOverlapGraph();
     }
 
     function clearSelection() {
@@ -676,64 +709,74 @@ function initializeApp() {
         selectedCells.clear();
         if (drawLayer) {
             map.removeLayer(drawLayer);
+            drawLayer = null;
         }
+        updateMap(currentCategory);
         updateScores();
+        updateSolutionCountGraph();
+        updateCriteriaOverlapGraph();
     }
 
     function displayCriteriaRasters(solution) {
-        isViewingCriteriaRasters = true;
-        document.querySelector('.leaflet-tile-pane').classList.add('transparent');
+    isViewingCriteriaRasters = true;
+    document.querySelector('.leaflet-tile-pane').classList.add('transparent');
 
-        const criteria = solutionCriteria[solution];
-        const raster1 = criteriaRasters[criteria[0]];
-        const raster2 = criteriaRasters[criteria[1]];
+    const criteria = solutionCriteria[solution];
+    const raster1 = criteriaRasters[criteria[0]];
+    const raster2 = criteriaRasters[criteria[1]];
 
-        if (gridLayer) {
-            map.removeLayer(gridLayer);
-        }
-        Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-        rasterLayers = {};
+    if (gridLayer) {
+        map.removeLayer(gridLayer);
+    }
+    Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
+    rasterLayers = {};
 
-        const allCriteria = [...new Set(Object.values(solutionCriteria).flat())];
-        const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(allCriteria);
+    const allCriteria = [...new Set(Object.values(solutionCriteria).flat())];
+    const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(allCriteria);
 
-        criteria.forEach((criterion, index) => {
-            const raster = criteriaRasters[criterion];
-            const rasterLayer = L.layerGroup().addTo(map);
-            rasterLayers[criterion] = rasterLayer;
+    criteria.forEach((criterion, index) => {
+        const raster = criteriaRasters[criterion];
+        const rasterLayer = L.layerGroup().addTo(map);
+        rasterLayers[criterion] = rasterLayer;
 
-            raster.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value) {
-                        const cellBounds = [
-                            [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                            [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                        ];
-                        L.rectangle(cellBounds, {
-                            color: "none",
-                            fillColor: criteriaColorScale(criterion),
-                            fillOpacity: 0.5
-                        }).addTo(rasterLayer);
-                    }
-                });
+        raster.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value) {
+                    const cellBounds = [
+                        [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                        [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+                    ];
+                    L.rectangle(cellBounds, {
+                        color: "none",
+                        fillColor: criteriaColorScale(criterion),
+                        fillOpacity: 0.5
+                    }).addTo(rasterLayer);
+                }
             });
         });
+    });
 
-        rasterLayers['selected'] = L.layerGroup().addTo(map);
-        selectedCells.forEach(({cell}, key) => {
-            const [lng, lat] = key.split(',').map(Number);
-            const rectangle = L.rectangle([[lat, lng], [lat - cellSizeLat, lng + cellSizeLng]], {
-                color: "red",
-                weight: 2,
-                fillColor: "red",
-                fillOpacity: 0.3
-            }).addTo(rasterLayers['selected']);
-            rectangle.on('click', () => toggleCellSelection(key, rectangle, cell));
+    // Add a new layer for selected cells
+    rasterLayers['selected'] = L.layerGroup().addTo(map);
+    selectedCells.forEach(({cell}, key) => {
+        const [lat, lng] = key.split(',').map(Number);
+        const rectangle = L.rectangle([[lat, lng], [lat - cellSizeLat, lng + cellSizeLng]], {
+            color: "red",
+            weight: 2,
+            fillColor: "red",
+            fillOpacity: 0.3
+        }).addTo(rasterLayers['selected']);
+        
+        // Preserve the click functionality
+        rectangle.on('click', () => {
+            toggleCellSelection(key, rectangle, cell);
+            updateCriteriaInfo(solution, criteria, calculateCriteriaAreas(raster1, raster2), criteriaColorScale);
         });
+    });
 
-        const areas = calculateCriteriaAreas(raster1, raster2);
-        updateCriteriaInfo(solution, criteria, areas, criteriaColorScale);
-    }
+    const areas = calculateCriteriaAreas(raster1, raster2);
+    updateCriteriaInfo(solution, criteria, areas, criteriaColorScale);
+}
 
     function calculateCriteriaAreas(raster1, raster2) {
         let area1 = 0, area2 = 0, overlapArea = 0;
@@ -923,7 +966,7 @@ function initializeApp() {
         g.append("g")
             .call(d3.axisLeft(y));
 
-        g.selectAll(".bar")
+            g.selectAll(".bar")
             .data(Object.entries(solutionCount))
             .enter().append("rect")
             .attr("class", "bar")
@@ -933,13 +976,15 @@ function initializeApp() {
             .attr("height", d => height - y(d[1]))
             .attr("fill", d => colorScale(d[0]));
 
-            svg.append("text")
+        svg.append("text")
             .attr("x", (width / 2) + margin.left)
             .attr("y", margin.top / 2)
             .attr("text-anchor", "middle")
             .style("font-size", "16px")
             .text(`Visible Solutions (Rank ${currentRank}) in Selected Cells`);
     }
+
+    createButtons("categoryButtons", Object.keys(challengeCategories), "category-button");
 
     d3.select("#categoryDropdown .dropbtn").text(currentCategory);
 
@@ -952,14 +997,30 @@ function initializeApp() {
     updateScores();
     addResetGridButton();
 
+    // Add click event listener to toggle the dropdown
+    document.querySelector('.dropbtn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        document.getElementById('categoryButtons').classList.toggle('show');
+    });
+
+    // Close the dropdown if clicked outside
+    window.addEventListener('click', function(e) {
+        if (!e.target.matches('.dropbtn')) {
+            var dropdowns = document.getElementsByClassName("dropdown-content");
+            for (var d = 0; d < dropdowns.length; d++) {
+                var openDropdown = dropdowns[d];
+                if (openDropdown.classList.contains('show')) {
+                    openDropdown.classList.remove('show');
+                }
+            }
+        }
+    });
+
     window.toggleRanking = toggleRanking;
     window.clearSelection = clearSelection;
     window.toggleDrawMode = toggleDrawMode;
     window.backToImpactMap = backToImpactMap;
     window.resetGridPosition = resetGridPosition;
-
-    createButtons("categoryButtons", Object.keys(challengeCategories), "category-button");
-
 }
 
 fetchJSONData();
@@ -995,9 +1056,12 @@ function clearSelection() {
     selectedCells.clear();
     if (drawLayer) {
         map.removeLayer(drawLayer);
+        drawLayer = null;
     }
+    updateMap(currentCategory);
     updateScores();
     updateSolutionCountGraph();
+    updateCriteriaOverlapGraph();
 }
 
 function toggleDrawMode() {
@@ -1017,6 +1081,10 @@ function toggleDrawMode() {
         map.off('mousedown', startDrawing);
         map.off('mousemove', continueDrawing);
         map.off('mouseup', finishDrawing);
+        if (drawLayer) {
+            map.removeLayer(drawLayer);
+            drawLayer = null;
+        }
     }
 }
 
@@ -1040,6 +1108,7 @@ document.getElementById('thresholdSlider').addEventListener('input', function() 
     document.getElementById('thresholdValue').textContent = currentThreshold;
     updateMap(currentCategory);
     updateScores();
+    updateSolutionCountGraph();
 });
 
 document.getElementById('rankSlider').addEventListener('input', function() {
@@ -1047,12 +1116,54 @@ document.getElementById('rankSlider').addEventListener('input', function() {
     document.getElementById('rankValue').textContent = currentRank;
     updateMap(currentCategory);
     updateScores();
+    updateSolutionCountGraph();
 });
 
-// Initialize the application
-document.addEventListener('DOMContentLoaded', function() {
-    fetchJSONData();
-});
+// Functions needed for draw mode
+function startDrawing(e) {
+    drawingPath = [e.latlng];
+    if (drawLayer) {
+        map.removeLayer(drawLayer);
+    }
+    drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
+}
+
+function continueDrawing(e) {
+    if (isDrawMode && drawingPath.length > 0) {
+        drawingPath.push(e.latlng);
+        drawLayer.setLatLngs(drawingPath);
+    }
+}
+
+function finishDrawing(e) {
+    if (isDrawMode) {
+        drawingPath.push(drawingPath[0]);  // Close the polygon
+        if (drawLayer) {
+            drawLayer.setLatLngs(drawingPath);
+            selectCellsInShape(drawLayer);
+        }
+        toggleDrawMode(); // Turn off draw mode
+    }
+}
+
+function selectCellsInShape(shape) {
+    if (!gridLayer) return;
+
+    gridLayer.eachLayer(function(layer) {
+        if (layer instanceof L.Rectangle) {
+            const bounds = layer.getBounds();
+            const center = bounds.getCenter();
+            if (shape.getBounds().contains(center)) {
+                const key = `${bounds.getNorth()},${bounds.getWest()}`;
+                toggleCellSelection(key, layer, layer.cell);
+            }
+        }
+    });
+
+    updateScores();
+    updateSolutionCountGraph();
+    updateCriteriaOverlapGraph();
+}
     </script>
 </body>
 </html>

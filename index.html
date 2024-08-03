@@ -199,21 +199,7 @@
     <script>
 let solutionCriteria = {};
 let challengeCategories = {};
-let solutionCosts = {
-    "sustainable drainage": 50,
-    "green and blue roofs": 100,
-    "green walls": 80,
-    "rain gardens": 60,
-    "swales": 40,
-    "features for species": 30,
-    "trees in hard landscapes": 70,
-    "street furniture": 20,
-    "traffic-free routes": 90,
-    "allotments": 25,
-    "orchards": 35,
-    "private domestic gardens": 15,
-    "green spaces": 45
-};
+let solutionCosts = {};
 let map;
 let gridLayer;
 let rasterLayers = {};
@@ -233,13 +219,15 @@ let isDrawMode = false;
 
 async function fetchJSONData() {
     try {
-        const [solutionCriteriaResponse, challengeCategoriesResponse] = await Promise.all([
+        const [solutionCriteriaResponse, challengeCategoriesResponse, solutionCostsResponse] = await Promise.all([
             fetch('solutionCriteria.json'),
-            fetch('challengeCategories.json')
+            fetch('challengeCategories.json'),
+            fetch('solutionCosts.json')
         ]);
 
         solutionCriteria = await solutionCriteriaResponse.json();
         challengeCategories = await challengeCategoriesResponse.json();
+        solutionCosts = await solutionCostsResponse.json();
 
         initializeApp();
     } catch (error) {

@@ -468,6 +468,7 @@
                 rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
             }
             updateScores();
+                updateSolutionCountGraph(); // Add this line
         }
 
         function updateScores() {
@@ -857,59 +858,74 @@
         }
 
         function updateSolutionCountGraph() {
-            const solutionCount = {};
-            gridLayer.eachLayer(layer => {
-                const cell = layer.cell;
-                Object.entries(cell).forEach(([solution, scores]) => {
-                    if (currentRanking === 'impact' && scores.impact >= currentThreshold) {
-                        if (!solutionCount[solution]) solutionCount[solution] = 0;
-                        solutionCount[solution]++;
-                    } else if (currentRanking === 'cost' && scores.cost <= currentThreshold) {
-                        if (!solutionCount[solution]) solutionCount[solution] = 0;
-                        solutionCount[solution]++;
-                    }
-                });
-            });
+    const solutionCount = {};
 
-            const svg = d3.select("#solutionCountGraph");
-            svg.selectAll("*").remove();
+    selectedCells.forEach(({cell}) => {
+        let validSolutions = Object.entries(cell)
+            .filter(([sol, scores]) => {
+                if (currentRanking === 'impact') {
+                    return scores.impact > 0 && scores.impact >= currentThreshold;
+                } else {
+                    return scores.cost > 0 && scores.cost <= currentThreshold;
+                }
+            })
+            .sort((a, b) => 
+                currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
+            );
 
-            const margin = {top: 20, right: 20, bottom: 30, left: 40};
-            const width = 260 - margin.left - margin.right;
-            const height = 200 - margin.top - margin.bottom;
-
-            const g = svg.append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
-
-            const x = d3.scaleBand()
-                .rangeRound([0, width])
-                .padding(0.1)
-                .domain(Object.keys(solutionCount));
-
-            const y = d3.scaleLinear()
-                .rangeRound([height, 0])
-                .domain([0, d3.max(Object.values(solutionCount))]);
-
-            g.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x))
-                .selectAll("text")
-                .attr("transform", "rotate(-45)")
-                .style("text-anchor", "end");
-
-            g.append("g")
-                .call(d3.axisLeft(y));
-
-            g.selectAll(".bar")
-                .data(Object.entries(solutionCount))
-                .enter().append("rect")
-                .attr("class", "bar")
-                .attr("x", d => x(d[0]))
-                .attr("y", d => y(d[1]))
-                .attr("width", x.bandwidth())
-                .attr("height", d => height - y(d[1]))
-                .attr("fill", d => colorScale(d[0]));
+        if (validSolutions.length >= currentRank) {
+            const visibleSolution = validSolutions[currentRank - 1][0];
+            if (!solutionCount[visibleSolution]) solutionCount[visibleSolution] = 0;
+            solutionCount[visibleSolution]++;
         }
+    });
+
+    const svg = d3.select("#solutionCountGraph");
+    svg.selectAll("*").remove();
+
+    const margin = {top: 20, right: 20, bottom: 30, left: 40};
+    const width = 260 - margin.left - margin.right;
+    const height = 200 - margin.top - margin.bottom;
+
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scaleBand()
+        .rangeRound([0, width])
+        .padding(0.1)
+        .domain(Object.keys(solutionCount));
+
+    const y = d3.scaleLinear()
+        .rangeRound([height, 0])
+        .domain([0, d3.max(Object.values(solutionCount)) || 1]);
+
+    g.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(x))
+        .selectAll("text")
+        .attr("transform", "rotate(-45)")
+        .style("text-anchor", "end");
+
+    g.append("g")
+        .call(d3.axisLeft(y));
+
+    g.selectAll(".bar")
+        .data(Object.entries(solutionCount))
+        .enter().append("rect")
+        .attr("class", "bar")
+        .attr("x", d => x(d[0]))
+        .attr("y", d => y(d[1]))
+        .attr("width", x.bandwidth())
+        .attr("height", d => height - y(d[1]))
+        .attr("fill", d => colorScale(d[0]));
+
+    svg.append("text")
+        .attr("x", (width / 2) + margin.left)
+        .attr("y", margin.top / 2)
+        .attr("text-anchor", "middle")
+        .style("font-size", "16px")
+        .text(`Visible Solutions (Rank ${currentRank}) in Selected Cells`);
+}
 
         d3.select("#categoryDropdown .dropbtn").text(currentCategory);
 

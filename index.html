@@ -413,8 +413,8 @@ function initializeApp() {
             const rectangle = L.rectangle(cellBounds, {
                 color: isSelected ? "red" : "none",
                 weight: isSelected ? 2 : 0,
-                fillColor: isSelected ? "red" : fillColor,
-                fillOpacity: isSelected ? 0.3 : fillOpacity
+                fillColor: fillColor,
+                fillOpacity: fillOpacity
             }).addTo(gridLayer);
 
             rectangle.cell = cell;
@@ -450,10 +450,10 @@ function initializeApp() {
     function toggleCellSelection(key, rectangle, cell) {
     if (selectedCells.has(key)) {
         selectedCells.delete(key);
-        rectangle.setStyle({color: "none", weight: 0, fillOpacity: 0.7});
+        rectangle.setStyle({color: "none", weight: 0});
     } else {
         selectedCells.set(key, {cell: cell, rectangle: rectangle});
-        rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
+        rectangle.setStyle({color: "red", weight: 2});
     }
     updateScores();
     updateSolutionCountGraph();
@@ -659,7 +659,7 @@ function initializeApp() {
 function clearSelection() {
     selectedCells.forEach(({rectangle}) => {
         if (rectangle && rectangle.setStyle) {
-            rectangle.setStyle({color: "none", weight: 0, fillOpacity: 0.7});
+            rectangle.setStyle({color: "none", weight: 0});
         }
     });
     selectedCells.clear();

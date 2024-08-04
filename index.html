@@ -664,55 +664,93 @@
     }
 
     function toggleDrawMode() {
-        isDrawMode = !isDrawMode;
-        const drawToggle = document.getElementById('drawToggle');
-        drawToggle.classList.toggle('active');
+    isDrawMode = !isDrawMode;
+    const drawToggle = document.getElementById('drawToggle');
+    drawToggle.classList.toggle('active');
 
-        if (isDrawMode) {
-            map.dragging.disable();
-            map.on('mousedown touchstart', startDrawing);
-            map.on('mousemove touchmove', continueDrawing);
-            map.on('mouseup touchend', finishDrawing);
-        } else {
-            map.dragging.enable();
-            map.off('mousedown touchstart', startDrawing);
-            map.off('mousemove touchmove', continueDrawing);
-            map.off('mouseup touchend', finishDrawing);
-            if (drawLayer) {
-                map.removeLayer(drawLayer);
-                drawLayer = null;
-            }
-        }
-    }
-
-    let drawingPath = [];
-
-    function startDrawing(e) {
-        drawingPath = [e.latlng || map.mouseEventToLatLng(e.originalEvent.touches[0])];
+    if (isDrawMode) {
+        map.dragging.disable();
+        map.on('mousedown', startDrawing);
+        map.on('mousemove', continueDrawing);
+        map.on('mouseup', finishDrawing);
+        map.on('touchstart', startDrawingTouch);
+        map.on('touchmove', continueDrawingTouch);
+        map.on('touchend', finishDrawingTouch);
+    } else {
+        map.dragging.enable();
+        map.off('mousedown', startDrawing);
+        map.off('mousemove', continueDrawing);
+        map.off('mouseup', finishDrawing);
+        map.off('touchstart', startDrawingTouch);
+        map.off('touchmove', continueDrawingTouch);
+        map.off('touchend', finishDrawingTouch);
         if (drawLayer) {
             map.removeLayer(drawLayer);
+            drawLayer = null;
         }
-        drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
     }
+}
 
-    function continueDrawing(e) {
-        if (isDrawMode && drawingPath.length > 0) {
-            const latlng = e.latlng || map.mouseEventToLatLng(e.originalEvent.touches[0]);
-            drawingPath.push(latlng);
+let drawingPath = [];
+
+function startDrawing(e) {
+    drawingPath = [e.latlng];
+    if (drawLayer) {
+        map.removeLayer(drawLayer);
+    }
+    drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
+}
+
+function continueDrawing(e) {
+    if (isDrawMode && drawingPath.length > 0) {
+        drawingPath.push(e.latlng);
+        drawLayer.setLatLngs(drawingPath);
+    }
+}
+
+function finishDrawing(e) {
+    if (isDrawMode) {
+        drawingPath.push(drawingPath[0]);  // Close the polygon
+        if (drawLayer) {
             drawLayer.setLatLngs(drawingPath);
+            selectCellsInShape(drawLayer);
         }
+        toggleDrawMode(); // Turn off draw mode
     }
+}
 
-    function finishDrawing(e) {
-        if (isDrawMode) {
-            drawingPath.push(drawingPath[0]);  // Close the polygon
-            if (drawLayer) {
-                drawLayer.setLatLngs(drawingPath);
-                selectCellsInShape(drawLayer);
-            }
-            toggleDrawMode(); // Turn off draw mode
-        }
+function startDrawingTouch(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const latlng = map.mouseEventToLatLng(touch);
+    drawingPath = [latlng];
+    if (drawLayer) {
+        map.removeLayer(drawLayer);
     }
+    drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
+}
+
+function continueDrawingTouch(e) {
+    e.preventDefault();
+    if (isDrawMode && drawingPath.length > 0) {
+        const touch = e.touches[0];
+        const latlng = map.mouseEventToLatLng(touch);
+        drawingPath.push(latlng);
+        drawLayer.setLatLngs(drawingPath);
+    }
+}
+
+function finishDrawingTouch(e) {
+    e.preventDefault();
+    if (isDrawMode) {
+        drawingPath.push(drawingPath[0]);  // Close the polygon
+        if (drawLayer) {
+            drawLayer.setLatLngs(drawingPath);
+            selectCellsInShape(drawLayer);
+        }
+        toggleDrawMode(); // Turn off draw mode
+    }
+}
 
     function selectCellsInShape(shape) {
         if (!gridLayer) return;

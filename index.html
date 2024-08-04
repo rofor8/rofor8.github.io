@@ -372,21 +372,21 @@ function initializeApp() {
         };
 
         suitabilityScores.forEach((row, y) => {
-            row.forEach((cell, x) => {
-                const cellBounds = [
-                    [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                    [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                ];
+    row.forEach((cell, x) => {
+        const cellBounds = [
+            [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+            [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+        ];
 
-                let fillColor, fillOpacity;
-                const validSolutions = Object.entries(cell)
-                    .filter(([sol, scores]) => {
-                        if (currentRanking === 'impact') {
-                            return scores.impact > 0;
-                        } else {
-                            return scores.cost > 0;
-                        }
-                    });
+        let fillColor, fillOpacity;
+        const validSolutions = Object.entries(cell)
+            .filter(([sol, scores]) => {
+                if (currentRanking === 'impact') {
+                    return scores.impact > 0;
+                } else {
+                    return scores.cost > 0;
+                }
+            });
                 
                 if (validSolutions.length > 0) {
                     let sortedSolutions = validSolutions.sort((a, b) => 
@@ -406,23 +406,26 @@ function initializeApp() {
                     fillOpacity = 0;
                 }
 
-                const rectangle = L.rectangle(cellBounds, {
-                    color: "none",
-                    weight: 0,
-                    fillColor: fillColor,
-                    fillOpacity: fillOpacity
-                }).addTo(gridLayer);
+                const key = `${gridExtent.west + x * cellSizeLng},${gridExtent.north - y * cellSizeLat}`;
+            
+            let isSelected = selectedCells.has(key);
+            
+            const rectangle = L.rectangle(cellBounds, {
+                color: isSelected ? "red" : "none",
+                weight: isSelected ? 2 : 0,
+                fillColor: isSelected ? "red" : fillColor,
+                fillOpacity: isSelected ? 0.3 : fillOpacity
+            }).addTo(gridLayer);
 
-                rectangle.cell = cell;  // Store cell data with the rectangle
+            rectangle.cell = cell;
 
-                const key = `${cellBounds[0][1]},${cellBounds[0][0]}`;
-                rectangle.on('click', () => toggleCellSelection(key, rectangle, cell));
+            rectangle.on('click', () => toggleCellSelection(key, rectangle, cell));
 
-                if (selectedCells.has(key)) {
-                    rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
-                }
-            });
+            if (isSelected) {
+                selectedCells.set(key, {cell: cell, rectangle: rectangle});
+            }
         });
+    });
 
         const maxRank = Math.max(...suitabilityScores.flat().map(cell => 
             Object.entries(cell)
@@ -445,16 +448,16 @@ function initializeApp() {
     }
 
     function toggleCellSelection(key, rectangle, cell) {
-        if (selectedCells.has(key)) {
-            selectedCells.delete(key);
-            rectangle.setStyle({color: "none", weight: 0, fillOpacity: 0.7});
-        } else {
-            selectedCells.set(key, {cell: cell, rectangle: rectangle});
-            rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
-        }
-        updateScores();
-        updateSolutionCountGraph();
+    if (selectedCells.has(key)) {
+        selectedCells.delete(key);
+        rectangle.setStyle({color: "none", weight: 0, fillOpacity: 0.7});
+    } else {
+        selectedCells.set(key, {cell: cell, rectangle: rectangle});
+        rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
     }
+    updateScores();
+    updateSolutionCountGraph();
+}
 
     function updateScores() {
         const infoPanel = d3.select("#rankInfo");
@@ -634,36 +637,40 @@ function initializeApp() {
     }
 
     function selectCellsInShape(shape) {
-        if (!gridLayer) return;
+    if (!gridLayer) return;
 
-        gridLayer.eachLayer(function(layer) {
-            if (layer instanceof L.Rectangle) {
-                const bounds = layer.getBounds();
-                const center = bounds.getCenter();
-                if (shape.getBounds().contains(center)) {
-                    const key = `${bounds.getNorth()},${bounds.getWest()}`;
+    gridLayer.eachLayer(function(layer) {
+        if (layer instanceof L.Rectangle) {
+            const bounds = layer.getBounds();
+            const center = bounds.getCenter();
+            if (shape.getBounds().contains(center)) {
+                const key = `${bounds.getWest()},${bounds.getNorth()}`;
+                if (!selectedCells.has(key)) {
                     toggleCellSelection(key, layer, layer.cell);
                 }
             }
-        });
-
-        updateScores();
-        updateSolutionCountGraph();
-    }
-
-    function clearSelection() {
-        selectedCells.forEach(({rectangle}) => {
-            rectangle.setStyle({color: "none", weight: 0, fillOpacity: 0.7});
-        });
-        selectedCells.clear();
-        if (drawLayer) {
-            map.removeLayer(drawLayer);
-            drawLayer = null;
         }
-        updateMap(currentCategory);
-        updateScores();
-        updateSolutionCountGraph();
+    });
+
+    updateScores();
+    updateSolutionCountGraph();
+}
+
+function clearSelection() {
+    selectedCells.forEach(({rectangle}) => {
+        if (rectangle && rectangle.setStyle) {
+            rectangle.setStyle({color: "none", weight: 0, fillOpacity: 0.7});
+        }
+    });
+    selectedCells.clear();
+    if (drawLayer) {
+        map.removeLayer(drawLayer);
+        drawLayer = null;
     }
+    updateMap(currentCategory);
+    updateScores();
+    updateSolutionCountGraph();
+}
 
     function updateSolutionCountGraph() {
         const solutionCount = {};

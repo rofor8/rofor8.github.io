@@ -567,13 +567,11 @@ function updateScores() {
 
     const barHeight = 20;
     const barSpacing = 5;
-    const groupHeight = (barHeight + barSpacing) * 3;
-    const groupSpacing = 40;
+    const groupHeight = (barHeight + barSpacing) * 3 + 25;  // Added 25 for solution title
+    const groupSpacing = 20;
     const toggleWidth = 20;
-    const labelWidth = 50;
-    const titleWidth = 120;
     const barWidth = 300;
-    const totalWidth = toggleWidth + titleWidth + labelWidth + barWidth + 100;
+    const totalWidth = toggleWidth + barWidth + 100;
     const totalHeight = (groupHeight + groupSpacing) * solutions.length;
 
     const svg = infoPanel.append("svg")
@@ -581,7 +579,7 @@ function updateScores() {
         .attr("height", totalHeight);
 
     const g = svg.append("g")
-        .attr("transform", `translate(0,20)`);
+        .attr("transform", `translate(0,10)`);
 
     solutions.forEach((solution, index) => {
         const yOffset = index * (groupHeight + groupSpacing);
@@ -589,84 +587,69 @@ function updateScores() {
         // Toggle for criteria rasters
         g.append("foreignObject")
             .attr("x", 0)
-            .attr("y", yOffset + groupHeight / 2 - 10)
+            .attr("y", yOffset)
             .attr("width", toggleWidth)
             .attr("height", 20)
             .html(`<input type="checkbox" class="criteria-toggle" data-solution="${solution}" ${activeCriteriaRasters.has(solution) ? 'checked' : ''}>`);
 
         // Solution name
         g.append("text")
-            .attr("x", toggleWidth + titleWidth / 2)
-            .attr("y", yOffset - 10)
-            .attr("text-anchor", "middle")
+            .attr("x", toggleWidth + 5)
+            .attr("y", yOffset + 15)
+            .attr("text-anchor", "start")
             .attr("font-weight", "bold")
             .text(solution);
+
+        const barStartX = toggleWidth;
+        const barStartY = yOffset + 25;
 
         // Impact bar
         const impactWidth = (rankTotals[solution].impact / maxValues.impact) * barWidth;
         g.append("rect")
-            .attr("x", toggleWidth + titleWidth + labelWidth)
-            .attr("y", yOffset)
+            .attr("x", barStartX)
+            .attr("y", barStartY)
             .attr("width", impactWidth)
             .attr("height", barHeight)
             .attr("fill", colorScale(solution));
 
         g.append("text")
-            .attr("x", toggleWidth + titleWidth + labelWidth - 5)
-            .attr("y", yOffset + barHeight / 2)
-            .attr("text-anchor", "end")
+            .attr("x", barStartX + 5)
+            .attr("y", barStartY + barHeight / 2)
             .attr("dominant-baseline", "middle")
-            .text("Impact");
-
-        g.append("text")
-            .attr("x", toggleWidth + titleWidth + labelWidth + impactWidth + 5)
-            .attr("y", yOffset + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .text(rankTotals[solution].impact.toFixed(0));
+            .attr("fill", "white")
+            .text(`Impact: ${rankTotals[solution].impact.toFixed(0)}`);
 
         // Cost bar
         const costWidth = (rankTotals[solution].cost / maxValues.cost) * barWidth;
         g.append("rect")
-            .attr("x", toggleWidth + titleWidth + labelWidth)
-            .attr("y", yOffset + barHeight + barSpacing)
+            .attr("x", barStartX)
+            .attr("y", barStartY + barHeight + barSpacing)
             .attr("width", costWidth)
             .attr("height", barHeight)
             .attr("fill", d3.color(colorScale(solution)).darker(0.5));
 
         g.append("text")
-            .attr("x", toggleWidth + titleWidth + labelWidth - 5)
-            .attr("y", yOffset + barHeight + barSpacing + barHeight / 2)
-            .attr("text-anchor", "end")
+            .attr("x", barStartX + 5)
+            .attr("y", barStartY + barHeight + barSpacing + barHeight / 2)
             .attr("dominant-baseline", "middle")
-            .text("Cost");
-
-        g.append("text")
-            .attr("x", toggleWidth + titleWidth + labelWidth + costWidth + 5)
-            .attr("y", yOffset + barHeight + barSpacing + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .text(`£${rankTotals[solution].cost.toFixed(0)}`);
+            .attr("fill", "white")
+            .text(`Cost: £${rankTotals[solution].cost.toFixed(0)}`);
 
         // Count bar
         const countWidth = (rankTotals[solution].count / maxValues.count) * barWidth;
         g.append("rect")
-            .attr("x", toggleWidth + titleWidth + labelWidth)
-            .attr("y", yOffset + (barHeight + barSpacing) * 2)
+            .attr("x", barStartX)
+            .attr("y", barStartY + (barHeight + barSpacing) * 2)
             .attr("width", countWidth)
             .attr("height", barHeight)
             .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
 
         g.append("text")
-            .attr("x", toggleWidth + titleWidth + labelWidth - 5)
-            .attr("y", yOffset + (barHeight + barSpacing) * 2 + barHeight / 2)
-            .attr("text-anchor", "end")
+            .attr("x", barStartX + 5)
+            .attr("y", barStartY + (barHeight + barSpacing) * 2 + barHeight / 2)
             .attr("dominant-baseline", "middle")
-            .text("Count");
-
-        g.append("text")
-            .attr("x", toggleWidth + titleWidth + labelWidth + countWidth + 5)
-            .attr("y", yOffset + (barHeight + barSpacing) * 2 + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .text(rankTotals[solution].count);
+            .attr("fill", "white")
+            .text(`Count: ${rankTotals[solution].count}`);
     });
 
     // Add event listeners to toggles

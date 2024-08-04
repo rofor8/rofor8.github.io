@@ -322,12 +322,11 @@
             map.remove();
         }
         map = L.map('map', {
-            renderer: L.canvas(),
-            tap: false // Disable tap handler for better mobile performance
-        }).setView([51.454514, -2.587910], 16);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        renderer: L.canvas(),
+        tap: true, // Enable tap handler
+        touchZoom: true,
+        dragging: true
+    }).setView([51.454514, -2.587910], 16);
 
         Object.values(solutionCriteria).flat().forEach((criterion, index) => {
             criteriaRasters[criterion] = generateBinaryRaster(100, 100, index);
@@ -696,60 +695,93 @@
     }
 
     function toggleDrawMode() {
-        isDrawMode = !isDrawMode;
-        const drawToggle = document.getElementById('drawToggle');
-        drawToggle.classList.toggle('active');
+    isDrawMode = !isDrawMode;
+    const drawToggle = document.getElementById('drawToggle');
+    drawToggle.classList.toggle('active');
 
-        if (isDrawMode) {
-            map.dragging.disable();
-            map.on('mousedown', startDrawing);
-            map.on('mousemove', continueDrawing);
-            map.on('mouseup', finishDrawing);
-            map.on('touchstart', startDrawingTouch);
-            map.on('touchmove', continueDrawingTouch);
-            map.on('touchend', finishDrawingTouch);
-        } else {
-            map.dragging.enable();
-            map.off('mousedown', startDrawing);
-            map.off('mousemove', continueDrawing);
-            map.off('mouseup', finishDrawing);
-            map.off('touchstart', startDrawingTouch);
-            map.off('touchmove', continueDrawingTouch);
-            map.off('touchend', finishDrawingTouch);
-            if (drawLayer) {
-                map.removeLayer(drawLayer);
-                drawLayer = null;
-            }
-        }
-    }
-
-    let drawingPath = [];
-
-    function startDrawing(e) {
-        drawingPath = [e.latlng];
+    if (isDrawMode) {
+        map.dragging.disable();
+        map.on('mousedown', startDrawing);
+        map.on('mousemove', continueDrawing);
+        map.on('mouseup', finishDrawing);
+        map.on('touchstart', startDrawingTouch);
+        map.on('touchmove', continueDrawingTouch);
+        map.on('touchend', finishDrawingTouch);
+    } else {
+        map.dragging.enable();
+        map.off('mousedown', startDrawing);
+        map.off('mousemove', continueDrawing);
+        map.off('mouseup', finishDrawing);
+        map.off('touchstart', startDrawingTouch);
+        map.off('touchmove', continueDrawingTouch);
+        map.off('touchend', finishDrawingTouch);
         if (drawLayer) {
             map.removeLayer(drawLayer);
+            drawLayer = null;
         }
-        drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
     }
+}
 
-    function continueDrawing(e) {
-        if (isDrawMode && drawingPath.length > 0) {
-            drawingPath.push(e.latlng);
+let drawingPath = [];
+
+function startDrawing(e) {
+    drawingPath = [e.latlng];
+    if (drawLayer) {
+        map.removeLayer(drawLayer);
+    }
+    drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
+}
+
+function continueDrawing(e) {
+    if (isDrawMode && drawingPath.length > 0) {
+        drawingPath.push(e.latlng);
+        drawLayer.setLatLngs(drawingPath);
+    }
+}
+
+function finishDrawing(e) {
+    if (isDrawMode) {
+        drawingPath.push(drawingPath[0]);  // Close the polygon
+        if (drawLayer) {
             drawLayer.setLatLngs(drawingPath);
+            selectCellsInShape(drawLayer);
         }
+        toggleDrawMode(); // Turn off draw mode
     }
+}
 
-    function finishDrawing(e) {
-        if (isDrawMode) {
-            drawingPath.push(drawingPath[0]);  // Close the polygon
-            if (drawLayer) {
-                drawLayer.setLatLngs(drawingPath);
-                selectCellsInShape(drawLayer);
-            }
-            toggleDrawMode(); // Turn off draw mode
-        }
+function startDrawingTouch(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const latlng = map.mouseEventToLatLng(touch);
+    drawingPath = [latlng];
+    if (drawLayer) {
+        map.removeLayer(drawLayer);
     }
+    drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
+}
+
+function continueDrawingTouch(e) {
+    e.preventDefault();
+    if (isDrawMode && drawingPath.length > 0) {
+        const touch = e.touches[0];
+        const latlng = map.mouseEventToLatLng(touch);
+        drawingPath.push(latlng);
+        drawLayer.setLatLngs(drawingPath);
+    }
+}
+
+function finishDrawingTouch(e) {
+    e.preventDefault();
+    if (isDrawMode) {
+        drawingPath.push(drawingPath[0]);  // Close the polygon
+        if (drawLayer) {
+            drawLayer.setLatLngs(drawingPath);
+            selectCellsInShape(drawLayer);
+        }
+        toggleDrawMode(); // Turn off draw mode
+    }
+}
 
     function startDrawingTouch(e) {
         e.preventDefault();

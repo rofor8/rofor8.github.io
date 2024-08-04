@@ -171,23 +171,9 @@
             z-index: 1000;
         }
 
-        .back-to-map-button {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 14px;
-            margin-top: 10px;
+        .criteria-toggle {
             cursor: pointer;
-            border-radius: 3px;
-            transition: background-color 0.3s;
-        }
-
-        .back-to-map-button:hover {
-            background-color: #45a049;
+            margin-left: 10px;
         }
     </style>
 </head>
@@ -230,12 +216,11 @@ let gridExtent = null;
 let currentRanking = 'impact';
 let currentRank = 1;
 const GRID_SIZE = 100;
-let isViewingCriteriaRasters = false;
 let currentCategory = "Biodiversity and soils";
-let currentSolution = null;
 let cellSizeLat, cellSizeLng;
 let drawLayer;
 let isDrawMode = false;
+let activeCriteriaRasters = new Set();
 
 async function fetchJSONData() {
     try {
@@ -409,7 +394,7 @@ function initializeApp() {
                     if (currentRank <= sortedSolutions.length) {
                         const rankedSolution = sortedSolutions[currentRank - 1];
                         fillColor = colorScale(rankedSolution[0]);
-                        fillOpacity = 0.7 * 0.7;
+                        fillOpacity = 0.7;
                     } else {
                         fillColor = "none";
                         fillOpacity = 0;
@@ -420,8 +405,8 @@ function initializeApp() {
                 }
 
                 const rectangle = L.rectangle(cellBounds, {
-                    color: "black",
-                    weight: 0.5,
+                    color: "none",
+                    weight: 0,
                     fillColor: fillColor,
                     fillOpacity: fillOpacity
                 }).addTo(gridLayer);
@@ -452,42 +437,18 @@ function initializeApp() {
         rankSlider.value = Math.min(currentRank, maxRank);
         rankValue.textContent = rankSlider.value;
 
-        // Reapply selection highlights
-        selectedCells.forEach((cellData, key) => {
-            const [lat, lng] = key.split(',').map(Number);
-            const rectangle = gridLayer.getLayers().find(layer => 
-                layer.getBounds().getNorth() === lat && layer.getBounds().getWest() === lng
-            );
-            if (rectangle) {
-                rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
-            }
-        });
-
         updateSolutionCountGraph();
         updateScores();
+        updateCriteriaRasters();
     }
 
     function toggleCellSelection(key, rectangle, cell) {
         if (selectedCells.has(key)) {
             selectedCells.delete(key);
-            if (isViewingCriteriaRasters) {
-                rasterLayers['selected'].removeLayer(rectangle);
-            } else {
-                rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
-            }
+            rectangle.setStyle({color: "none", weight: 0, fillOpacity: 0.7});
         } else {
             selectedCells.set(key, {cell: cell, rectangle: rectangle});
-            if (isViewingCriteriaRasters) {
-                const [lat, lng] = key.split(',').map(Number);
-                L.rectangle([[lat, lng], [lat - cellSizeLat, lng + cellSizeLng]], {
-                    color: "red",
-                    weight: 2,
-                    fillColor: "red",
-                    fillOpacity: 0.3
-                }).addTo(rasterLayers['selected']);
-            } else {
-                rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
-            }
+            rectangle.setStyle({color: "red", weight: 2, fillOpacity: 0.3});
         }
         updateScores();
         updateSolutionCountGraph();
@@ -543,6 +504,7 @@ function initializeApp() {
                         <th>Impact</th>
                         <th>Cost</th>
                         <th>Cells</th>
+                        <th></th>
                     </tr>`;
         
         let rankTotalImpact = 0;
@@ -559,6 +521,7 @@ function initializeApp() {
                         <td>${scores.impact.toFixed(0)}</td>
                         <td>£${scores.cost.toFixed(0)}</td>
                         <td>${scores.count}</td>
+                        <td><input type="checkbox" class="criteria-toggle" data-solution="${solution}" ${activeCriteriaRasters.has(solution) ? 'checked' : ''}></td>
                     </tr>`;
             
             rankTotalImpact += scores.impact;
@@ -571,18 +534,22 @@ function initializeApp() {
                     <td><strong>${rankTotalImpact.toFixed(0)}</strong></td>
                     <td><strong>£${rankTotalCost.toFixed(0)}</strong></td>
                     <td><strong>${rankTotalCells}</strong></td>
+                    <td></td>
                 </tr>`;
         html += "</table>";
 
         infoPanel.html(html);
 
-        // Add click event to solution rows to display criteria rasters
-        infoPanel.selectAll("tr")
-            .on("click", function() {
-                const solution = d3.select(this).attr("data-solution");
-                if (solution) {
-                    displayCriteriaRasters(solution);
+        // Add click event to criteria toggles
+        infoPanel.selectAll(".criteria-toggle")
+            .on("change", function() {
+                const solution = this.getAttribute("data-solution");
+                if (this.checked) {
+                    activeCriteriaRasters.add(solution);
+                } else {
+                    activeCriteriaRasters.delete(solution);
                 }
+                updateCriteriaRasters();
             });
     }
 
@@ -608,7 +575,6 @@ function initializeApp() {
                 d3.select(this).classed("active", true);
                 d3.select("#categoryDropdown .dropbtn").text(d);
                 currentCategory = d;
-                currentSolution = null;
 
                 updateMap(currentCategory);
                 updateScores();
@@ -685,7 +651,7 @@ function initializeApp() {
 
     function clearSelection() {
         selectedCells.forEach(({rectangle}) => {
-            rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
+            rectangle.setStyle({color: "none", weight: 0, fillOpacity: 0.7});
         });
         selectedCells.clear();
         if (drawLayer) {
@@ -773,129 +739,47 @@ function initializeApp() {
             .text(`Visible Solutions (Rank ${currentRank}) in Selected Cells`);
     }
 
-    function displayCriteriaRasters(solution) {
-        isViewingCriteriaRasters = true;
-        document.querySelector('.leaflet-tile-pane').classList.add('transparent');
-
-        const criteria = solutionCriteria[solution];
-        const raster1 = criteriaRasters[criteria[0]];
-        const raster2 = criteriaRasters[criteria[1]];
-
-        if (gridLayer) {
-            map.removeLayer(gridLayer);
-        }
+    function updateCriteriaRasters() {
+        // Remove all existing criteria rasters
         Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
         rasterLayers = {};
 
-        const allCriteria = [...new Set(Object.values(solutionCriteria).flat())];
-        const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(allCriteria);
+        // Add new criteria rasters for active solutions
+        activeCriteriaRasters.forEach(solution => {
+            const criteria = solutionCriteria[solution];
+            criteria.forEach((criterion, index) => {
+                const raster = criteriaRasters[criterion];
+                const rasterLayer = L.layerGroup().addTo(map);
+                rasterLayers[`${solution}_${criterion}`] = rasterLayer;
 
-        criteria.forEach((criterion, index) => {
-            const raster = criteriaRasters[criterion];
-            const rasterLayer = L.layerGroup().addTo(map);
-            rasterLayers[criterion] = rasterLayer;
-
-            raster.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value) {
-                        const cellBounds = [
-                            [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                            [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                        ];
-                        L.rectangle(cellBounds, {
-                            color: "none",
-                            fillColor: criteriaColorScale(criterion),
-                            fillOpacity: 0.5
-                        }).addTo(rasterLayer);
-                    }
+                raster.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            const cellBounds = [
+                                [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                                [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+                            ];
+                            L.polyline([
+                                [cellBounds[0][0], cellBounds[0][1]],
+                                [cellBounds[1][0], cellBounds[1][1]]
+                            ], {
+                                color: colorScale(solution),
+                                weight: 1,
+                                opacity: 0.7
+                            }).addTo(rasterLayer);
+                            L.polyline([
+                                [cellBounds[0][0], cellBounds[1][1]],
+                                [cellBounds[1][0], cellBounds[0][1]]
+                            ], {
+                                color: colorScale(solution),
+                                weight: 1,
+                                opacity: 0.7
+                            }).addTo(rasterLayer);
+                        }
+                    });
                 });
             });
         });
-
-        // Add a new layer for selected cells
-        rasterLayers['selected'] = L.layerGroup().addTo(map);
-        selectedCells.forEach(({cell}, key) => {
-            const [lat, lng] = key.split(',').map(Number);
-            const rectangle = L.rectangle([[lat, lng], [lat - cellSizeLat, lng + cellSizeLng]], {
-                color: "red",
-                weight: 2,
-                fillColor: "red",
-                fillOpacity: 0.3
-            }).addTo(rasterLayers['selected']);
-            
-            // Preserve the click functionality
-            rectangle.on('click', () => {
-                toggleCellSelection(key, rectangle, cell);
-                updateCriteriaInfo(solution, criteria, calculateCriteriaAreas(raster1, raster2), criteriaColorScale);
-            });
-        });
-
-        const areas = calculateCriteriaAreas(raster1, raster2);
-        updateCriteriaInfo(solution, criteria, areas, criteriaColorScale);
-    }
-
-    function calculateCriteriaAreas(raster1, raster2) {
-        let area1 = 0, area2 = 0, overlapArea = 0;
-        const totalCells = raster1.length * raster1[0].length;
-
-        for (let y = 0; y < raster1.length; y++) {
-            for (let x = 0; x < raster1[0].length; x++) {
-                if (raster1[y][x]) area1++;
-                if (raster2[y][x]) area2++;
-                if (raster1[y][x] && raster2[y][x]) overlapArea++;
-            }
-        }
-
-        return {
-            criteria1: (area1 / totalCells) * 100,
-            criteria2: (area2 / totalCells) * 100,
-            overlap: (overlapArea / totalCells) * 100
-        };
-    }
-
-    function updateCriteriaInfo(solution, criteria, areas, colorScale) {
-        const infoPanel = d3.select("#infoPanel");
-        infoPanel.html(`
-            <h3>${solution}</h3>
-            <table>
-                <tr>
-                    <th>Criterion</th>
-                    <th>Coverage</th>
-                </tr>
-                <tr>
-                    <td>
-                        <span style="display: inline-block; width: 10px; height: 10px; background-color: ${colorScale(criteria[0])}; margin-right: 5px;"></span>
-                        ${criteria[0]}
-                    </td>
-                    <td>${areas.criteria1.toFixed(1)}%</td>
-                </tr>
-                <tr>
-                    <td>
-                        <span style="display: inline-block; width: 10px; height: 10px; background-color: ${colorScale(criteria[1])}; margin-right: 5px;"></span>
-                        ${criteria[1]}
-                    </td>
-                    <td>${areas.criteria2.toFixed(1)}%</td>
-                </tr>
-                <tr>
-                    <td>
-                        <span style="display: inline-block; width: 10px; height: 10px; background: linear-gradient(to right, ${colorScale(criteria[0])}, ${colorScale(criteria[1])}); margin-right: 5px;"></span>
-                        Overlap
-                    </td>
-                    <td>${areas.overlap.toFixed(1)}%</td>
-                </tr>
-            </table>
-            <p>Cost: £${solutionCosts[solution]}/m²</p>
-            <button class="back-to-map-button" onclick="backToImpactMap()">Back to Map</button>
-        `);
-    }
-
-    function backToImpactMap() {
-        isViewingCriteriaRasters = false;
-        document.querySelector('.leaflet-tile-pane').classList.remove('transparent');
-
-        Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-        updateMap(currentCategory);
-        updateScores();
     }
 
     createButtons("categoryButtons", Object.keys(challengeCategories), "category-button");
@@ -928,11 +812,9 @@ function initializeApp() {
             }
         }
     });
-
     window.toggleRanking = toggleRanking;
     window.clearSelection = clearSelection;
     window.toggleDrawMode = toggleDrawMode;
-    window.backToImpactMap = backToImpactMap;
 }
 
 fetchJSONData();
@@ -950,7 +832,7 @@ function toggleRanking() {
 
 function clearSelection() {
     selectedCells.forEach(({rectangle}) => {
-        rectangle.setStyle({color: "black", weight: 0.5, fillOpacity: 0.7 * 0.7});
+        rectangle.setStyle({color: "none", weight: 0, fillOpacity: 0.7});
     });
     selectedCells.clear();
     if (drawLayer) {
@@ -982,15 +864,6 @@ function toggleDrawMode() {
             drawLayer = null;
         }
     }
-}
-
-function backToImpactMap() {
-    isViewingCriteriaRasters = false;
-    document.querySelector('.leaflet-tile-pane').classList.remove('transparent');
-
-    Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-    updateMap(currentCategory);
-    updateScores();
 }
 
 // Event listeners for sliders

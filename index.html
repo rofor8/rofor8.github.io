@@ -673,9 +673,14 @@ function toggleDrawMode() {
         map.boxZoom.disable();
         map.keyboard.disable();
 
-        map.getContainer().addEventListener('touchstart', handleTouchStart, false);
-        map.getContainer().addEventListener('touchmove', handleTouchMove, false);
-        map.getContainer().addEventListener('touchend', handleTouchEnd, false);
+        map.getContainer().addEventListener('touchstart', handleDrawStart, false);
+        map.getContainer().addEventListener('touchmove', handleDrawMove, false);
+        map.getContainer().addEventListener('touchend', handleDrawEnd, false);
+
+        // Add mouse event listeners
+        map.getContainer().addEventListener('mousedown', handleDrawStart, false);
+        map.getContainer().addEventListener('mousemove', handleDrawMove, false);
+        map.getContainer().addEventListener('mouseup', handleDrawEnd, false);
     } else {
         map.dragging.enable();
         map.touchZoom.enable();
@@ -684,9 +689,14 @@ function toggleDrawMode() {
         map.boxZoom.enable();
         map.keyboard.enable();
 
-        map.getContainer().removeEventListener('touchstart', handleTouchStart, false);
-        map.getContainer().removeEventListener('touchmove', handleTouchMove, false);
-        map.getContainer().removeEventListener('touchend', handleTouchEnd, false);
+        map.getContainer().removeEventListener('touchstart', handleDrawStart, false);
+        map.getContainer().removeEventListener('touchmove', handleDrawMove, false);
+        map.getContainer().removeEventListener('touchend', handleDrawEnd, false);
+
+        // Remove mouse event listeners
+        map.getContainer().removeEventListener('mousedown', handleDrawStart, false);
+        map.getContainer().removeEventListener('mousemove', handleDrawMove, false);
+        map.getContainer().removeEventListener('mouseup', handleDrawEnd, false);
 
         if (drawLayer) {
             map.removeLayer(drawLayer);
@@ -715,6 +725,49 @@ function handleTouchMove(e) {
     const latlng = map.containerPointToLatLng(L.point(touch.clientX, touch.clientY));
     drawingPath.push(latlng);
     drawLayer.setLatLngs(drawingPath);
+}
+
+function handleDrawStart(e) {
+    e.preventDefault();
+    drawStartTime = new Date().getTime();
+    const point = e.touches ? e.touches[0] : e;
+    const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
+    drawingPath = [latlng];
+    
+    if (drawLayer) {
+        map.removeLayer(drawLayer);
+    }
+    drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
+}
+
+function handleDrawMove(e) {
+    if (!isDrawMode) return;
+    e.preventDefault();
+    const point = e.touches ? e.touches[0] : e;
+    const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
+    drawingPath.push(latlng);
+    drawLayer.setLatLngs(drawingPath);
+}
+
+function handleDrawEnd(e) {
+    if (!isDrawMode) return;
+    e.preventDefault();
+    const drawEndTime = new Date().getTime();
+    const drawDuration = drawEndTime - drawStartTime;
+
+    if (drawDuration < 500 && drawingPath.length < 3) {
+        // This was likely a click/tap, not a draw. Ignore it.
+        map.removeLayer(drawLayer);
+        drawLayer = null;
+        return;
+    }
+
+    drawingPath.push(drawingPath[0]);  // Close the polygon
+    if (drawLayer) {
+        drawLayer.setLatLngs(drawingPath);
+        selectCellsInShape(drawLayer);
+    }
+    toggleDrawMode(); // Turn off draw mode
 }
 
 function handleTouchEnd(e) {

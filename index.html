@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Urban Planning Tool</title>
+    <title>NBS Tool</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"/>
@@ -324,7 +324,8 @@ function initializeApp() {
         renderer: L.canvas(),
         tap: true,
         touchZoom: true,
-        dragging: true
+        dragging: true,
+        zoomControl: false  // Remove zoom buttons
     }).setView([51.454514, -2.587910], 16);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -371,7 +372,6 @@ function setupUI() {
         document.getElementById('rankValue').textContent = currentRank;
         updateMap(currentCategory);
         updateScores();
-        updateSolutionCountGraph();
     });
 }
 
@@ -409,6 +409,7 @@ function calculateOverlapArea(x, y, criteria, gridSize) {
 }
 
 function updateMap(challengeCategory) {
+    const selectedKeys = Array.from(selectedCells.keys());
     const suitabilityScores = calculateSuitabilityScores(GRID_SIZE, challengeCategory);
 
     if (gridLayer) {
@@ -421,7 +422,6 @@ function updateMap(challengeCategory) {
         gridOrigin = map.getCenter();
     }
 
-    const mapBounds = map.getBounds();
     const mapCenter = map.getCenter();
     
     const gridSizeMeters = 2000;
@@ -439,6 +439,8 @@ function updateMap(challengeCategory) {
         east: gridOrigin.lng + (gridSizeMeters / lngDegreeSize) / 2,
         west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
     };
+
+    selectedCells.clear();
 
     suitabilityScores.forEach((row, y) => {
         row.forEach((cell, x) => {
@@ -477,7 +479,7 @@ function updateMap(challengeCategory) {
 
             const key = `${gridExtent.west + x * cellSizeLng},${gridExtent.north - y * cellSizeLat}`;
         
-            let isSelected = selectedCells.has(key);
+            let isSelected = selectedKeys.includes(key);
         
             const rectangle = L.rectangle(cellBounds, {
                 color: isSelected ? "red" : "none",
@@ -513,7 +515,6 @@ function updateMap(challengeCategory) {
     rankSlider.value = Math.min(currentRank, maxRank);
     rankValue.textContent = rankSlider.value;
 
-    updateSolutionCountGraph();
     updateScores();
     updateCriteriaRasters();
 }
@@ -527,7 +528,6 @@ function toggleCellSelection(key, rectangle, cell) {
         rectangle.setStyle({color: "red", weight: 2});
     }
     updateScores();
-    updateSolutionCountGraph();
 }
 
 function updateScores() {
@@ -569,7 +569,7 @@ function updateScores() {
     const barSpacing = 5;
     const groupHeight = (barHeight + barSpacing) * 3 + 25;  // Added 25 for solution title
     const groupSpacing = 20;
-    const toggleWidth = 20;
+    const toggleWidth = 30;  // Increased from 20 to 30
     const barWidth = 300;
     const totalWidth = toggleWidth + barWidth + 100;
     const totalHeight = (groupHeight + groupSpacing) * solutions.length;
@@ -636,7 +636,8 @@ function updateScores() {
             .text(`Cost: £${rankTotals[solution].cost.toFixed(0)}`);
 
         // Count bar
-        const countWidth = (rankTotals[solution].count / maxValues.count) * barWidth;
+// Count bar
+const countWidth = (rankTotals[solution].count / maxValues.count) * barWidth;
         g.append("rect")
             .attr("x", barStartX)
             .attr("y", barStartY + (barHeight + barSpacing) * 2)
@@ -666,12 +667,15 @@ function updateScores() {
 }
 
 function toggleRanking() {
+    const currentRank = document.getElementById('rankSlider').value;
     currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
     const toggleButton = document.getElementById('rankingToggle');
     toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
     toggleButton.classList.toggle('active');
 
     updateMap(currentCategory);
+    document.getElementById('rankSlider').value = currentRank;
+    document.getElementById('rankValue').textContent = currentRank;
     updateScores();
 }
 
@@ -713,7 +717,6 @@ function toggleDrawMode() {
         map.getContainer().addEventListener('touchmove', handleDrawMove, false);
         map.getContainer().addEventListener('touchend', handleDrawEnd, false);
 
-        // Add mouse event listeners
         map.getContainer().addEventListener('mousedown', handleDrawStart, false);
         map.getContainer().addEventListener('mousemove', handleDrawMove, false);
         map.getContainer().addEventListener('mouseup', handleDrawEnd, false);
@@ -729,7 +732,6 @@ function toggleDrawMode() {
         map.getContainer().removeEventListener('touchmove', handleDrawMove, false);
         map.getContainer().removeEventListener('touchend', handleDrawEnd, false);
 
-        // Remove mouse event listeners
         map.getContainer().removeEventListener('mousedown', handleDrawStart, false);
         map.getContainer().removeEventListener('mousemove', handleDrawMove, false);
         map.getContainer().removeEventListener('mouseup', handleDrawEnd, false);
@@ -739,28 +741,6 @@ function toggleDrawMode() {
             drawLayer = null;
         }
     }
-}
-
-function handleTouchStart(e) {
-    e.preventDefault();
-    touchStartTime = new Date().getTime();
-    const touch = e.touches[0];
-    const latlng = map.containerPointToLatLng(L.point(touch.clientX, touch.clientY));
-    drawingPath = [latlng];
-    
-    if (drawLayer) {
-        map.removeLayer(drawLayer);
-    }
-    drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
-}
-
-function handleTouchMove(e) {
-    if (!isDrawMode) return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    const latlng = map.containerPointToLatLng(L.point(touch.clientX, touch.clientY));
-    drawingPath.push(latlng);
-    drawLayer.setLatLngs(drawingPath);
 }
 
 function handleDrawStart(e) {
@@ -806,27 +786,6 @@ function handleDrawEnd(e) {
     toggleDrawMode(); // Turn off draw mode
 }
 
-function handleTouchEnd(e) {
-    if (!isDrawMode) return;
-    e.preventDefault();
-    const touchEndTime = new Date().getTime();
-    const touchDuration = touchEndTime - touchStartTime;
-
-    if (touchDuration < 500 && drawingPath.length < 3) {
-        // This was likely a tap, not a draw. Ignore it.
-        map.removeLayer(drawLayer);
-        drawLayer = null;
-        return;
-    }
-
-    drawingPath.push(drawingPath[0]);  // Close the polygon
-    if (drawLayer) {
-        drawLayer.setLatLngs(drawingPath);
-        selectCellsInShape(drawLayer);
-    }
-    toggleDrawMode(); // Turn off draw mode
-}
-
 function selectCellsInShape(shape) {
     if (!gridLayer) return;
 
@@ -846,7 +805,6 @@ function selectCellsInShape(shape) {
     });
 
     updateScores();
-    updateSolutionCountGraph();
 }
 
 function pointInPolygon(point, polygon) {
@@ -874,11 +832,6 @@ function clearSelection() {
         drawLayer = null;
     }
     updateMap(currentCategory);
-    updateScores();
-    updateSolutionCountGraph();
-}
-
-function updateSolutionCountGraph() {
     updateScores();
 }
 

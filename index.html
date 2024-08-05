@@ -244,13 +244,15 @@
     </div>
 
     <script>
+
 let solutionCriteria = {};
 let challengeCategories = {};
 let solutionCosts = {};
 let map;
 let gridLayer;
 let rasterLayers = {};
-let selectedCells = new Map();
+let selectedCellKeys = new Set();
+let allCells = [];
 let gridOrigin = null;
 let gridExtent = null;
 let currentRanking = 'impact';
@@ -325,7 +327,7 @@ function initializeApp() {
         tap: true,
         touchZoom: true,
         dragging: true,
-        zoomControl: false  // Remove zoom buttons
+        zoomControl: false
     }).setView([51.454514, -2.587910], 16);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -370,7 +372,7 @@ function setupUI() {
     document.getElementById('rankSlider').addEventListener('input', function() {
         currentRank = parseInt(this.value);
         document.getElementById('rankValue').textContent = currentRank;
-        updateMap(currentCategory);
+        renderCells();
         updateScores();
     });
 }
@@ -409,7 +411,6 @@ function calculateOverlapArea(x, y, criteria, gridSize) {
 }
 
 function updateMap(challengeCategory) {
-    const selectedKeys = Array.from(selectedCells.keys());
     const suitabilityScores = calculateSuitabilityScores(GRID_SIZE, challengeCategory);
 
     if (gridLayer) {
@@ -440,7 +441,7 @@ function updateMap(challengeCategory) {
         west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
     };
 
-    selectedCells.clear();
+    allCells = [];
 
     suitabilityScores.forEach((row, y) => {
         row.forEach((cell, x) => {
@@ -449,56 +450,13 @@ function updateMap(challengeCategory) {
                 [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
             ];
 
-            let fillColor, fillOpacity;
-            const validSolutions = Object.entries(cell)
-                .filter(([sol, scores]) => {
-                    if (currentRanking === 'impact') {
-                        return scores.impact > 0;
-                    } else {
-                        return scores.cost > 0;
-                    }
-                });
+            const key = `${x},${y}`;
             
-            if (validSolutions.length > 0) {
-                let sortedSolutions = validSolutions.sort((a, b) => 
-                    currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-                );
-
-                if (currentRank <= sortedSolutions.length) {
-                    const rankedSolution = sortedSolutions[currentRank - 1];
-                    fillColor = colorScale(rankedSolution[0]);
-                    fillOpacity = 0.7;
-                } else {
-                    fillColor = "none";
-                    fillOpacity = 0;
-                }
-            } else {
-                fillColor = "none";
-                fillOpacity = 0;
-            }
-
-            const key = `${gridExtent.west + x * cellSizeLng},${gridExtent.north - y * cellSizeLat}`;
-        
-            let isSelected = selectedKeys.includes(key);
-        
-            const rectangle = L.rectangle(cellBounds, {
-                color: isSelected ? "red" : "none",
-                weight: isSelected ? 2 : 0,
-                fillColor: fillColor,
-                fillOpacity: fillOpacity
-            }).addTo(gridLayer);
-
-            rectangle.cell = cell;
-
-            if (isSelected) {
-                selectedCells.set(key, {cell: cell, rectangle: rectangle});
-            }
-
-            rectangle.on('click', function(e) {
-                toggleCellSelection(key, rectangle, cell);
-            });
+            allCells.push({key, cell, bounds: cellBounds});
         });
     });
+
+    renderCells();
 
     const maxRank = Math.max(...suitabilityScores.flat().map(cell => 
         Object.entries(cell)
@@ -519,14 +477,82 @@ function updateMap(challengeCategory) {
     updateCriteriaRasters();
 }
 
-function toggleCellSelection(key, rectangle, cell) {
-    if (selectedCells.has(key)) {
-        selectedCells.delete(key);
-        rectangle.setStyle({color: "none", weight: 0});
+function renderCells() {
+    const canvas = document.createElement('canvas');
+    canvas.width = map.getSize().x;
+    canvas.height = map.getSize().y;
+    const ctx = canvas.getContext('2d');
+
+    allCells.forEach(({key, cell, bounds}) => {
+        let fillColor, fillOpacity;
+        const validSolutions = Object.entries(cell)
+            .filter(([sol, scores]) => {
+                if (currentRanking === 'impact') {
+                    return scores.impact > 0;
+                } else {
+                    return scores.cost > 0;
+                }
+            });
+        
+        if (validSolutions.length > 0) {
+            let sortedSolutions = validSolutions.sort((a, b) => 
+                currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
+            );
+
+            if (currentRank <= sortedSolutions.length) {
+                const rankedSolution = sortedSolutions[currentRank - 1];
+                fillColor = colorScale(rankedSolution[0]);
+                fillOpacity = 0.7;
+            } else {
+                fillColor = "rgba(0,0,0,0)";
+                fillOpacity = 0;
+            }
+        } else {
+            fillColor = "rgba(0,0,0,0)";
+            fillOpacity = 0;
+        }
+
+        const isSelected = selectedCellKeys.has(key);
+
+        const pixelBounds = bounds.map(latlng => map.latLngToContainerPoint(latlng));
+        ctx.fillStyle = fillColor;
+        ctx.globalAlpha = fillOpacity;
+        ctx.fillRect(pixelBounds[0].x, pixelBounds[0].y, pixelBounds[1].x - pixelBounds[0].x, pixelBounds[1].y - pixelBounds[0].y);
+
+        if (isSelected) {
+            ctx.strokeStyle = "red";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(pixelBounds[0].x, pixelBounds[0].y, pixelBounds[1].x - pixelBounds[0].x, pixelBounds[1].y - pixelBounds[0].y);
+        }
+    });
+
+    const canvasLayer = L.imageOverlay(canvas.toDataURL(), map.getBounds());
+    gridLayer.clearLayers();
+    gridLayer.addLayer(canvasLayer);
+
+    // Add click event listener to the map
+    map.off('click');
+    map.on('click', function(e) {
+        const clickedPoint = map.latLngToContainerPoint(e.latlng);
+        const clickedCell = allCells.find(({bounds}) => {
+            const pixelBounds = bounds.map(latlng => map.latLngToContainerPoint(latlng));
+            return clickedPoint.x >= pixelBounds[0].x && clickedPoint.x <= pixelBounds[1].x &&
+                   clickedPoint.y >= pixelBounds[0].y && clickedPoint.y <= pixelBounds[1].y;
+        });
+
+        if (clickedCell) {
+            toggleCellSelection(clickedCell.key);
+        }
+    });
+}
+
+function toggleCellSelection(key) {
+    if (selectedCellKeys.has(key)) {
+        selectedCellKeys.delete(key);
     } else {
-        selectedCells.set(key, {cell: cell, rectangle: rectangle});
-        rectangle.setStyle({color: "red", weight: 2});
+        selectedCellKeys.add(key);
     }
+    renderCells();
     updateScores();
 }
 
@@ -534,21 +560,25 @@ function updateScores() {
     const infoPanel = d3.select("#rankInfo");
     infoPanel.html("");  // Clear previous content
 
-    if (selectedCells.size === 0) {
+    if (selectedCellKeys.size === 0) {
         infoPanel.html("<p>No cells selected. Select cells on the map to see scores.</p>");
         return;
     }
 
     const rankTotals = {};
-    selectedCells.forEach(({cell}) => {
-        Object.entries(cell).forEach(([solution, scores]) => {
-            if (!rankTotals[solution]) {
-                rankTotals[solution] = { impact: 0, cost: 0, count: 0 };
-            }
-            rankTotals[solution].impact += scores.impact;
-            rankTotals[solution].cost += scores.cost;
-            rankTotals[solution].count++;
-        });
+    selectedCellKeys.forEach(key => {
+        const cellData = allCells.find(cell => cell.key === key);
+        if (cellData) {
+            const {cell} = cellData;
+            Object.entries(cell).forEach(([solution, scores]) => {
+                if (!rankTotals[solution]) {
+                    rankTotals[solution] = { impact: 0, cost: 0, count: 0 };
+                }
+                rankTotals[solution].impact += scores.impact;
+                rankTotals[solution].cost += scores.cost;
+                rankTotals[solution].count++;
+            });
+        }
     });
 
     const solutions = Object.keys(rankTotals).sort((a, b) => {
@@ -567,9 +597,9 @@ function updateScores() {
 
     const barHeight = 20;
     const barSpacing = 5;
-    const groupHeight = (barHeight + barSpacing) * 3 + 25;  // Added 25 for solution title
+    const groupHeight = (barHeight + barSpacing) * 3 + 25;
     const groupSpacing = 20;
-    const toggleWidth = 30;  // Increased from 20 to 30
+    const toggleWidth = 30;
     const barWidth = 300;
     const totalWidth = toggleWidth + barWidth + 100;
     const totalHeight = (groupHeight + groupSpacing) * solutions.length;
@@ -584,7 +614,6 @@ function updateScores() {
     solutions.forEach((solution, index) => {
         const yOffset = index * (groupHeight + groupSpacing);
 
-        // Toggle for criteria rasters
         g.append("foreignObject")
             .attr("x", 0)
             .attr("y", yOffset)
@@ -592,7 +621,6 @@ function updateScores() {
             .attr("height", 20)
             .html(`<input type="checkbox" class="criteria-toggle" data-solution="${solution}" ${activeCriteriaRasters.has(solution) ? 'checked' : ''}>`);
 
-        // Solution name
         g.append("text")
             .attr("x", toggleWidth + 5)
             .attr("y", yOffset + 15)
@@ -603,7 +631,6 @@ function updateScores() {
         const barStartX = toggleWidth;
         const barStartY = yOffset + 25;
 
-        // Impact bar
         const impactWidth = (rankTotals[solution].impact / maxValues.impact) * barWidth;
         g.append("rect")
             .attr("x", barStartX)
@@ -612,270 +639,251 @@ function updateScores() {
             .attr("height", barHeight)
             .attr("fill", colorScale(solution));
 
-        g.append("text")
-            .attr("x", barStartX + 5)
-            .attr("y", barStartY + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("fill", "white")
-            .text(`Impact: ${rankTotals[solution].impact.toFixed(0)}`);
+g.append("text")
+    .attr("x", barStartX + 5)
+    .attr("y", barStartY + barHeight / 2)
+    .attr("dominant-baseline", "middle")
+    .attr("fill", "white")
+    .text(`Impact: ${rankTotals[solution].impact.toFixed(0)}`);
 
-        // Cost bar
-        const costWidth = (rankTotals[solution].cost / maxValues.cost) * barWidth;
-        g.append("rect")
-            .attr("x", barStartX)
-            .attr("y", barStartY + barHeight + barSpacing)
-            .attr("width", costWidth)
-            .attr("height", barHeight)
-            .attr("fill", d3.color(colorScale(solution)).darker(0.5));
+const costWidth = (rankTotals[solution].cost / maxValues.cost) * barWidth;
+g.append("rect")
+    .attr("x", barStartX)
+    .attr("y", barStartY + barHeight + barSpacing)
+    .attr("width", costWidth)
+    .attr("height", barHeight)
+    .attr("fill", d3.color(colorScale(solution)).darker(0.5));
 
-        g.append("text")
-            .attr("x", barStartX + 5)
-            .attr("y", barStartY + barHeight + barSpacing + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("fill", "white")
-            .text(`Cost: £${rankTotals[solution].cost.toFixed(0)}`);
+g.append("text")
+    .attr("x", barStartX + 5)
+    .attr("y", barStartY + barHeight + barSpacing + barHeight / 2)
+    .attr("dominant-baseline", "middle")
+    .attr("fill", "white")
+    .text(`Cost: £${rankTotals[solution].cost.toFixed(0)}`);
 
-        // Count bar
-// Count bar
 const countWidth = (rankTotals[solution].count / maxValues.count) * barWidth;
-        g.append("rect")
-            .attr("x", barStartX)
-            .attr("y", barStartY + (barHeight + barSpacing) * 2)
-            .attr("width", countWidth)
-            .attr("height", barHeight)
-            .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
+g.append("rect")
+    .attr("x", barStartX)
+    .attr("y", barStartY + (barHeight + barSpacing) * 2)
+    .attr("width", countWidth)
+    .attr("height", barHeight)
+    .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
 
-        g.append("text")
-            .attr("x", barStartX + 5)
-            .attr("y", barStartY + (barHeight + barSpacing) * 2 + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("fill", "white")
-            .text(`Count: ${rankTotals[solution].count}`);
-    });
+g.append("text")
+    .attr("x", barStartX + 5)
+    .attr("y", barStartY + (barHeight + barSpacing) * 2 + barHeight / 2)
+    .attr("dominant-baseline", "middle")
+    .attr("fill", "white")
+    .text(`Count: ${rankTotals[solution].count}`);
+});
 
-    // Add event listeners to toggles
-    infoPanel.selectAll(".criteria-toggle")
-        .on("change", function() {
-            const solution = this.getAttribute("data-solution");
-            if (this.checked) {
-                activeCriteriaRasters.add(solution);
-            } else {
-                activeCriteriaRasters.delete(solution);
-            }
-            updateCriteriaRasters();
-        });
+infoPanel.selectAll(".criteria-toggle")
+.on("change", function() {
+    const solution = this.getAttribute("data-solution");
+    if (this.checked) {
+        activeCriteriaRasters.add(solution);
+    } else {
+        activeCriteriaRasters.delete(solution);
+    }
+    updateCriteriaRasters();
+});
 }
 
 function toggleRanking() {
-    const currentRank = document.getElementById('rankSlider').value;
-    currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
-    const toggleButton = document.getElementById('rankingToggle');
-    toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
-    toggleButton.classList.toggle('active');
+currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
+const toggleButton = document.getElementById('rankingToggle');
+toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
+toggleButton.classList.toggle('active');
 
-    updateMap(currentCategory);
-    document.getElementById('rankSlider').value = currentRank;
-    document.getElementById('rankValue').textContent = currentRank;
-    updateScores();
+renderCells();
+updateScores();
 }
 
 function createButtons(containerId, dataArray, buttonClass) {
-    const container = d3.select(`#${containerId}`);
-    container.selectAll("button")
-        .data(dataArray)
-        .enter().append("button")
-        .attr("class", buttonClass)
-        .text(d => d)
-        .on("click", function(event, d) {
-            d3.selectAll(".category-button").classed("active", false);
-            d3.select(this).classed("active", true);
-            d3.select("#categoryDropdown .dropbtn").text(d);
-            currentCategory = d;
+const container = d3.select(`#${containerId}`);
+container.selectAll("button")
+.data(dataArray)
+.enter().append("button")
+.attr("class", buttonClass)
+.text(d => d)
+.on("click", function(event, d) {
+    d3.selectAll(".category-button").classed("active", false);
+    d3.select(this).classed("active", true);
+    d3.select("#categoryDropdown .dropbtn").text(d);
+    currentCategory = d;
 
-            updateMap(currentCategory);
-            updateScores();
-        });
+    updateMap(currentCategory);
+});
 }
 
 let drawingPath = [];
 let touchStartTime;
 
 function toggleDrawMode() {
-    isDrawMode = !isDrawMode;
-    const drawToggle = document.getElementById('drawToggle');
-    drawToggle.classList.toggle('active');
+isDrawMode = !isDrawMode;
+const drawToggle = document.getElementById('drawToggle');
+drawToggle.classList.toggle('active');
 
-    if (isDrawMode) {
-        map.dragging.disable();
-        map.touchZoom.disable();
-        map.doubleClickZoom.disable();
-        map.scrollWheelZoom.disable();
-        map.boxZoom.disable();
-        map.keyboard.disable();
+if (isDrawMode) {
+map.dragging.disable();
+map.touchZoom.disable();
+map.doubleClickZoom.disable();
+map.scrollWheelZoom.disable();
+map.boxZoom.disable();
+map.keyboard.disable();
 
-        map.getContainer().addEventListener('touchstart', handleDrawStart, false);
-        map.getContainer().addEventListener('touchmove', handleDrawMove, false);
-        map.getContainer().addEventListener('touchend', handleDrawEnd, false);
+map.getContainer().addEventListener('touchstart', handleDrawStart, false);
+map.getContainer().addEventListener('touchmove', handleDrawMove, false);
+map.getContainer().addEventListener('touchend', handleDrawEnd, false);
 
-        map.getContainer().addEventListener('mousedown', handleDrawStart, false);
-        map.getContainer().addEventListener('mousemove', handleDrawMove, false);
-        map.getContainer().addEventListener('mouseup', handleDrawEnd, false);
-    } else {
-        map.dragging.enable();
-        map.touchZoom.enable();
-        map.doubleClickZoom.enable();
-        map.scrollWheelZoom.enable();
-        map.boxZoom.enable();
-        map.keyboard.enable();
+map.getContainer().addEventListener('mousedown', handleDrawStart, false);
+map.getContainer().addEventListener('mousemove', handleDrawMove, false);
+map.getContainer().addEventListener('mouseup', handleDrawEnd, false);
+} else {
+map.dragging.enable();
+map.touchZoom.enable();
+map.doubleClickZoom.enable();
+map.scrollWheelZoom.enable();
+map.boxZoom.enable();
+map.keyboard.enable();
 
-        map.getContainer().removeEventListener('touchstart', handleDrawStart, false);
-        map.getContainer().removeEventListener('touchmove', handleDrawMove, false);
-        map.getContainer().removeEventListener('touchend', handleDrawEnd, false);
+map.getContainer().removeEventListener('touchstart', handleDrawStart, false);
+map.getContainer().removeEventListener('touchmove', handleDrawMove, false);
+map.getContainer().removeEventListener('touchend', handleDrawEnd, false);
 
-        map.getContainer().removeEventListener('mousedown', handleDrawStart, false);
-        map.getContainer().removeEventListener('mousemove', handleDrawMove, false);
-        map.getContainer().removeEventListener('mouseup', handleDrawEnd, false);
+map.getContainer().removeEventListener('mousedown', handleDrawStart, false);
+map.getContainer().removeEventListener('mousemove', handleDrawMove, false);
+map.getContainer().removeEventListener('mouseup', handleDrawEnd, false);
 
-        if (drawLayer) {
-            map.removeLayer(drawLayer);
-            drawLayer = null;
-        }
-    }
+if (drawLayer) {
+    map.removeLayer(drawLayer);
+    drawLayer = null;
+}
+}
 }
 
 function handleDrawStart(e) {
-    e.preventDefault();
-    drawStartTime = new Date().getTime();
-    const point = e.touches ? e.touches[0] : e;
-    const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
-    drawingPath = [latlng];
-    
-    if (drawLayer) {
-        map.removeLayer(drawLayer);
-    }
-    drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
+e.preventDefault();
+drawStartTime = new Date().getTime();
+const point = e.touches ? e.touches[0] : e;
+const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
+drawingPath = [latlng];
+
+if (drawLayer) {
+map.removeLayer(drawLayer);
+}
+drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
 }
 
 function handleDrawMove(e) {
-    if (!isDrawMode) return;
-    e.preventDefault();
-    const point = e.touches ? e.touches[0] : e;
-    const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
-    drawingPath.push(latlng);
-    drawLayer.setLatLngs(drawingPath);
+if (!isDrawMode) return;
+e.preventDefault();
+const point = e.touches ? e.touches[0] : e;
+const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
+drawingPath.push(latlng);
+drawLayer.setLatLngs(drawingPath);
 }
 
 function handleDrawEnd(e) {
-    if (!isDrawMode) return;
-    e.preventDefault();
-    const drawEndTime = new Date().getTime();
-    const drawDuration = drawEndTime - drawStartTime;
+if (!isDrawMode) return;
+e.preventDefault();
+const drawEndTime = new Date().getTime();
+const drawDuration = drawEndTime - drawStartTime;
 
-    if (drawDuration < 500 && drawingPath.length < 3) {
-        // This was likely a click/tap, not a draw. Ignore it.
-        map.removeLayer(drawLayer);
-        drawLayer = null;
-        return;
-    }
+if (drawDuration < 500 && drawingPath.length < 3) {
+map.removeLayer(drawLayer);
+drawLayer = null;
+return;
+}
 
-    drawingPath.push(drawingPath[0]);  // Close the polygon
-    if (drawLayer) {
-        drawLayer.setLatLngs(drawingPath);
-        selectCellsInShape(drawLayer);
-    }
-    toggleDrawMode(); // Turn off draw mode
+drawingPath.push(drawingPath[0]);
+if (drawLayer) {
+drawLayer.setLatLngs(drawingPath);
+selectCellsInShape(drawLayer);
+}
+toggleDrawMode();
 }
 
 function selectCellsInShape(shape) {
-    if (!gridLayer) return;
+if (!gridLayer) return;
 
-    const bounds = L.latLngBounds(drawingPath);
+const bounds = L.latLngBounds(drawingPath);
 
-    gridLayer.eachLayer(function(layer) {
-        if (layer instanceof L.Rectangle) {
-            const cellBounds = layer.getBounds();
-            const cellCenter = cellBounds.getCenter();
-            if (bounds.contains(cellCenter) && pointInPolygon(cellCenter, drawingPath)) {
-                const key = `${cellBounds.getWest()},${cellBounds.getNorth()}`;
-                if (!selectedCells.has(key)) {
-                    toggleCellSelection(key, layer, layer.cell);
-                }
-            }
-        }
-    });
+allCells.forEach(({key, bounds: cellBounds}) => {
+const cellCenter = L.latLngBounds(cellBounds).getCenter();
+if (bounds.contains(cellCenter) && pointInPolygon(cellCenter, drawingPath)) {
+    selectedCellKeys.add(key);
+}
+});
 
-    updateScores();
+renderCells();
+updateScores();
 }
 
 function pointInPolygon(point, polygon) {
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].lat, yi = polygon[i].lng;
-        const xj = polygon[j].lat, yj = polygon[j].lng;
-        
-        const intersect = ((yi > point.lng) !== (yj > point.lng))
-            && (point.lat < (xj - xi) * (point.lng - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-    }
-    return inside;
+let inside = false;
+for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+const xi = polygon[i].lat, yi = polygon[i].lng;
+const xj = polygon[j].lat, yj = polygon[j].lng;
+
+const intersect = ((yi > point.lng) !== (yj > point.lng))
+    && (point.lat < (xj - xi) * (point.lng - yi) / (yj - yi) + xi);
+if (intersect) inside = !inside;
+}
+return inside;
 }
 
 function clearSelection() {
-    selectedCells.forEach(({rectangle}) => {
-        if (rectangle && rectangle.setStyle) {
-            rectangle.setStyle({color: "none", weight: 0});
-        }
-    });
-    selectedCells.clear();
-    if (drawLayer) {
-        map.removeLayer(drawLayer);
-        drawLayer = null;
-    }
-    updateMap(currentCategory);
-    updateScores();
+selectedCellKeys.clear();
+if (drawLayer) {
+map.removeLayer(drawLayer);
+drawLayer = null;
+}
+renderCells();
+updateScores();
 }
 
 function updateCriteriaRasters() {
-    Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-    rasterLayers = {};
+Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
+rasterLayers = {};
 
-    activeCriteriaRasters.forEach(solution => {
-        const criteria = solutionCriteria[solution];
-        criteria.forEach((criterion, index) => {
-            const raster = criteriaRasters[criterion];
-            const rasterLayer = L.layerGroup().addTo(map);
-            rasterLayers[`${solution}_${criterion}`] = rasterLayer;
+activeCriteriaRasters.forEach(solution => {
+const criteria = solutionCriteria[solution];
+criteria.forEach((criterion, index) => {
+    const raster = criteriaRasters[criterion];
+    const rasterLayer = L.layerGroup().addTo(map);
+    rasterLayers[`${solution}_${criterion}`] = rasterLayer;
 
-            const criterionColor = criteriaColorScale(criterion);
+    const criterionColor = criteriaColorScale(criterion);
 
-            raster.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value) {
-                        const cellBounds = [
-                            [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                            [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                        ];
-                        L.polyline([
-                            [cellBounds[0][0], cellBounds[0][1]],
-                            [cellBounds[1][0], cellBounds[1][1]]
-                        ], {
-                            color: criterionColor,
-                            weight: 2,
-                            opacity: 0.8
-                        }).addTo(rasterLayer);
-                        L.polyline([
-                            [cellBounds[0][0], cellBounds[1][1]],
-                            [cellBounds[1][0], cellBounds[0][1]]
-                        ], {
-                            color: criterionColor,
-                            weight: 2,
-                            opacity: 0.8
-                        }).addTo(rasterLayer);
-                    }
-                });
-            });
+    raster.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value) {
+                const cellBounds = [
+                    [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                    [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+                ];
+                L.polyline([
+                    [cellBounds[0][0], cellBounds[0][1]],
+                    [cellBounds[1][0], cellBounds[1][1]]
+                ], {
+                    color: criterionColor,
+                    weight: 2,
+                    opacity: 0.8
+                }).addTo(rasterLayer);
+                L.polyline([
+                    [cellBounds[0][0], cellBounds[1][1]],
+                    [cellBounds[1][0], cellBounds[0][1]]
+                ], {
+                    color: criterionColor,
+                    weight: 2,
+                    opacity: 0.8
+                }).addTo(rasterLayer);
+            }
         });
     });
+});
+});
 }
 
 // Initialize the application
@@ -885,6 +893,7 @@ fetchJSONData();
 window.toggleRanking = toggleRanking;
 window.clearSelection = clearSelection;
 window.toggleDrawMode = toggleDrawMode;
+
     </script>
 </body>
 </html>

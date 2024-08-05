@@ -10,9 +10,7 @@
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://unpkg.com/leaflet-tilelayer-mbtiles@1.3.1/Leaflet.TileLayer.MBTiles.js"></script>
-
-
+    <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
     <style>
         body {
@@ -372,15 +370,20 @@ const colorScale = d3.scaleOrdinal()
 
 const criteriaRasters = {};
 
-async function loadRasters() {
+async function loadCOGs() {
     const criteria = new Set(Object.values(solutionCriteria).flat());
     for (const criterion of criteria) {
-        const mbtilesUrl = `rasters/${criterion}.mbtiles`;
-        const layer = new L.TileLayer.MBTiles(mbtilesUrl, {
-            minZoom: 0,
-            maxZoom: 4
-        });
-        criteriaRasters[criterion] = layer;
+        const response = await fetch(`rasters/${criterion}.tif`);
+        const arrayBuffer = await response.arrayBuffer();
+        const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+        const image = await tiff.getImage();
+        const rasterData = await image.readRasters();
+        
+        criteriaRasters[criterion] = Array.from({ length: GRID_SIZE }, (_, y) => 
+            Array.from({ length: GRID_SIZE }, (_, x) => 
+                rasterData[0][y * GRID_SIZE + x] > 0 ? 1 : 0
+            )
+        );
     }
 }
 
@@ -433,7 +436,7 @@ async function fetchJSONData() {
         challengeCategories = await challengeCategoriesResponse.json();
         solutionCosts = await solutionCostsResponse.json();
 
-        await loadRasters();
+        await loadCOGs();
         initializeApp();
     } catch (error) {
         console.error('Error loading JSON data:', error);
@@ -465,21 +468,17 @@ function calculateSuitabilityScores(gridSize, challengeCategory) {
 function calculateOverlapArea(x, y, criteria, gridSize) {
     let totalValue = 0;
     criteria.forEach(criterion => {
-        const rasterLayer = criteriaRasters[criterion];
-        const tileCoords = rasterLayer.getTileCoords(map.getZoom(), x, y);
-        if (tileCoords) {
-            const tileData = rasterLayer.getTileData(tileCoords.x, tileCoords.y, map.getZoom());
-            if (tileData && tileData.raster && tileData.raster.features.length > 0) {
-                totalValue += 1;
-            }
-        }
+        const raster = criteriaRasters[criterion];
+        const rasterX = Math.floor(x / gridSize * raster.length);
+        const rasterY = Math.floor(y / gridSize * raster[0].length);
+        totalValue += raster[rasterY][rasterX];
     });
     return totalValue / criteria.length;
 }
 
 async function initializeApp() {
     console.log('Initializing app');
-    await loadRasters();
+    await loadCOGs();
     if (map) {
         console.log('Removing existing map');
         map.remove();
@@ -742,7 +741,7 @@ function updateScores() {
         if (currentRanking === 'impact') {
             return rankTotals[b].impact - rankTotals[a].impact;
         } else {
-            return rankTotals[a].cost - rankTotals[b].cost
+            return rankTotals[a].cost - rankTotals[b].cost;
         }
     });
 
@@ -1032,10 +1031,39 @@ function updateCriteriaRasters() {
 
     activeCriteriaRasters.forEach(solution => {
         const criteria = solutionCriteria[solution];
-        criteria.forEach(criterion => {
-            const rasterLayer = criteriaRasters[criterion];
+        criteria.forEach((criterion, index) => {
+            const raster = criteriaRasters[criterion];
+            const rasterLayer = L.layerGroup().addTo(map);
             rasterLayers[`${solution}_${criterion}`] = rasterLayer;
-            rasterLayer.addTo(map);
+
+            const criterionColor = criteriaColorScale(criterion);
+
+            raster.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        const cellBounds = [
+                            [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                            [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+                        ];
+                        L.polyline([
+                            [cellBounds[0][0], cellBounds[0][1]],
+                            [cellBounds[1][0], cellBounds[1][1]]
+                        ], {
+                            color: criterionColor,
+                            weight: 2,
+                            opacity: 0.8
+                        }).addTo(rasterLayer);
+                        L.polyline([
+                            [cellBounds[0][0], cellBounds[1][1]],
+                            [cellBounds[1][0], cellBounds[0][1]]
+                        ], {
+                            color: criterionColor,
+                            weight: 2,
+                            opacity: 0.8
+                        }).addTo(rasterLayer);
+                    }
+                });
+            });
         });
     });
 }

@@ -112,6 +112,9 @@
             cursor: pointer;
         }
 
+        .leaflet-tile-pane {
+    filter: grayscale(100%) brightness(105%) contrast(105%);
+}
         .dropdown-content button:hover {background-color: #f1f1f1}
 
         .dropdown:hover .dropdown-content {
@@ -225,6 +228,7 @@
             <div id="mapButtons">
                 <button id="drawToggle" class="map-button" onclick="toggleDrawMode()"><i class="fas fa-draw-polygon"></i></button>
                 <button id="clearSelection" class="map-button" onclick="clearSelection()"><i class="fas fa-trash-alt"></i></button>
+           
             </div>
         </div>
         
@@ -329,9 +333,10 @@
             zoomControl: false
         }).setView([51.454514, -2.587910], 16);
         
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    className: 'map-tiles'
+}).addTo(map);
 
         Object.values(solutionCriteria).flat().forEach((criterion, index) => {
             criteriaRasters[criterion] = generateBinaryRaster(100, 100, index);

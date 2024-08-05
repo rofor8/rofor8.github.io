@@ -10,6 +10,9 @@
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/leaflet-tilelayer-mbtiles@1.3.1/Leaflet.TileLayer.MBTiles.js"></script>
+
+
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
     <style>
         body {
@@ -372,22 +375,12 @@ const criteriaRasters = {};
 async function loadRasters() {
     const criteria = new Set(Object.values(solutionCriteria).flat());
     for (const criterion of criteria) {
-        const img = new Image();
-        img.src = `rasters/${criterion}.png`;
-        await new Promise(resolve => img.onload = resolve);
-        
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        
-        criteriaRasters[criterion] = Array.from({ length: 100 }, (_, y) => 
-            Array.from({ length: 100 }, (_, x) => 
-                imageData.data[(y * 100 + x) * 4] > 0 ? 1 : 0
-            )
-        );
+        const mbtilesUrl = `rasters/${criterion}.mbtiles`;
+        const layer = new L.TileLayer.MBTiles(mbtilesUrl, {
+            minZoom: 0,
+            maxZoom: 4
+        });
+        criteriaRasters[criterion] = layer;
     }
 }
 
@@ -472,10 +465,14 @@ function calculateSuitabilityScores(gridSize, challengeCategory) {
 function calculateOverlapArea(x, y, criteria, gridSize) {
     let totalValue = 0;
     criteria.forEach(criterion => {
-        const raster = criteriaRasters[criterion];
-        const rasterX = Math.floor(x / gridSize * raster.length);
-        const rasterY = Math.floor(y / gridSize * raster[0].length);
-        totalValue += raster[rasterY][rasterX];
+        const rasterLayer = criteriaRasters[criterion];
+        const tileCoords = rasterLayer.getTileCoords(map.getZoom(), x, y);
+        if (tileCoords) {
+            const tileData = rasterLayer.getTileData(tileCoords.x, tileCoords.y, map.getZoom());
+            if (tileData && tileData.raster && tileData.raster.features.length > 0) {
+                totalValue += 1;
+            }
+        }
     });
     return totalValue / criteria.length;
 }
@@ -745,7 +742,7 @@ function updateScores() {
         if (currentRanking === 'impact') {
             return rankTotals[b].impact - rankTotals[a].impact;
         } else {
-            return rankTotals[a].cost - rankTotals[b].cost;
+            return rankTotals[a].cost - rankTotals[b].cost
         }
     });
 
@@ -1035,39 +1032,10 @@ function updateCriteriaRasters() {
 
     activeCriteriaRasters.forEach(solution => {
         const criteria = solutionCriteria[solution];
-        criteria.forEach((criterion, index) => {
-            const raster = criteriaRasters[criterion];
-            const rasterLayer = L.layerGroup().addTo(map);
+        criteria.forEach(criterion => {
+            const rasterLayer = criteriaRasters[criterion];
             rasterLayers[`${solution}_${criterion}`] = rasterLayer;
-
-            const criterionColor = criteriaColorScale(criterion);
-
-            raster.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value) {
-                        const cellBounds = [
-                            [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                            [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                        ];
-                        L.polyline([
-                            [cellBounds[0][0], cellBounds[0][1]],
-                            [cellBounds[1][0], cellBounds[1][1]]
-                        ], {
-                            color: criterionColor,
-                            weight: 2,
-                            opacity: 0.8
-                        }).addTo(rasterLayer);
-                        L.polyline([
-                            [cellBounds[0][0], cellBounds[1][1]],
-                            [cellBounds[1][0], cellBounds[0][1]]
-                        ], {
-                            color: criterionColor,
-                            weight: 2,
-                            opacity: 0.8
-                        }).addTo(rasterLayer);
-                    }
-                });
-            });
+            rasterLayer.addTo(map);
         });
     });
 }

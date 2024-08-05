@@ -227,6 +227,49 @@
             background-color: #555;
         }
 
+        #searchContainer {
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        #searchButton {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 10px;
+            font-size: 18px;
+            color: #4CAF50;
+        }
+
+        #searchButton:hover {
+            color: #45a049;
+        }
+
+        #searchInput {
+            padding: 5px;
+            width: 200px;
+            border: none;
+            outline: none;
+        }
+
+        .dark-mode #searchContainer {
+            background-color: #333;
+        }
+
+        .dark-mode #searchButton {
+            color: #4CAF50;
+        }
+
+        .dark-mode #searchButton:hover {
+            color: #45a049;
+        }
+
+        .dark-mode #searchInput {
+            background-color: #444;
+            color: #f0f0f0;
+        }
+
         @media (min-width: 768px) {
             #app-container {
                 flex-direction: row;
@@ -258,10 +301,7 @@
             .dropdown-content {
                 max-height: 150px;
             }
-            .dark-mode #infoPanel {
-    background-color: #222;
-    color: #f0f0f0;
-}
+
             .toggle-button {
                 padding: 8px 16px;
                 font-size: 14px;
@@ -273,6 +313,10 @@
     <div id="app-container">
         <div id="mapContainer">
             <div id="map"></div>
+            <div id="searchContainer" style="position: absolute; top: 20px; left: 20px; z-index: 1000;">
+                <button id="searchButton" onclick="toggleSearch()"><i class="fas fa-search"></i></button>
+                <input type="text" id="searchInput" placeholder="Enter location" style="display: none;">
+            </div>
             <div id="mapButtons">
                 <button id="drawToggle" class="map-button" onclick="toggleDrawMode()"><i class="fas fa-draw-polygon"></i></button>
                 <button id="clearSelection" class="map-button" onclick="clearSelection()"><i class="fas fa-trash-alt"></i></button>
@@ -322,6 +366,43 @@ const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10);
 const colorScale = d3.scaleOrdinal()
     .domain(Object.keys(solutionCriteria))
     .range(d3.schemeCategory10);
+
+function toggleSearch() {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput.style.display === 'none') {
+        searchInput.style.display = 'inline-block';
+        searchInput.focus();
+    } else {
+        searchInput.style.display = 'none';
+    }
+}
+
+function searchLocation() {
+    const query = document.getElementById('searchInput').value;
+    if (!query) return;
+
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.length > 0) {
+                const lat = parseFloat(data[0].lat);
+                const lon = parseFloat(data[0].lon);
+                map.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(map)
+                    .bindPopup(data[0].display_name)
+                    .openPopup();
+                document.getElementById('searchInput').style.display = 'none';
+            } else {
+                alert('Location not found');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while searching');
+        });
+}
 
 async function fetchJSONData() {
     try {
@@ -1036,6 +1117,15 @@ window.toggleRanking = toggleRanking;
 window.clearSelection = clearSelection;
 window.toggleDrawMode = toggleDrawMode;
 window.toggleDarkMode = toggleDarkMode;
+window.toggleSearch = toggleSearch;
+window.searchLocation = searchLocation;
+
+// Add this event listener to allow searching when the Enter key is pressed
+document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        searchLocation();
+    }
+});
 </script>
 </body>
 </html>

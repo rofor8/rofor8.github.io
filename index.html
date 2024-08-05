@@ -112,9 +112,6 @@
             cursor: pointer;
         }
 
-        .leaflet-tile-pane {
-    filter: grayscale(100%) brightness(105%) contrast(105%);
-}
         .dropdown-content button:hover {background-color: #f1f1f1}
 
         .dropdown:hover .dropdown-content {
@@ -181,6 +178,55 @@
             margin-left: 10px;
         }
 
+        .leaflet-tile-pane {
+            filter: grayscale(100%) brightness(105%) contrast(105%);
+        }
+
+        body.dark-mode {
+            background-color: #333;
+            color: #f0f0f0;
+        }
+
+        .dark-mode #map {
+            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+
+        .dark-mode .leaflet-control-attribution {
+            background-color: rgba(0, 0, 0, 0.5);
+            color: #f0f0f0;
+        }
+
+        .dark-mode #infoPanel {
+            background-color: #222;
+            color: #f0f0f0;
+        }
+
+        .dark-mode .toggle-button {
+            background-color: #555;
+        }
+
+        .dark-mode .toggle-button.active {
+            background-color: #777;
+        }
+
+        .dark-mode .dropbtn {
+            background-color: #444;
+            color: #f0f0f0;
+        }
+
+        .dark-mode .dropdown-content {
+            background-color: #333;
+        }
+
+        .dark-mode .dropdown-content button {
+            background-color: #444;
+            color: #f0f0f0;
+        }
+
+        .dark-mode .dropdown-content button:hover {
+            background-color: #555;
+        }
+
         @media (min-width: 768px) {
             #app-container {
                 flex-direction: row;
@@ -194,7 +240,6 @@
             }
         }
 
-        /* Mobile-specific styles */
         @media (max-width: 767px) {
             #mapButtons {
                 top: 10px;
@@ -228,7 +273,7 @@
             <div id="mapButtons">
                 <button id="drawToggle" class="map-button" onclick="toggleDrawMode()"><i class="fas fa-draw-polygon"></i></button>
                 <button id="clearSelection" class="map-button" onclick="clearSelection()"><i class="fas fa-trash-alt"></i></button>
-           
+                <button id="darkModeToggle" class="map-button" onclick="toggleDarkMode()"><i class="fas fa-moon"></i></button>
             </div>
         </div>
         
@@ -333,10 +378,10 @@
             zoomControl: false
         }).setView([51.454514, -2.587910], 16);
         
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    className: 'map-tiles'
-}).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            className: 'map-tiles'
+        }).addTo(map);
 
         Object.values(solutionCriteria).flat().forEach((criterion, index) => {
             criteriaRasters[criterion] = generateBinaryRaster(100, 100, index);
@@ -415,6 +460,20 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     }
 
     function updateMap(challengeCategory) {
+        if (map) map.remove();
+        map = L.map('map', {
+            renderer: L.canvas(),
+            tap: true,
+            touchZoom: true,
+            dragging: true,
+            zoomControl: false
+        }).setView([51.454514, -2.587910], 16);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            className: 'map-tiles'
+        }).addTo(map);
+
         const suitabilityScores = calculateSuitabilityScores(GRID_SIZE, challengeCategory);
 
         if (gridLayer) {
@@ -771,145 +830,157 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             map.getContainer().removeEventListener('mousemove', handleDrawMove, false);
             map.getContainer().removeEventListener('mouseup', handleDrawEnd, false);
 
-            if (drawLayer) {
-                map.removeLayer(drawLayer);
-                drawLayer = null;
-            }
-        }
-    }
+if (drawLayer) {
+    map.removeLayer(drawLayer);
+    drawLayer = null;
+}
+}
+}
 
-    function handleDrawStart(e) {
-        e.preventDefault();
-        drawStartTime = new Date().getTime();
-        const point = e.touches ? e.touches[0] : e;
-        const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
-        drawingPath = [latlng];
+function handleDrawStart(e) {
+e.preventDefault();
+drawStartTime = new Date().getTime();
+const point = e.touches ? e.touches[0] : e;
+const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
+drawingPath = [latlng];
 
-        if (drawLayer) {
-            map.removeLayer(drawLayer);
-        }
-        drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
-    }
+if (drawLayer) {
+map.removeLayer(drawLayer);
+}
+drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
+}
 
-    function handleDrawMove(e) {
-        if (!isDrawMode) return;
-        e.preventDefault();
-        const point = e.touches ? e.touches[0] : e;
-        const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
-        drawingPath.push(latlng);
-        drawLayer.setLatLngs(drawingPath);
-    }
+function handleDrawMove(e) {
+if (!isDrawMode) return;
+e.preventDefault();
+const point = e.touches ? e.touches[0] : e;
+const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
+drawingPath.push(latlng);
+drawLayer.setLatLngs(drawingPath);
+}
 
-    function handleDrawEnd(e) {
-        if (!isDrawMode) return;
-        e.preventDefault();
-        const drawEndTime = new Date().getTime();
-        const drawDuration = drawEndTime - drawStartTime;
+function handleDrawEnd(e) {
+if (!isDrawMode) return;
+e.preventDefault();
+const drawEndTime = new Date().getTime();
+const drawDuration = drawEndTime - drawStartTime;
 
-        if (drawDuration < 500 && drawingPath.length < 3) {
-            map.removeLayer(drawLayer);
-            drawLayer = null;
-            return;
-        }
+if (drawDuration < 500 && drawingPath.length < 3) {
+map.removeLayer(drawLayer);
+drawLayer = null;
+return;
+}
 
-        drawingPath.push(drawingPath[0]);
-        if (drawLayer) {
-            drawLayer.setLatLngs(drawingPath);
-            selectCellsInShape(drawLayer);
-        }
-        toggleDrawMode();
-    }
+drawingPath.push(drawingPath[0]);
+if (drawLayer) {
+drawLayer.setLatLngs(drawingPath);
+selectCellsInShape(drawLayer);
+}
+toggleDrawMode();
+}
 
-    function selectCellsInShape(shape) {
-        if (!gridLayer) return;
+function selectCellsInShape(shape) {
+if (!gridLayer) return;
 
-        const bounds = L.latLngBounds(drawingPath);
+const bounds = L.latLngBounds(drawingPath);
 
-        allCells.forEach(({key, bounds: cellBounds}) => {
-            const cellCenter = L.latLngBounds(cellBounds).getCenter();
-            if (bounds.contains(cellCenter) && pointInPolygon(cellCenter, drawingPath)) {
-                selectedCellKeys.add(key);
+allCells.forEach(({key, bounds: cellBounds}) => {
+const cellCenter = L.latLngBounds(cellBounds).getCenter();
+if (bounds.contains(cellCenter) && pointInPolygon(cellCenter, drawingPath)) {
+    selectedCellKeys.add(key);
+}
+});
+
+renderCells();
+updateScores();
+}
+
+function pointInPolygon(point, polygon) {
+let inside = false;
+for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+const xi = polygon[i].lat, yi = polygon[i].lng;
+const xj = polygon[j].lat, yj = polygon[j].lng;
+
+const intersect = ((yi > point.lng) !== (yj > point.lng))
+    && (point.lat < (xj - xi) * (point.lng - yi) / (yj - yi) + xi);
+if (intersect) inside = !inside;
+}
+return inside;
+}
+
+function clearSelection() {
+selectedCellKeys.clear();
+if (drawLayer) {
+map.removeLayer(drawLayer);
+drawLayer = null;
+}
+renderCells();
+updateScores();
+}
+
+function updateCriteriaRasters() {
+Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
+rasterLayers = {};
+
+activeCriteriaRasters.forEach(solution => {
+const criteria = solutionCriteria[solution];
+criteria.forEach((criterion, index) => {
+    const raster = criteriaRasters[criterion];
+    const rasterLayer = L.layerGroup().addTo(map);
+    rasterLayers[`${solution}_${criterion}`] = rasterLayer;
+
+    const criterionColor = criteriaColorScale(criterion);
+
+    raster.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value) {
+                const cellBounds = [
+                    [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                    [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+                ];
+                L.polyline([
+                    [cellBounds[0][0], cellBounds[0][1]],
+                    [cellBounds[1][0], cellBounds[1][1]]
+                ], {
+                    color: criterionColor,
+                    weight: 2,
+                    opacity: 0.8
+                }).addTo(rasterLayer);
+                L.polyline([
+                    [cellBounds[0][0], cellBounds[1][1]],
+                    [cellBounds[1][0], cellBounds[0][1]]
+                ], {
+                    color: criterionColor,
+                    weight: 2,
+                    opacity: 0.8
+                }).addTo(rasterLayer);
             }
         });
+    });
+});
+});
+}
 
-        renderCells();
-        updateScores();
-    }
+function toggleDarkMode() {
+document.body.classList.toggle('dark-mode');
+const darkModeButton = document.getElementById('darkModeToggle');
+if (document.body.classList.contains('dark-mode')) {
+darkModeButton.innerHTML = '<i class="fas fa-sun"></i>';
+} else {
+darkModeButton.innerHTML = '<i class="fas fa-moon"></i>';
+}
+updateMap(currentCategory);
+}
 
-    function pointInPolygon(point, polygon) {
-        let inside = false;
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-            const xi = polygon[i].lat, yi = polygon[i].lng;
-            const xj = polygon[j].lat, yj = polygon[j].lng;
+// Initialize the application
+fetchJSONData();
 
-            const intersect = ((yi > point.lng) !== (yj > point.lng))
-                && (point.lat < (xj - xi) * (point.lng - yi) / (yj - yi) + xi);
-            if (intersect) inside = !inside;
-        }
-        return inside;
-    }
+// Global functions that need to be accessible from HTML
+window.toggleRanking = toggleRanking;
+window.clearSelection = clearSelection;
+window.toggleDrawMode = toggleDrawMode;
+window.toggleDarkMode = toggleDarkMode;
 
-    function clearSelection() {
-        selectedCellKeys.clear();
-        if (drawLayer) {
-            map.removeLayer(drawLayer);
-            drawLayer = null;
-        }
-        renderCells();
-        updateScores();
-    }
-
-    function updateCriteriaRasters() {
-        Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-        rasterLayers = {};
-
-        activeCriteriaRasters.forEach(solution => {
-            const criteria = solutionCriteria[solution];
-            criteria.forEach((criterion, index) => {
-                const raster = criteriaRasters[criterion];
-                const rasterLayer = L.layerGroup().addTo(map);
-                rasterLayers[`${solution}_${criterion}`] = rasterLayer;
-
-                const criterionColor = criteriaColorScale(criterion);
-
-                raster.forEach((row, y) => {
-                    row.forEach((value, x) => {
-                        if (value) {
-                            const cellBounds = [
-                                [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                                [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                            ];
-                            L.polyline([
-                                [cellBounds[0][0], cellBounds[0][1]],
-                                [cellBounds[1][0], cellBounds[1][1]]
-                            ], {
-                                color: criterionColor,
-                                weight: 2,
-                                opacity: 0.8
-                            }).addTo(rasterLayer);
-                            L.polyline([
-                                [cellBounds[0][0], cellBounds[1][1]],
-                                [cellBounds[1][0], cellBounds[0][1]]
-                            ], {
-                                color: criterionColor,
-                                weight: 2,
-                                opacity: 0.8
-                            }).addTo(rasterLayer);
-                        }
-                    });
-                });
-            });
-        });
-    }
-
-    // Initialize the application
-    fetchJSONData();
-
-    // Global functions that need to be accessible from HTML
-    window.toggleRanking = toggleRanking;
-    window.clearSelection = clearSelection;
-    window.toggleDrawMode = toggleDrawMode;
-
-    </script>
+</script>
 </body>
 </html>

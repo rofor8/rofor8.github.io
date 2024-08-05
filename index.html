@@ -367,6 +367,30 @@ const colorScale = d3.scaleOrdinal()
     .domain(Object.keys(solutionCriteria))
     .range(d3.schemeCategory10);
 
+const criteriaRasters = {};
+
+async function loadRasters() {
+    const criteria = new Set(Object.values(solutionCriteria).flat());
+    for (const criterion of criteria) {
+        const img = new Image();
+        img.src = `rasters/${criterion}.png`;
+        await new Promise(resolve => img.onload = resolve);
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        criteriaRasters[criterion] = Array.from({ length: 100 }, (_, y) => 
+            Array.from({ length: 100 }, (_, x) => 
+                imageData.data[(y * 100 + x) * 4] > 0 ? 1 : 0
+            )
+        );
+    }
+}
+
 function toggleSearch() {
     const searchInput = document.getElementById('searchInput');
     if (searchInput.style.display === 'none') {
@@ -416,42 +440,49 @@ async function fetchJSONData() {
         challengeCategories = await challengeCategoriesResponse.json();
         solutionCosts = await solutionCostsResponse.json();
 
+        await loadRasters();
         initializeApp();
     } catch (error) {
         console.error('Error loading JSON data:', error);
     }
 }
 
-function generateBinaryRaster(width, height, seed) {
-    const raster = [];
-    const numShapes = 5 + Math.floor(Math.random() * 5);
-
-    for (let y = 0; y < height; y++) {
-        raster.push(new Array(width).fill(0));
-    }
-
-    for (let i = 0; i < numShapes; i++) {
-        const centerX = Math.floor(Math.random() * width);
-        const centerY = Math.floor(Math.random() * height);
-        const maxRadius = Math.min(20, Math.min(width, height) / 5);
-        const radius = 5 + Math.floor(Math.random() * maxRadius);
-
-        for (let y = Math.max(0, centerY - radius); y < Math.min(height, centerY + radius); y++) {
-            for (let x = Math.max(0, centerX - radius); x < Math.min(width, centerX + radius); x++) {
-                if (Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2) <= Math.pow(radius, 2)) {
-                    raster[y][x] = 1;
-                }
+function calculateSuitabilityScores(gridSize, challengeCategory) {
+    const grid = [];
+    for (let y = 0; y < gridSize; y++) {
+        const row = [];
+        for (let x = 0; x < gridSize; x++) {
+            const cellScores = {};
+            for (const [solution, criteria] of Object.entries(solutionCriteria)) {
+                const area = calculateOverlapArea(x, y, criteria, gridSize);
+                const weight = challengeCategories[challengeCategory][solution];
+                cellScores[solution] = {
+                    impact: area * weight * 100,
+                    cost: area * solutionCosts[solution],
+                    area: area
+                };
             }
+            row.push(cellScores);
         }
+        grid.push(row);
     }
-
-    return raster;
+    return grid;
 }
 
-const criteriaRasters = {};
+function calculateOverlapArea(x, y, criteria, gridSize) {
+    let totalValue = 0;
+    criteria.forEach(criterion => {
+        const raster = criteriaRasters[criterion];
+        const rasterX = Math.floor(x / gridSize * raster.length);
+        const rasterY = Math.floor(y / gridSize * raster[0].length);
+        totalValue += raster[rasterY][rasterX];
+    });
+    return totalValue / criteria.length;
+}
 
-function initializeApp() {
+async function initializeApp() {
     console.log('Initializing app');
+    await loadRasters();
     if (map) {
         console.log('Removing existing map');
         map.remove();
@@ -468,10 +499,6 @@ function initializeApp() {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         className: 'map-tiles'
     }).addTo(map);
-
-    Object.values(solutionCriteria).flat().forEach((criterion, index) => {
-        criteriaRasters[criterion] = generateBinaryRaster(100, 100, index);
-    });
 
     setupUI();
     updateMap(currentCategory);
@@ -510,39 +537,6 @@ function setupUI() {
         renderCells();
         updateScores();
     });
-}
-
-function calculateSuitabilityScores(gridSize, challengeCategory) {
-    const grid = [];
-    for (let y = 0; y < gridSize; y++) {
-        const row = [];
-        for (let x = 0; x < gridSize; x++) {
-            const cellScores = {};
-            for (const [solution, criteria] of Object.entries(solutionCriteria)) {
-                const area = calculateOverlapArea(x, y, criteria, gridSize);
-                const weight = challengeCategories[challengeCategory][solution];
-                cellScores[solution] = {
-                    impact: area * weight * 100,
-                    cost: area * solutionCosts[solution],
-                    area: area
-                };
-            }
-            row.push(cellScores);
-        }
-        grid.push(row);
-    }
-    return grid;
-}
-
-function calculateOverlapArea(x, y, criteria, gridSize) {
-    let totalValue = 0;
-    criteria.forEach(criterion => {
-        const raster = criteriaRasters[criterion];
-        const rasterX = Math.floor(x / gridSize * raster.length);
-        const rasterY = Math.floor(y / gridSize * raster[0].length);
-        totalValue += raster[rasterY][rasterX];
-    });
-    return totalValue / criteria.length;
 }
 
 function updateMap(challengeCategory) {

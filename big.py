@@ -10,7 +10,7 @@ from pyproj import CRS
 
 # Define the center point and area size
 center_lat, center_lon = 51.454514, -2.587910
-width_km, height_km = 100, 100
+width_km, height_km = 100, 100  # Increase the area size to 100 km x 100 km
 
 # Define the CRS (WGS84)
 wgs84 = CRS('EPSG:4326')
@@ -29,8 +29,8 @@ xmax = center_lon + lon_offset
 ymax = center_lat + lat_offset
 
 # Define the grid
-width = 100
-height = 100
+width = 1000  # Increase the grid resolution
+height = 1000  # Increase the grid resolution
 res = max((xmax - xmin) / width, (ymax - ymin) / height)
 
 transform = from_origin(xmin, ymax, res, res)
@@ -70,7 +70,7 @@ def generate_raster(criterion):
     raster = np.zeros((height, width), dtype=np.uint8)
 
     # Generate random points within the bounding box
-    n_points = np.random.randint(55, 200)  # Random number of points between 5 and 20
+    n_points = np.random.randint(5, 20)  # Random number of points between 5 and 20
     random_points = gpd.GeoDataFrame(
         geometry=[Point(np.random.uniform(xmin, xmax), np.random.uniform(ymin, ymax)) for _ in range(n_points)],
         crs=wgs84
@@ -78,14 +78,14 @@ def generate_raster(criterion):
 
     # Buffer the points to create circular areas
     # Convert the buffer distance from km to degrees (approximate)
-    buffer_km = np.random.uniform(1, 7.0)  # Random radius between 0.5-1.0 km
+    buffer_km = np.random.uniform(0.5, 1.0)  # Random radius between 0.5-1.0 km
     buffer_deg_lat = buffer_km / km_per_degree_lat
     buffer_deg_lon = buffer_km / km_per_degree_lon
     buffered_points = random_points.buffer(np.sqrt(buffer_deg_lat * buffer_deg_lon))
 
     # Rasterize the buffered points
     shapes = ((geom, 1) for geom in buffered_points.geometry)
-    rasterize(shapes=shapes, out=raster, transform=transform)
+    rasterize(shapes=shapes, out=raster, transform=transform, fill=0, all_touched=True)
 
     return raster
 

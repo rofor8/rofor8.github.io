@@ -619,150 +619,173 @@
     }
 
     function updateScores() {
-        const infoPanel = d3.select("#rankInfo");
-        infoPanel.html("");  // Clear previous content
+    const infoPanel = d3.select("#rankInfo");
+    infoPanel.html("");  // Clear previous content
 
-        if (selectedCellKeys.size === 0) {
-            infoPanel.html("<p>No cells selected. Select cells on the map to see scores.</p>");
-            return;
-        }
-
-        const rankTotals = {};
-        selectedCellKeys.forEach(key => {
-            const cellData = allCells.find(cell => cell.key === key);
-            if (cellData) {
-                const {cell} = cellData;
-                const validSolutions = Object.entries(cell)
-                    .filter(([sol, scores]) => {
-                        if (currentRanking === 'impact') {
-                            return scores.impact > 0;
-                        } else {
-                            return scores.cost > 0;
-                        }
-                    })
-                    .sort((a, b) => 
-                        currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-                    );
-
-                if (currentRank <= validSolutions.length) {
-                    const [solution, scores] = validSolutions[currentRank - 1];
-                    if (!rankTotals[solution]) {
-                        rankTotals[solution] = { impact: 0, cost: 0, count: 0 };
-                    }
-                    rankTotals[solution].impact += scores.impact;
-                    rankTotals[solution].cost += scores.cost;
-                    rankTotals[solution].count++;
-                }
-            }
-        });
-
-        const solutions = Object.keys(rankTotals).sort((a, b) => {
-            if (currentRanking === 'impact') {
-                return rankTotals[b].impact - rankTotals[a].impact;
-            } else {
-                return rankTotals[a].cost - rankTotals[b].cost;
-            }
-        });
-
-        const maxValues = {
-            impact: d3.max(solutions, s => rankTotals[s].impact),
-            cost: d3.max(solutions, s => rankTotals[s].cost),
-            count: d3.max(solutions, s => rankTotals[s].count)
-        };
-
-        const barHeight = 20;
-        const barSpacing = 5;
-        const groupHeight = (barHeight + barSpacing) * 3 + 25;
-        const groupSpacing = 20;
-        const toggleWidth = 30;
-        const barWidth = 300;
-        const totalWidth = toggleWidth + barWidth + 100;
-        const totalHeight = (groupHeight + groupSpacing) * solutions.length;
-
-        const svg = infoPanel.append("svg")
-            .attr("width", totalWidth)
-            .attr("height", totalHeight);
-
-        const g = svg.append("g")
-            .attr("transform", `translate(0,10)`);
-
-        solutions.forEach((solution, index) => {
-            const yOffset = index * (groupHeight + groupSpacing);
-
-            g.append("foreignObject")
-                .attr("x", 0)
-                .attr("y", yOffset)
-                .attr("width", toggleWidth)
-                .attr("height", 20)
-                .html(`<input type="checkbox" class="criteria-toggle" data-solution="${solution}" ${activeCriteriaRasters.has(solution) ? 'checked' : ''}>`);
-
-            g.append("text")
-                .attr("x", toggleWidth + 5)
-                .attr("y", yOffset + 15)
-                .attr("text-anchor", "start")
-                .attr("font-weight", "bold")
-                .text(solution);
-
-            const barStartX = toggleWidth;
-            const barStartY = yOffset + 25;
-
-            const impactWidth = (rankTotals[solution].impact / maxValues.impact) * barWidth;
-            g.append("rect")
-                .attr("x", barStartX)
-                .attr("y", barStartY)
-                .attr("width", impactWidth)
-                .attr("height", barHeight)
-                .attr("fill", colorScale(solution));
-
-            g.append("text")
-                .attr("x", barStartX + 5)
-                .attr("y", barStartY + barHeight / 2)
-                .attr("dominant-baseline", "middle")
-                .attr("fill", "white")
-                .text(`Impact: ${rankTotals[solution].impact.toFixed(0)}`);
-
-            const costWidth = (rankTotals[solution].cost / maxValues.cost) * barWidth;
-            g.append("rect")
-                .attr("x", barStartX)
-                .attr("y", barStartY + barHeight + barSpacing)
-                .attr("width", costWidth)
-                .attr("height", barHeight)
-                .attr("fill", d3.color(colorScale(solution)).darker(0.5));
-
-            g.append("text")
-                .attr("x", barStartX + 5)
-                .attr("y", barStartY + barHeight + barSpacing + barHeight / 2)
-                .attr("dominant-baseline", "middle")
-                .attr("fill", "white")
-                .text(`Cost: £${rankTotals[solution].cost.toFixed(0)}`);
-
-            const countWidth = (rankTotals[solution].count / maxValues.count) * barWidth;
-            g.append("rect")
-                .attr("x", barStartX)
-                .attr("y", barStartY + (barHeight + barSpacing) * 2)
-                .attr("width", countWidth)
-                .attr("height", barHeight)
-                .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
-
-            g.append("text")
-                .attr("x", barStartX + 5)
-                .attr("y", barStartY + (barHeight + barSpacing) * 2 + barHeight / 2)
-                .attr("dominant-baseline", "middle")
-                .attr("fill", "white")
-                .text(`Count: ${rankTotals[solution].count}`);
-        });
-
-        infoPanel.selectAll(".criteria-toggle")
-            .on("change", function() {
-                const solution = this.getAttribute("data-solution");
-                if (this.checked) {
-                    activeCriteriaRasters.add(solution);
-                } else {
-                    activeCriteriaRasters.delete(solution);
-                }
-                updateCriteriaRasters();
-            });
+    if (selectedCellKeys.size === 0) {
+        infoPanel.html("<p>No cells selected. Select cells on the map to see scores.</p>");
+        return;
     }
+
+    const rankTotals = {};
+    selectedCellKeys.forEach(key => {
+        const cellData = allCells.find(cell => cell.key === key);
+        if (cellData) {
+            const {cell} = cellData;
+            const validSolutions = Object.entries(cell)
+                .filter(([sol, scores]) => {
+                    if (currentRanking === 'impact') {
+                        return scores.impact > 0;
+                    } else {
+                        return scores.cost > 0;
+                    }
+                })
+                .sort((a, b) => 
+                    currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
+                );
+
+            if (currentRank <= validSolutions.length) {
+                const [solution, scores] = validSolutions[currentRank - 1];
+                if (!rankTotals[solution]) {
+                    rankTotals[solution] = { impact: 0, cost: 0, count: 0 };
+                }
+                rankTotals[solution].impact += scores.impact;
+                rankTotals[solution].cost += scores.cost;
+                rankTotals[solution].count++;
+            }
+        }
+    });
+
+    const solutions = Object.keys(rankTotals).sort((a, b) => {
+        if (currentRanking === 'impact') {
+            return rankTotals[b].impact - rankTotals[a].impact;
+        } else {
+            return rankTotals[a].cost - rankTotals[b].cost;
+        }
+    });
+
+    const maxValues = {
+        impact: d3.max(solutions, s => rankTotals[s].impact),
+        cost: d3.max(solutions, s => rankTotals[s].cost),
+        count: d3.max(solutions, s => rankTotals[s].count)
+    };
+
+    const barHeight = 20;
+    const barSpacing = 5;
+    const groupHeight = (barHeight + barSpacing) * 3 + 25;
+    const groupSpacing = 20;
+    const toggleWidth = 30;
+    const valueWidth = 70;
+    const barWidth = 250;
+    const totalWidth = toggleWidth + valueWidth + barWidth + 20;
+    const totalHeight = (groupHeight + groupSpacing) * solutions.length;
+
+    const svg = infoPanel.append("svg")
+        .attr("width", totalWidth)
+        .attr("height", totalHeight);
+
+    const g = svg.append("g")
+        .attr("transform", `translate(0,10)`);
+
+    solutions.forEach((solution, index) => {
+        const yOffset = index * (groupHeight + groupSpacing);
+
+        g.append("foreignObject")
+            .attr("x", 0)
+            .attr("y", yOffset)
+            .attr("width", toggleWidth)
+            .attr("height", 20)
+            .html(`<input type="checkbox" class="criteria-toggle" data-solution="${solution}" ${activeCriteriaRasters.has(solution) ? 'checked' : ''}>`);
+
+        g.append("text")
+            .attr("x", toggleWidth + 5)
+            .attr("y", yOffset + 15)
+            .attr("text-anchor", "start")
+            .attr("font-weight", "bold")
+            .text(solution);
+
+        const valueStartX = toggleWidth;
+        const barStartX = valueStartX + valueWidth + 5;
+        const barStartY = yOffset + 25;
+
+        const impactWidth = (rankTotals[solution].impact / maxValues.impact) * barWidth;
+        g.append("text")
+            .attr("x", valueStartX)
+            .attr("y", barStartY + barHeight / 2)
+            .attr("dominant-baseline", "middle")
+            .attr("text-anchor", "start")
+            .text(`${rankTotals[solution].impact.toFixed(0)}`);
+
+        g.append("rect")
+            .attr("x", barStartX)
+            .attr("y", barStartY)
+            .attr("width", impactWidth)
+            .attr("height", barHeight)
+            .attr("fill", colorScale(solution));
+
+        g.append("text")
+            .attr("x", barStartX + 5)
+            .attr("y", barStartY + barHeight / 2)
+            .attr("dominant-baseline", "middle")
+            .attr("fill", "white")
+            .text("Impact");
+
+        const costWidth = (rankTotals[solution].cost / maxValues.cost) * barWidth;
+        g.append("text")
+            .attr("x", valueStartX)
+            .attr("y", barStartY + barHeight + barSpacing + barHeight / 2)
+            .attr("dominant-baseline", "middle")
+            .attr("text-anchor", "start")
+            .text(`£${rankTotals[solution].cost.toFixed(0)}`);
+
+        g.append("rect")
+            .attr("x", barStartX)
+            .attr("y", barStartY + barHeight + barSpacing)
+            .attr("width", costWidth)
+            .attr("height", barHeight)
+            .attr("fill", d3.color(colorScale(solution)).darker(0.5));
+
+        g.append("text")
+            .attr("x", barStartX + 5)
+            .attr("y", barStartY + barHeight + barSpacing + barHeight / 2)
+            .attr("dominant-baseline", "middle")
+            .attr("fill", "white")
+            .text("Cost");
+
+        const countWidth = (rankTotals[solution].count / maxValues.count) * barWidth;
+        g.append("text")
+            .attr("x", valueStartX)
+            .attr("y", barStartY + (barHeight + barSpacing) * 2 + barHeight / 2)
+            .attr("dominant-baseline", "middle")
+            .attr("text-anchor", "start")
+            .text(`${rankTotals[solution].count}`);
+
+        g.append("rect")
+            .attr("x", barStartX)
+            .attr("y", barStartY + (barHeight + barSpacing) * 2)
+            .attr("width", countWidth)
+            .attr("height", barHeight)
+            .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
+
+        g.append("text")
+            .attr("x", barStartX + 5)
+            .attr("y", barStartY + (barHeight + barSpacing) * 2 + barHeight / 2)
+            .attr("dominant-baseline", "middle")
+            .attr("fill", "white")
+            .text("Count");
+    });
+
+    infoPanel.selectAll(".criteria-toggle")
+        .on("change", function() {
+            const solution = this.getAttribute("data-solution");
+            if (this.checked) {
+                activeCriteriaRasters.add(solution);
+            } else {
+                activeCriteriaRasters.delete(solution);
+            }
+            updateCriteriaRasters();
+        });
+}
 
     function toggleRanking() {
         currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';

@@ -1,7 +1,7 @@
 import rasterio
 from rasterio.transform import from_origin
 from rasterio.features import rasterize
-from rasterio.enums import Resampling  # Add this import
+from rasterio.enums import Resampling
 import numpy as np
 import geopandas as gpd
 import json
@@ -14,22 +14,19 @@ width_km, height_km = 10, 10
 
 # Define the CRS (WGS84)
 wgs84 = CRS('EPSG:4326')
-# British National Grid
-bng = CRS('EPSG:27700')
 
-# Create a point and transform it to British National Grid
-center_point = Point(center_lon, center_lat)
-center_gdf = gpd.GeoDataFrame(geometry=[center_point], crs=wgs84)
-center_bng = center_gdf.to_crs(bng)
+# Calculate the bounding box in degrees
+# Approximate degree to km conversion at this latitude
+km_per_degree_lat = 111.32
+km_per_degree_lon = 111.32 * np.cos(np.radians(center_lat))
 
-# Get the coordinates of the center in BNG
-center_x, center_y = center_bng.geometry.iloc[0].x, center_bng.geometry.iloc[0].y
+lat_offset = (height_km / 2) / km_per_degree_lat
+lon_offset = (width_km / 2) / km_per_degree_lon
 
-# Define the bounding box
-xmin = center_x - 5000  # 5km west
-ymin = center_y - 5000  # 5km south
-xmax = center_x + 5000  # 5km east
-ymax = center_y + 5000  # 5km north
+xmin = center_lon - lon_offset
+ymin = center_lat - lat_offset
+xmax = center_lon + lon_offset
+ymax = center_lat + lat_offset
 
 # Define the grid
 width = 100
@@ -50,7 +47,7 @@ def create_cog(data, output_path, transform):
         'count': 1,
         'width': data.shape[1],
         'height': data.shape[0],
-        'crs': 'EPSG:27700',
+        'crs': 'EPSG:4326',
         'transform': transform,
         'compress': 'lzw',
         'predictor': 2,
@@ -76,11 +73,15 @@ def generate_raster(criterion):
     n_points = np.random.randint(5, 20)  # Random number of points between 5 and 20
     random_points = gpd.GeoDataFrame(
         geometry=[Point(np.random.uniform(xmin, xmax), np.random.uniform(ymin, ymax)) for _ in range(n_points)],
-        crs=bng
+        crs=wgs84
     )
 
     # Buffer the points to create circular areas
-    buffered_points = random_points.buffer(np.random.randint(500, 1000))  # Random radius between 100-500m
+    # Convert the buffer distance from km to degrees (approximate)
+    buffer_km = np.random.uniform(0.5, 1.0)  # Random radius between 0.5-1.0 km
+    buffer_deg_lat = buffer_km / km_per_degree_lat
+    buffer_deg_lon = buffer_km / km_per_degree_lon
+    buffered_points = random_points.buffer(np.sqrt(buffer_deg_lat * buffer_deg_lon))
 
     # Rasterize the buffered points
     shapes = ((geom, 1) for geom in buffered_points.geometry)

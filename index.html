@@ -10,7 +10,8 @@
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+    <script src="https://unpkg.com/geotiff"></script>
+
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
     <style>
         body {
@@ -341,90 +342,82 @@
     </div>
 
     <script>
-let solutionCriteria = {};
-let challengeCategories = {};
-let solutionCosts = {};
-let map;
-let gridLayer;
-let rasterLayers = {};
-let selectedCellKeys = new Set();
-let allCells = [];
-let gridOrigin = null;
-let gridExtent = null;
-let currentRanking = 'impact';
-let currentRank = 1;
-const GRID_SIZE = 100;
-let currentCategory = "Biodiversity and soils";
-let cellSizeLat, cellSizeLng;
-let drawLayer;
-let isDrawMode = false;
-let activeCriteriaRasters = new Set();
-let drawStartTime;
-let drawingPath = [];
+    let solutionCriteria = {};
+    let challengeCategories = {};
+    let solutionCosts = {};
+    let map;
+    let gridLayer;
+    let rasterLayers = {};
+    let selectedCellKeys = new Set();
+    let allCells = [];
+    let gridOrigin = null;
+    let gridExtent = null;
+    let currentRanking = 'impact';
+    let currentRank = 1;
+    const GRID_SIZE = 100;
+    let currentCategory = "Biodiversity and soils";
+    let cellSizeLat, cellSizeLng;
+    let drawLayer;
+    let isDrawMode = false;
+    let activeCriteriaRasters = new Set();
+    let drawStartTime;
+    let drawingPath = [];
 
-const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10);
+    const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
-const colorScale = d3.scaleOrdinal()
-    .domain(Object.keys(solutionCriteria))
-    .range(d3.schemeCategory10);
+    const colorScale = d3.scaleOrdinal()
+        .domain(Object.keys(solutionCriteria))
+        .range(d3.schemeCategory10);
 
-const criteriaRasters = {};
+    const criteriaRasters = {};
 
-async function loadCOGs() {
-    const criteria = new Set(Object.values(solutionCriteria).flat());
-    for (const criterion of criteria) {
-        const response = await fetch(`rasters/${criterion}.tif`);
-        const arrayBuffer = await response.arrayBuffer();
-        const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
-        const image = await tiff.getImage();
-        const rasterData = await image.readRasters();
-        
-        criteriaRasters[criterion] = Array.from({ length: GRID_SIZE }, (_, y) => 
-            Array.from({ length: GRID_SIZE }, (_, x) => 
-                rasterData[0][y * GRID_SIZE + x] > 0 ? 1 : 0
-            )
-        );
-    }
-}
+    class COGLayer {
+        constructor(url) {
+            this.url = url;
+            this.tiff = null;
+            this.image = null;
+            this.width = 0;
+            this.height = 0;
+            this.loadTiff();
+        }
 
-function toggleSearch() {
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput.style.display === 'none') {
-        searchInput.style.display = 'inline-block';
-        searchInput.focus();
-    } else {
-        searchInput.style.display = 'none';
-    }
-}
+        async loadTiff() {
+            const response = await fetch(this.url);
+            const arrayBuffer = await response.arrayBuffer();
+            this.tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+            this.image = await this.tiff.getImage();
+            this.width = this.image.getWidth();
+            this.height = this.image.getHeight();
+        }
 
-function searchLocation() {
-    const query = document.getElementById('searchInput').value;
-    if (!query) return;
-
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
-
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            if (data && data.length > 0) {
-                const lat = parseFloat(data[0].lat);
-                const lon = parseFloat(data[0].lon);
-                map.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(map)
-                    .bindPopup(data[0].display_name)
-                    .openPopup();
-                document.getElementById('searchInput').style.display = 'none';
-            } else {
-                alert('Location not found');
+        async getTileData(x, y, z) {
+            if (!this.image) {
+                await this.loadTiff();
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while searching');
-        });
-}
 
-async function fetchJSONData() {
+            const tileSize = 256;
+            const tileOrigin = [x * tileSize, y * tileSize];
+            const tileWindow = [tileOrigin[0], tileOrigin[1], tileOrigin[0] + tileSize, tileOrigin[1] + tileSize];
+
+            const data = await this.image.readRasters({
+                window: tileWindow,
+                width: tileSize,
+                height: tileSize,
+            });
+
+            return data[0];
+        }
+    }
+
+    async function loadRasters() {
+        const criteria = new Set(Object.values(solutionCriteria).flat());
+        for (const criterion of criteria) {
+            const cogUrl = `rasters/${criterion}.tif`;
+            criteriaRasters[criterion] = new COGLayer(cogUrl);
+        }
+    }
+
+    async function fetchJSONData() {
     try {
         const [solutionCriteriaResponse, challengeCategoriesResponse, solutionCostsResponse] = await Promise.all([
             fetch('solutionCriteria.json'),
@@ -436,49 +429,15 @@ async function fetchJSONData() {
         challengeCategories = await challengeCategoriesResponse.json();
         solutionCosts = await solutionCostsResponse.json();
 
-        await loadCOGs();
+        await loadRasters();
         initializeApp();
     } catch (error) {
         console.error('Error loading JSON data:', error);
     }
 }
 
-function calculateSuitabilityScores(gridSize, challengeCategory) {
-    const grid = [];
-    for (let y = 0; y < gridSize; y++) {
-        const row = [];
-        for (let x = 0; x < gridSize; x++) {
-            const cellScores = {};
-            for (const [solution, criteria] of Object.entries(solutionCriteria)) {
-                const area = calculateOverlapArea(x, y, criteria, gridSize);
-                const weight = challengeCategories[challengeCategory][solution];
-                cellScores[solution] = {
-                    impact: area * weight * 100,
-                    cost: area * solutionCosts[solution],
-                    area: area
-                };
-            }
-            row.push(cellScores);
-        }
-        grid.push(row);
-    }
-    return grid;
-}
-
-function calculateOverlapArea(x, y, criteria, gridSize) {
-    let totalValue = 0;
-    criteria.forEach(criterion => {
-        const raster = criteriaRasters[criterion];
-        const rasterX = Math.floor(x / gridSize * raster.length);
-        const rasterY = Math.floor(y / gridSize * raster[0].length);
-        totalValue += raster[rasterY][rasterX];
-    });
-    return totalValue / criteria.length;
-}
-
-async function initializeApp() {
+function initializeApp() {
     console.log('Initializing app');
-    await loadCOGs();
     if (map) {
         console.log('Removing existing map');
         map.remove();
@@ -535,123 +494,120 @@ function setupUI() {
     });
 }
 
-function updateMap(challengeCategory) {
-    const currentCenter = map ? map.getCenter() : [51.454514, -2.587910];
-    const currentZoom = map ? map.getZoom() : 16;
+// Make sure to add the createButtons function if it's not already defined
+function createButtons(containerId, dataArray, buttonClass) {
+    const container = d3.select(`#${containerId}`);
+    container.selectAll("button")
+        .data(dataArray)
+        .enter().append("button")
+        .attr("class", buttonClass)
+        .text(d => d)
+        .on("click", function(event, d) {
+            d3.selectAll(".category-button").classed("active", false);
+            d3.select(this).classed("active", true);
+            d3.select("#categoryDropdown .dropbtn").text(d);
+            currentCategory = d;
 
-    if (map) map.remove();
-    map = L.map('map', {
-        renderer: L.canvas(),
-        tap: true,
-        touchZoom: true,
-        dragging: true,
-        zoomControl: false
-    }).setView(currentCenter, currentZoom);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        className: 'map-tiles'
-    }).addTo(map);
-
-    const suitabilityScores = calculateSuitabilityScores(GRID_SIZE, challengeCategory);
-
-    if (gridLayer) {
-        map.removeLayer(gridLayer);
-    }
-
-    gridLayer = L.layerGroup().addTo(map);
-
-    if (!gridOrigin) {
-        gridOrigin = map.getCenter();
-    }
-
-    const mapCenter = map.getCenter();
-    
-    const gridSizeMeters = 2000;
-
-    const latDegreeSize = 111000;
-    const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180);
-
-    const cellSizeMeters = gridSizeMeters / GRID_SIZE;
-    cellSizeLat = cellSizeMeters / latDegreeSize;
-    cellSizeLng = cellSizeMeters / lngDegreeSize;
-
-    gridExtent = {
-        north: gridOrigin.lat + (gridSizeMeters / latDegreeSize) / 2,
-        south: gridOrigin.lat - (gridSizeMeters / latDegreeSize) / 2,
-        east: gridOrigin.lng + (gridSizeMeters / lngDegreeSize) / 2,
-        west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
-    };
-
-    allCells = [];
-
-    suitabilityScores.forEach((row, y) => {
-        row.forEach((cell, x) => {
-            const cellBounds = [
-                [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-            ];
-
-            const key = `${x},${y}`;
-            
-            allCells.push({key, cell, bounds: cellBounds});
+            updateMap(currentCategory);
         });
-    });
-
-    renderCells();
-
-    const maxRank = Math.max(...suitabilityScores.flat().map(cell => 
-        Object.entries(cell)
-            .filter(([sol, scores]) => {
-                if (currentRanking === 'impact') {
-                    return scores.impact > 0;
-                } else {
-                    return scores.cost > 0;
-                }
-            })
-            .length
-    ));
-    rankSlider.max = maxRank;
-    rankSlider.value = Math.min(currentRank, maxRank);
-    rankValue.textContent = rankSlider.value;
-
-    updateScores();
-    updateCriteriaRasters();
 }
 
-function renderCells() {
+    function updateMap(challengeCategory) {
+        const currentCenter = map ? map.getCenter() : [51.454514, -2.587910];
+        const currentZoom = map ? map.getZoom() : 16;
+
+        if (map) map.remove();
+        map = L.map('map', {
+            renderer: L.canvas(),
+            tap: true,
+            touchZoom: true,
+            dragging: true,
+            zoomControl: false
+        }).setView(currentCenter, currentZoom);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            className: 'map-tiles'
+        }).addTo(map);
+
+        if (gridLayer) {
+            map.removeLayer(gridLayer);
+        }
+
+        gridLayer = L.layerGroup().addTo(map);
+
+        if (!gridOrigin) {
+            gridOrigin = map.getCenter();
+        }
+
+        const mapCenter = map.getCenter();
+        
+        const gridSizeMeters = 2000;
+
+        const latDegreeSize = 111000;
+        const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180);
+
+        const cellSizeMeters = gridSizeMeters / GRID_SIZE;
+        cellSizeLat = cellSizeMeters / latDegreeSize;
+        cellSizeLng = cellSizeMeters / lngDegreeSize;
+
+        gridExtent = {
+            north: gridOrigin.lat + (gridSizeMeters / latDegreeSize) / 2,
+            south: gridOrigin.lat - (gridSizeMeters / latDegreeSize) / 2,
+            east: gridOrigin.lng + (gridSizeMeters / lngDegreeSize) / 2,
+            west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
+        };
+
+        allCells = [];
+
+        for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+                const cellBounds = [
+                    [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+                    [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+                ];
+
+                const key = `${x},${y}`;
+                
+                allCells.push({key, bounds: cellBounds});
+            }
+        }
+
+        renderCells();
+
+        const maxRank = GRID_SIZE * GRID_SIZE;
+        rankSlider.max = maxRank;
+        rankSlider.value = Math.min(currentRank, maxRank);
+        rankValue.textContent = rankSlider.value;
+
+        updateScores();
+        updateCriteriaRasters();
+
+        map.on('moveend', () => {
+            renderCells();
+            updateCriteriaRasters();
+        });
+    }
+
+    function renderCells() {
     const canvas = document.createElement('canvas');
     canvas.width = map.getSize().x;
     canvas.height = map.getSize().y;
     const ctx = canvas.getContext('2d');
 
-    allCells.forEach(({key, cell, bounds}) => {
+    allCells.forEach(({key, bounds}) => {
         let fillColor, fillOpacity;
-        const validSolutions = Object.entries(cell)
-            .filter(([sol, scores]) => {
-                if (currentRanking === 'impact') {
-                    return scores.impact > 0;
-                } else {
-                    return scores.cost > 0;
-                }
-            });
         
-        if (validSolutions.length > 0) {
-            let sortedSolutions = validSolutions.sort((a, b) => 
-                currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-            );
+        // Calculate cell suitability based on visible criteria rasters
+        // This is a placeholder calculation and should be replaced with your actual suitability calculation
+        const suitability = Math.random(); // Replace this with actual suitability calculation
 
-            if (currentRank <= sortedSolutions.length) {
-                const rankedSolution = sortedSolutions[currentRank - 1];
-                fillColor = colorScale(rankedSolution[0]);
-                fillOpacity = 0.7;
-            } else {
-                fillColor = "rgba(0,0,0,0)";
-                fillOpacity = 0;
-            }
+        if (suitability > 0) {
+            fillColor = d3.interpolateViridis(suitability);
+            fillOpacity = 0.7;
         } else {
-            fillColor = "rgba(0,0,0,0)";
-            fillOpacity = 0;
+            fillColor = "rgba(200,200,200,0.3)"; // Light gray for empty cells
+            fillOpacity = 0.3;
         }
 
         const isSelected = selectedCellKeys.has(key);
@@ -660,6 +616,11 @@ function renderCells() {
         ctx.fillStyle = fillColor;
         ctx.globalAlpha = fillOpacity;
         ctx.fillRect(pixelBounds[0].x, pixelBounds[0].y, pixelBounds[1].x - pixelBounds[0].x, pixelBounds[1].y - pixelBounds[0].y);
+
+        // Add a border to all cells
+        ctx.strokeStyle = "rgba(0,0,0,0.2)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(pixelBounds[0].x, pixelBounds[0].y, pixelBounds[1].x - pixelBounds[0].x, pixelBounds[1].y - pixelBounds[0].y);
 
         if (isSelected) {
             ctx.strokeStyle = "red";
@@ -689,433 +650,337 @@ function renderCells() {
     });
 }
 
-function toggleCellSelection(key) {
-    if (selectedCellKeys.has(key)) {
-        selectedCellKeys.delete(key);
-    } else {
-        selectedCellKeys.add(key);
+
+
+    function calculateSuitabilityScores(gridSize, challengeCategory) {
+    const grid = [];
+    for (let y = 0; y < gridSize; y++) {
+        const row = [];
+        for (let x = 0; x < gridSize; x++) {
+            const cellScores = {};
+            for (const [solution, criteria] of Object.entries(solutionCriteria)) {
+                const area = calculateOverlapArea(x, y, criteria, gridSize);
+                const weight = challengeCategories[challengeCategory][solution] || 0;
+                cellScores[solution] = {
+                    impact: area * weight * 100,
+                    cost: area * (solutionCosts[solution] || 0),
+                    area: area
+                };
+            }
+            row.push(cellScores);
+        }
+        grid.push(row);
     }
-    renderCells();
-    updateScores();
+    return grid;
 }
 
-function updateScores() {
-    const infoPanel = d3.select("#rankInfo");
-    infoPanel.html("");  // Clear previous content
-
-    if (selectedCellKeys.size === 0) {
-        infoPanel.html("<p>No cells selected. Select cells on the map to see scores.</p>");
-        return;
-    }
-
-    const rankTotals = {};
-    selectedCellKeys.forEach(key => {
-        const cellData = allCells.find(cell => cell.key === key);
-        if (cellData) {
-            const {cell} = cellData;
-            const validSolutions = Object.entries(cell)
-                .filter(([sol, scores]) => {
-                    if (currentRanking === 'impact') {
-                        return scores.impact > 0;
-                    } else {
-                        return scores.cost > 0;
-                    }
-                })
-                .sort((a, b) => 
-                    currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-                );
-
-            if (currentRank <= validSolutions.length) {
-                const [solution, scores] = validSolutions[currentRank - 1];
-                if (!rankTotals[solution]) {
-                    rankTotals[solution] = { impact: 0, cost: 0, count: 0 };
+function calculateOverlapArea(x, y, criteria, gridSize) {
+    let totalValue = 0;
+    criteria.forEach(criterion => {
+        const rasterLayer = criteriaRasters[criterion];
+        if (rasterLayer) {
+            const tileCoords = rasterLayer.getTileCoords(map.getZoom(), x, y);
+            if (tileCoords) {
+                const tileData = rasterLayer.getTileData(tileCoords.x, tileCoords.y, map.getZoom());
+                if (tileData && tileData.raster && tileData.raster.features && tileData.raster.features.length > 0) {
+                    totalValue += 1;
                 }
-                rankTotals[solution].impact += scores.impact;
-                rankTotals[solution].cost += scores.cost;
-                rankTotals[solution].count++;
             }
         }
     });
+    return criteria.length > 0 ? totalValue / criteria.length : 0;
+}
 
-    const solutions = Object.keys(rankTotals).sort((a, b) => {
-        if (currentRanking === 'impact') {
-            return rankTotals[b].impact - rankTotals[a].impact;
+    async function getSuitabilityFromRaster(raster, bounds) {
+        const tileSize = 256;
+        const zoom = map.getZoom();
+        const nw = map.project(bounds[0], zoom);
+        const se = map.project(bounds[1], zoom);
+        
+        const tileNW = nw.divideBy(tileSize).floor();
+        const tileSE = se.divideBy(tileSize).floor();
+
+        let totalValue = 0;
+        let pixelCount = 0;
+
+        for (let x = tileNW.x; x <= tileSE.x; x++) {
+            for (let y = tileNW.y; y <= tileSE.y; y++) {
+                const tileData = await raster.getTileData(x, y, zoom);
+                if (tileData) {
+                    for (let i = 0; i < tileData.length; i++) {
+                        totalValue += tileData[i];
+                        pixelCount++;
+                    }
+                }
+            }
+        }
+
+        return pixelCount > 0 ? totalValue / pixelCount : 0;
+    }
+
+    async function updateCriteriaRasters() {
+        const bounds = map.getBounds();
+        const zoom = map.getZoom();
+        const tileSize = 256;
+
+        for (const solution of activeCriteriaRasters) {
+            const criteria = solutionCriteria[solution];
+            for (const criterion of criteria) {
+                const raster = criteriaRasters[criterion];
+                
+                const minTile = map.project(bounds.getNorthWest(), zoom).divideBy(tileSize).floor();
+                const maxTile = map.project(bounds.getSouthEast(), zoom).divideBy(tileSize).ceil();
+
+                for (let x = minTile.x; x < maxTile.x; x++) {
+                    for (let y = minTile.y; y < maxTile.y; y++) {
+                        await raster.getTileData(x, y, zoom);
+                    }
+                }
+            }
+        }
+    }
+
+    function toggleCellSelection(key) {
+        if (selectedCellKeys.has(key)) {
+            selectedCellKeys.delete(key);
         } else {
-            return rankTotals[a].cost - rankTotals[b].cost;
+            selectedCellKeys.add(key);
         }
-    });
+        renderCells();
+        updateScores();
+    }
 
-    const maxValues = {
-        impact: d3.max(solutions, s => rankTotals[s].impact),
-        cost: d3.max(solutions, s => rankTotals[s].cost),
-        count: d3.max(solutions, s => rankTotals[s].count)
-    };
+    function updateScores() {
+        const infoPanel = d3.select("#rankInfo");
+        infoPanel.html("");  // Clear previous content
 
-    const barHeight = 20;
-    const barSpacing = 5;
-    const groupHeight = (barHeight + barSpacing) * 3 + 25;
-    const groupSpacing = 20;
-    const toggleWidth = 30;
-    const valueWidth = 70;
-    const barWidth = 250;
-    const totalWidth = toggleWidth + valueWidth + barWidth + 20;
-    const totalHeight = (groupHeight + groupSpacing) * solutions.length;
+        if (selectedCellKeys.size === 0) {
+            infoPanel.html("<p>No cells selected. Select cells on the map to see scores.</p>");
+            return;
+        }
 
-    const svg = infoPanel.append("svg")
-        .attr("width", totalWidth)
-        .attr("height", totalHeight);
+        // Calculate and display scores for selected cells
+        // This function needs to be implemented based on your specific scoring logic
+    }
 
-    const g = svg.append("g")
-        .attr("transform", `translate(0,10)`);
+    function toggleRanking() {
+        currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
+        const toggleButton = document.getElementById('rankingToggle');
+        toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
+        toggleButton.classList.toggle('active');
 
-    const isDarkMode = document.body.classList.contains('dark-mode');
-    const textColor = isDarkMode ? 'white' : 'black';
+        renderCells();
+        updateScores();
+    }
 
-    solutions.forEach((solution, index) => {
-        const yOffset = index * (groupHeight + groupSpacing);
+    function toggleDrawMode() {
+        isDrawMode = !isDrawMode;
+        const drawToggle = document.getElementById('drawToggle');
+        drawToggle.classList.toggle('active');
 
-        g.append("foreignObject")
-            .attr("x", 0)
-            .attr("y", yOffset)
-            .attr("width", toggleWidth)
-            .attr("height", 20)
-            .html(`<input type="checkbox" class="criteria-toggle" data-solution="${solution}" ${activeCriteriaRasters.has(solution) ? 'checked' : ''}>`);
+        if (isDrawMode) {
+            map.dragging.disable();
+            map.touchZoom.disable();
+            map.doubleClickZoom.disable();
+            map.scrollWheelZoom.disable();
+            map.boxZoom.disable();
+            map.keyboard.disable();
 
-        g.append("text")
-            .attr("x", toggleWidth + 5)
-            .attr("y", yOffset + 15)
-            .attr("text-anchor", "start")
-            .attr("font-weight", "bold")
-            .attr("fill", textColor)
-            .text(solution);
+            map.getContainer().addEventListener('mousedown', handleDrawStart);
+            map.getContainer().addEventListener('mousemove', handleDrawMove);
+            map.getContainer().addEventListener('mouseup', handleDrawEnd);
+            map.getContainer().addEventListener('touchstart', handleDrawStart);
+            map.getContainer().addEventListener('touchmove', handleDrawMove);
+            map.getContainer().addEventListener('touchend', handleDrawEnd);
+        } else {
+            map.dragging.enable();
+            map.touchZoom.enable();
+            map.doubleClickZoom.enable();
+            map.scrollWheelZoom.enable();
+            map.boxZoom.enable();
+            map.keyboard.enable();
 
-        const valueStartX = toggleWidth;
-        const barStartX = valueStartX + valueWidth + 5;
-        const barStartY = yOffset + 25;
+            map.getContainer().removeEventListener('mousedown', handleDrawStart);
+            map.getContainer().removeEventListener('mousemove', handleDrawMove);
+            map.getContainer().removeEventListener('mouseup', handleDrawEnd);
+            map.getContainer().removeEventListener('touchstart', handleDrawStart);
+            map.getContainer().removeEventListener('touchmove', handleDrawMove);
+            map.getContainer().removeEventListener('touchend', handleDrawEnd);
 
-        const impactWidth = (rankTotals[solution].impact / maxValues.impact) * barWidth;
-        g.append("text")
-            .attr("x", valueStartX)
-            .attr("y", barStartY + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("text-anchor", "start")
-            .attr("fill", textColor)
-            .text(`${rankTotals[solution].impact.toFixed(0)}`);
-
-        g.append("rect")
-            .attr("x", barStartX)
-            .attr("y", barStartY)
-            .attr("width", impactWidth)
-            .attr("height", barHeight)
-            .attr("fill", colorScale(solution));
-
-        g.append("text")
-            .attr("x", barStartX + 5)
-            .attr("y", barStartY + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("fill", "white")
-            .text("Impact");
-
-        const costWidth = (rankTotals[solution].cost / maxValues.cost) * barWidth;
-        g.append("text")
-            .attr("x", valueStartX)
-            .attr("y", barStartY + barHeight + barSpacing + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("text-anchor", "start")
-            .attr("fill", textColor)
-            .text(`£${rankTotals[solution].cost.toFixed(0)}`);
-
-        g.append("rect")
-            .attr("x", barStartX)
-            .attr("y", barStartY + barHeight + barSpacing)
-            .attr("width", costWidth)
-            .attr("height", barHeight)
-            .attr("fill", d3.color(colorScale(solution)).darker(0.5));
-
-        g.append("text")
-            .attr("x", barStartX + 5)
-            .attr("y", barStartY + barHeight + barSpacing + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("fill", "white")
-            .text("Cost");
-
-        const countWidth = (rankTotals[solution].count / maxValues.count) * barWidth;
-        g.append("text")
-            .attr("x", valueStartX)
-            .attr("y", barStartY + (barHeight + barSpacing) * 2 + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("text-anchor", "start")
-            .attr("fill", textColor)
-            .text(`${rankTotals[solution].count}`);
-
-        g.append("rect")
-            .attr("x", barStartX)
-            .attr("y", barStartY + (barHeight + barSpacing) * 2)
-            .attr("width", countWidth)
-            .attr("height", barHeight)
-            .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
-
-        g.append("text")
-            .attr("x", barStartX + 5)
-            .attr("y", barStartY + (barHeight + barSpacing) * 2 + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("fill", "white")
-            .text("Count");
-    });
-
-    infoPanel.selectAll(".criteria-toggle")
-        .on("change", function() {
-            const solution = this.getAttribute("data-solution");
-            if (this.checked) {
-                activeCriteriaRasters.add(solution);
-            } else {
-                activeCriteriaRasters.delete(solution);
+            if (drawLayer) {
+                map.removeLayer(drawLayer);
+                drawLayer = null;
             }
-            updateCriteriaRasters();
+        }
+    }
+
+    function handleDrawStart(e) {
+        if (!isDrawMode) return;
+        e.preventDefault();
+        drawStartTime = new Date().getTime();
+        const point = e.touches ? e.touches[0] : e;
+        const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
+        drawingPath = [latlng];
+
+        if (drawLayer) {
+            map.removeLayer(drawLayer);
+        }
+        drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
+    }
+
+    function handleDrawMove(e) {
+        if (!isDrawMode) return;
+        e.preventDefault();
+        const point = e.touches ? e.touches[0] : e;
+        const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
+        drawingPath.push(latlng);
+        drawLayer.setLatLngs(drawingPath);
+    }
+
+    function handleDrawEnd(e) {
+        if (!isDrawMode) return;
+        e.preventDefault();
+        const drawEndTime = new Date().getTime();
+        const drawDuration = drawEndTime - drawStartTime;
+
+        if (drawDuration < 500 && drawingPath.length < 3) {
+            map.removeLayer(drawLayer);
+            drawLayer = null;
+            return;
+        }
+
+        drawingPath.push(drawingPath[0]);
+        if (drawLayer) {
+            drawLayer.setLatLngs(drawingPath);
+            selectCellsInShape(drawLayer);
+        }
+        toggleDrawMode();
+    }
+
+    function selectCellsInShape(shape) {
+        if (!gridLayer) return;
+
+        const bounds = L.latLngBounds(drawingPath);
+
+        allCells.forEach(({key, bounds: cellBounds}) => {
+            const cellCenter = L.latLngBounds(cellBounds).getCenter();
+            if (bounds.contains(cellCenter) && pointInPolygon(cellCenter, drawingPath)) {
+                selectedCellKeys.add(key);
+            }
         });
-}
 
-function toggleRanking() {
-    currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
-    const toggleButton = document.getElementById('rankingToggle');
-    toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
-    toggleButton.classList.toggle('active');
+        renderCells();
+        updateScores();
+    }
 
-    renderCells();
-    updateScores();
-}
+    function pointInPolygon(point, polygon) {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            const xi = polygon[i].lat, yi = polygon[i].lng;
+            const xj = polygon[j].lat, yj = polygon[j].lng;
 
-function createButtons(containerId, dataArray, buttonClass) {
-    const container = d3.select(`#${containerId}`);
-    container.selectAll("button")
-        .data(dataArray)
-        .enter().append("button")
-        .attr("class", buttonClass)
-        .text(d => d)
-        .on("click", function(event, d) {
-            d3.selectAll(".category-button").classed("active", false);
-            d3.select(this).classed("active", true);
-            d3.select("#categoryDropdown .dropbtn").text(d);
-            currentCategory = d;
+            const intersect = ((yi > point.lng) !== (yj > point.lng))
+                && (point.lat < (xj - xi) * (point.lng - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
 
-            updateMap(currentCategory);
-        });
-}
-
-function toggleDrawMode() {
-    isDrawMode = !isDrawMode;
-    const drawToggle = document.getElementById('drawToggle');
-    drawToggle.classList.toggle('active');
-
-    if (isDrawMode) {
-        map.dragging.disable();
-        map.touchZoom.disable();
-        map.doubleClickZoom.disable();
-        map.scrollWheelZoom.disable();
-        map.boxZoom.disable();
-        map.keyboard.disable();
-
-        map.getContainer().addEventListener('mousedown', handleDrawStart);
-        map.getContainer().addEventListener('mousemove', handleDrawMove);
-        map.getContainer().addEventListener('mouseup', handleDrawEnd);
-        map.getContainer().addEventListener('touchstart', handleDrawStart);
-        map.getContainer().addEventListener('touchmove', handleDrawMove);
-        map.getContainer().addEventListener('touchend', handleDrawEnd);
-    } else {
-        map.dragging.enable();
-        map.touchZoom.enable();
-        map.doubleClickZoom.enable();
-        map.scrollWheelZoom.enable();
-        map.boxZoom.enable();
-        map.keyboard.enable();
-
-        map.getContainer().removeEventListener('mousedown', handleDrawStart);
-        map.getContainer().removeEventListener('mousemove', handleDrawMove);
-        map.getContainer().removeEventListener('mouseup', handleDrawEnd);
-        map.getContainer().removeEventListener('touchstart', handleDrawStart);
-        map.getContainer().removeEventListener('touchmove', handleDrawMove);
-        map.getContainer().removeEventListener('touchend', handleDrawEnd);
-
+    function clearSelection() {
+        selectedCellKeys.clear();
         if (drawLayer) {
             map.removeLayer(drawLayer);
             drawLayer = null;
         }
-    }
-}
-
-function handleDrawStart(e) {
-    if (!isDrawMode) return;
-    e.preventDefault();
-    drawStartTime = new Date().getTime();
-    const point = e.touches ? e.touches[0] : e;
-    const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
-    drawingPath = [latlng];
-
-    if (drawLayer) {
-        map.removeLayer(drawLayer);
-    }
-    drawLayer = L.polyline(drawingPath, {color: 'red'}).addTo(map);
-}
-
-function handleDrawMove(e) {
-    if (!isDrawMode) return;
-    e.preventDefault();
-    const point = e.touches ? e.touches[0] : e;
-    const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
-    drawingPath.push(latlng);
-    drawLayer.setLatLngs(drawingPath);
-}
-
-function handleDrawEnd(e) {
-    if (!isDrawMode) return;
-    e.preventDefault();
-    const drawEndTime = new Date().getTime();
-    const drawDuration = drawEndTime - drawStartTime;
-
-    if (drawDuration < 500 && drawingPath.length < 3) {
-        map.removeLayer(drawLayer);
-        drawLayer = null;
-        return;
+        renderCells();
+        updateScores();
     }
 
-    drawingPath.push(drawingPath[0]);
-    if (drawLayer) {
-        drawLayer.setLatLngs(drawingPath);
-        selectCellsInShape(drawLayer);
-    }
-    toggleDrawMode();
-}
-
-function selectCellsInShape(shape) {
-    if (!gridLayer) return;
-
-    const bounds = L.latLngBounds(drawingPath);
-
-    allCells.forEach(({key, bounds: cellBounds}) => {
-        const cellCenter = L.latLngBounds(cellBounds).getCenter();
-        if (bounds.contains(cellCenter) && pointInPolygon(cellCenter, drawingPath)) {
-            selectedCellKeys.add(key);
+    function toggleDarkMode() {
+        const isDarkMode = document.body.classList.toggle('dark-mode');
+        const darkModeButton = document.getElementById('darkModeToggle');
+        if (isDarkMode) {
+            darkModeButton.innerHTML = '<i class="fas fa-sun"></i>';
+        } else {
+            darkModeButton.innerHTML = '<i class="fas fa-moon"></i>';
         }
-    });
-
-    renderCells();
-    updateScores();
-}
-
-function pointInPolygon(point, polygon) {
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].lat, yi = polygon[i].lng;
-        const xj = polygon[j].lat, yj = polygon[j].lng;
-
-        const intersect = ((yi > point.lng) !== (yj > point.lng))
-            && (point.lat < (xj - xi) * (point.lng - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-    }
-    return inside;
-}
-
-function clearSelection() {
-    selectedCellKeys.clear();
-    if (drawLayer) {
-        map.removeLayer(drawLayer);
-        drawLayer = null;
-    }
-    renderCells();
-    updateScores();
-}
-
-function updateCriteriaRasters() {
-    Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-    rasterLayers = {};
-
-    activeCriteriaRasters.forEach(solution => {
-        const criteria = solutionCriteria[solution];
-        criteria.forEach((criterion, index) => {
-            const raster = criteriaRasters[criterion];
-            const rasterLayer = L.layerGroup().addTo(map);
-            rasterLayers[`${solution}_${criterion}`] = rasterLayer;
-
-            const criterionColor = criteriaColorScale(criterion);
-
-            raster.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value) {
-                        const cellBounds = [
-                            [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                            [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                        ];
-                        L.polyline([
-                            [cellBounds[0][0], cellBounds[0][1]],
-                            [cellBounds[1][0], cellBounds[1][1]]
-                        ], {
-                            color: criterionColor,
-                            weight: 2,
-                            opacity: 0.8
-                        }).addTo(rasterLayer);
-                        L.polyline([
-                            [cellBounds[0][0], cellBounds[1][1]],
-                            [cellBounds[1][0], cellBounds[0][1]]
-                        ], {
-                            color: criterionColor,
-                            weight: 2,
-                            opacity: 0.8
-                        }).addTo(rasterLayer);
-                    }
-                });
-            });
+        
+        // Store current map state
+        const currentCenter = map.getCenter();
+        const currentZoom = map.getZoom();
+        
+        // Recreate the map layer to apply dark mode styles
+        map.eachLayer(function (layer) {
+            if (layer instanceof L.TileLayer) {
+                map.removeLayer(layer);
+            }
         });
-    });
-}
 
-function toggleDarkMode() {
-    const isDarkMode = document.body.classList.toggle('dark-mode');
-    const darkModeButton = document.getElementById('darkModeToggle');
-    if (isDarkMode) {
-        darkModeButton.innerHTML = '<i class="fas fa-sun"></i>';
-    } else {
-        darkModeButton.innerHTML = '<i class="fas fa-moon"></i>';
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            className: 'map-tiles'
+        }).addTo(map);
+
+        // Restore map state
+        map.setView(currentCenter, currentZoom);
+
+        updateMap(currentCategory);
     }
-    
-    // Store current map state
-    const currentCenter = map.getCenter();
-    const currentZoom = map.getZoom();
-    
-    // Recreate the map layer to apply dark mode styles
-    map.eachLayer(function (layer) {
-        if (layer instanceof L.TileLayer) {
-            map.removeLayer(layer);
+
+    function toggleSearch() {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput.style.display === 'none') {
+            searchInput.style.display = 'inline-block';
+            searchInput.focus();
+        } else {
+            searchInput.style.display = 'none';
+        }
+    }
+
+    function searchLocation() {
+        const query = document.getElementById('searchInput').value;
+        if (!query) return;
+
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.length > 0) {
+                    const lat = parseFloat(data[0].lat);
+                    const lon = parseFloat(data[0].lon);
+                    map.setView([lat, lon], 16);
+                    L.marker([lat, lon]).addTo(map)
+                        .bindPopup(data[0].display_name)
+                        .openPopup();
+                    document.getElementById('searchInput').style.display = 'none';
+                } else {
+                    alert('Location not found');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while searching');
+            });
+    }
+
+    // Initialize the application
+    fetchJSONData();
+
+    // Global functions that need to be accessible from HTML
+    window.toggleRanking = toggleRanking;
+    window.clearSelection = clearSelection;
+    window.toggleDrawMode = toggleDrawMode;
+    window.toggleDarkMode = toggleDarkMode;
+    window.toggleSearch = toggleSearch;
+    window.searchLocation = searchLocation;
+
+    // Add this event listener to allow searching when the Enter key is pressed
+    document.getElementById('searchInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchLocation();
         }
     });
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        className: 'map-tiles'
-    }).addTo(map);
-
-    // Restore map state
-    map.setView(currentCenter, currentZoom);
-
-    updateMap(currentCategory);
-}
-
-// Initialize the application
-fetchJSONData();
-
-// Global functions that need to be accessible from HTML
-window.toggleRanking = toggleRanking;
-window.clearSelection = clearSelection;
-window.toggleDrawMode = toggleDrawMode;
-window.toggleDarkMode = toggleDarkMode;
-window.toggleSearch = toggleSearch;
-window.searchLocation = searchLocation;
-
-// Add this event listener to allow searching when the Enter key is pressed
-document.getElementById('searchInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        searchLocation();
-    }
-});
-</script>
+    </script>
 </body>
 </html>

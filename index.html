@@ -498,6 +498,10 @@ async function initializeApp() {
 
     setupUI();
     updateMap(currentCategory);
+
+    // Add event listeners for pan and zoom
+    map.on('moveend', () => updateMap(currentCategory));
+    map.on('zoomend', () => updateMap(currentCategory));
 }
 
 function setupUI() {
@@ -536,22 +540,8 @@ function setupUI() {
 }
 
 function updateMap(challengeCategory) {
-    const currentCenter = map ? map.getCenter() : [51.454514, -2.587910];
-    const currentZoom = map ? map.getZoom() : 16;
-
-    if (map) map.remove();
-    map = L.map('map', {
-        renderer: L.canvas(),
-        tap: true,
-        touchZoom: true,
-        dragging: true,
-        zoomControl: false
-    }).setView(currentCenter, currentZoom);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        className: 'map-tiles'
-    }).addTo(map);
+    const currentCenter = map.getCenter();
+    const currentZoom = map.getZoom();
 
     const suitabilityScores = calculateSuitabilityScores(GRID_SIZE, challengeCategory);
 
@@ -562,10 +552,10 @@ function updateMap(challengeCategory) {
     gridLayer = L.layerGroup().addTo(map);
 
     if (!gridOrigin) {
-        gridOrigin = map.getCenter();
+        gridOrigin = currentCenter;
     }
 
-    const mapCenter = map.getCenter();
+    const mapCenter = currentCenter;
     
     const gridSizeMeters = 2000;
 
@@ -611,9 +601,10 @@ function updateMap(challengeCategory) {
             })
             .length
     ));
+    const rankSlider = document.getElementById('rankSlider');
     rankSlider.max = maxRank;
     rankSlider.value = Math.min(currentRank, maxRank);
-    rankValue.textContent = rankSlider.value;
+    document.getElementById('rankValue').textContent = rankSlider.value;
 
     updateScores();
     updateCriteriaRasters();
@@ -1101,10 +1092,10 @@ function toggleDarkMode() {
     updateMap(currentCategory);
 }
 
-// Initialize the applicationn
+// Initialize the application
 fetchJSONData();
 
-// Global functions that need to be accessible from HTML s
+// Global functions that need to be accessible from HTML
 window.toggleRanking = toggleRanking;
 window.clearSelection = clearSelection;
 window.toggleDrawMode = toggleDrawMode;
@@ -1118,6 +1109,25 @@ document.getElementById('searchInput').addEventListener('keypress', function(e) 
         searchLocation();
     }
 });
+
+// Debounce function to limit the frequency of map updates
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), wait);
+    };
+}
+
+// Debounced version of updateMap
+const debouncedUpdateMap = debounce((category) => {
+    updateMap(category);
+}, 250);
+
+// Update event listeners for pan and zoom
+map.on('moveend', () => debouncedUpdateMap(currentCategory));
+map.on('zoomend', () => debouncedUpdateMap(currentCategory));
 </script>
 </body>
 </html>

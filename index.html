@@ -11,7 +11,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+
+
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <script>
+        window.jsPDF = window.jspdf.jsPDF;
+    </script>
+   
     <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
     <style>
         body {
@@ -332,6 +340,10 @@
                 <div id="categoryButtons" class="dropdown-content"></div>
             </div>
             <button id="rankingToggle" class="toggle-button" onclick="toggleRanking()">Ranked by: Impact</button>
+            <button id="downloadReport" class="map-button" onclick="window.generateReport()"><i class="fas fa-file-pdf"></i></button>
+
+
+
             <div class="slider-container">
                 <label for="rankSlider">Rank:</label>
                 <input type="range" id="rankSlider" min="1" max="1" step="1" value="1">
@@ -415,6 +427,58 @@
         map.on('zoomend', () => debouncedUpdateMap(currentCategory));
     }
 
+
+    function gatherReportData() {
+    const reportData = {
+        selectedCells: [],
+        currentCategory: currentCategory,
+        currentRanking: currentRanking,
+        currentRank: currentRank,
+        totalImpact: 0,
+        totalCost: 0,
+        solutionBreakdown: {}
+    };
+
+    selectedCellKeys.forEach(key => {
+        const cellData = allCells.find(cell => cell.key === key);
+        if (cellData) {
+            const {cell} = cellData;
+            const validSolutions = Object.entries(cell)
+                .filter(([sol, scores]) => {
+                    if (currentRanking === 'impact') {
+                        return scores.impact > 0;
+                    } else {
+                        return scores.cost > 0;
+                    }
+                })
+                .sort((a, b) => 
+                    currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
+                );
+
+            if (currentRank <= validSolutions.length) {
+                const [solution, scores] = validSolutions[currentRank - 1];
+                reportData.selectedCells.push({
+                    key: key,
+                    solution: solution,
+                    impact: scores.impact,
+                    cost: scores.cost
+                });
+
+                reportData.totalImpact += scores.impact;
+                reportData.totalCost += scores.cost;
+
+                if (!reportData.solutionBreakdown[solution]) {
+                    reportData.solutionBreakdown[solution] = { count: 0, totalImpact: 0, totalCost: 0 };
+                }
+                reportData.solutionBreakdown[solution].count++;
+                reportData.solutionBreakdown[solution].totalImpact += scores.impact;
+                reportData.solutionBreakdown[solution].totalCost += scores.cost;
+            }
+        }
+    });
+
+    return reportData;
+}
     async function loadCOGs() {
         const criteria = new Set(Object.values(solutionCriteria).flat());
         for (const criterion of criteria) {
@@ -483,6 +547,88 @@
             throw error;
         }
     }
+
+
+    function generateReport() {
+    const reportData = gatherReportData();
+    
+    // Check if jsPDF is available
+    if (typeof jsPDF === 'undefined') {
+        console.error('jsPDF is not loaded. Make sure the library is included correctly.');
+        alert('Unable to generate PDF. Please try again later.');
+        return;
+    }
+    
+    // Create a new document
+    const doc = new jsPDF();
+
+    let yOffset = 20;
+
+    // Title
+    doc.setFontSize(20);
+    doc.text("Nature Based Solutions Report", 20, yOffset);
+    yOffset += 15;
+
+    // Summary
+    doc.setFontSize(14);
+    doc.text(`Category: ${reportData.currentCategory}`, 20, yOffset);
+    yOffset += 10;
+    doc.text(`Ranking: ${reportData.currentRanking}`, 20, yOffset);
+    yOffset += 10;
+    doc.text(`Rank: ${reportData.currentRank}`, 20, yOffset);
+    yOffset += 10;
+    doc.text(`Total Impact: ${reportData.totalImpact.toFixed(2)}`, 20, yOffset);
+    yOffset += 10;
+    doc.text(`Total Cost: £${reportData.totalCost.toFixed(2)}`, 20, yOffset);
+    yOffset += 15;
+
+    // Solution Breakdown
+    doc.setFontSize(16);
+    doc.text("Solution Breakdown", 20, yOffset);
+    yOffset += 10;
+
+    doc.setFontSize(12);
+    Object.entries(reportData.solutionBreakdown).forEach(([solution, data]) => {
+        doc.text(`${solution}:`, 20, yOffset);
+        yOffset += 5;
+        doc.text(`  Count: ${data.count}`, 30, yOffset);
+        yOffset += 5;
+        doc.text(`  Total Impact: ${data.totalImpact.toFixed(2)}`, 30, yOffset);
+        yOffset += 5;
+        doc.text(`  Total Cost: £${data.totalCost.toFixed(2)}`, 30, yOffset);
+        yOffset += 10;
+    });
+
+    // Selected Cells Details
+    if (yOffset > 250) {
+        doc.addPage();
+        yOffset = 20;
+    }
+
+    doc.setFontSize(16);
+    doc.text("Selected Cells Details", 20, yOffset);
+    yOffset += 10;
+
+    doc.setFontSize(12);
+    reportData.selectedCells.forEach((cell, index) => {
+        if (yOffset > 250) {
+            doc.addPage();
+            yOffset = 20;
+        }
+        doc.text(`Cell ${index + 1} (${cell.key}):`, 20, yOffset);
+        yOffset += 5;
+        doc.text(`  Solution: ${cell.solution}`, 30, yOffset);
+        yOffset += 5;
+        doc.text(`  Impact: ${cell.impact.toFixed(2)}`, 30, yOffset);
+        yOffset += 5;
+        doc.text(`  Cost: £${cell.cost.toFixed(2)}`, 30, yOffset);
+        yOffset += 10;
+    });
+
+    // Save the PDF
+    doc.save("NBS_Report.pdf");
+}
+
 
     function setupUI() {
         createButtons("categoryButtons", Object.keys(challengeCategories), "category-button");
@@ -1164,6 +1310,9 @@
     window.toggleDarkMode = toggleDarkMode;
     window.toggleSearch = toggleSearch;
     window.searchLocation = searchLocation;
+    window.generateReport = generateReport;
+
+
 
     // Add this event listener to allow searching when the Enter key is pressed
     document.getElementById('searchInput').addEventListener('keypress', function(e) {
@@ -1173,5 +1322,6 @@
     });
 
     </script>
+    
 </body>
 </html>

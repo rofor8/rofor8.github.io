@@ -459,6 +459,7 @@ async function loadVisibleTiles() {
   }
 }
 
+
 function getVisibleTiles(bounds) {
     const tiles = [];
     const tileSize = 256; // Assuming 256x256 tiles
@@ -477,6 +478,7 @@ function getVisibleTiles(bounds) {
 }
 
 
+
 async function fetchTileData(tile) {
   const { x, y, zoom } = tile;
   const criteria = new Set(Object.values(solutionCriteria).flat());
@@ -492,11 +494,27 @@ async function fetchTileData(tile) {
       const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
       const image = await tiff.getImage();
 
+      // Get the dimensions of the GeoTIFF
+      const imageWidth = image.getWidth();
+      const imageHeight = image.getHeight();
+      const tileWidth = 256; // Assuming 256x256 tiles
+      const tileHeight = 256; // Assuming 256x256 tiles
+
+      // Calculate the tile offsets and dimensions
+      const tileXOffset = x * tileWidth;
+      const tileYOffset = y * tileHeight;
+      const tileXSize = Math.min(tileWidth, imageWidth - tileXOffset);
+      const tileYSize = Math.min(tileHeight, imageHeight - tileYOffset);
+
+      // Check if the tile coordinates and dimensions are valid
+      if (tileXOffset >= imageWidth || tileYOffset >= imageHeight || tileXSize <= 0 || tileYSize <= 0) {
+        console.warn(`Invalid tile coordinates or dimensions: x=${x}, y=${y}, zoom=${zoom}`);
+        continue;
+      }
+
       // Read the tile data
-      const tileWidth = image.getTileWidth();
-      const tileHeight = image.getTileHeight();
       const raster = await image.readRasters({
-        window: [x * tileWidth, y * tileHeight, tileWidth, tileHeight],
+        window: [tileXOffset, tileYOffset, tileXSize, tileYSize],
       });
 
       tileData[criterion] = raster[0];
@@ -508,6 +526,11 @@ async function fetchTileData(tile) {
 
   return tileData;
 }
+
+
+
+
+
 
 const tileCanvas = document.createElement('canvas');
 const tileCtx = tileCanvas.getContext('2d');

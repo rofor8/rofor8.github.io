@@ -364,7 +364,7 @@
 
     <script>
 
-
+// Web Worker for heavy computations
 const worker = new Worker('worker.js');
 
 let solutionCriteria = {};
@@ -1646,69 +1646,67 @@ function toggleDarkMode() {
     updateMap(currentCategory);
 }
 
-
-
-    function toggleSearch() {
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput.style.display === 'none') {
-            searchInput.style.display = 'inline-block';
-            searchInput.focus();
-        } else {
-            searchInput.style.display = 'none';
-        }
+function toggleSearch() {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput.style.display === 'none') {
+        searchInput.style.display = 'inline-block';
+        searchInput.focus();
+    } else {
+        searchInput.style.display = 'none';
     }
+}
 
-    function searchLocation() {
-        const query = document.getElementById('searchInput').value;
-        if (!query) return;
+function searchLocation() {
+    const query = document.getElementById('searchInput').value;
+    if (!query) return;
 
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
 
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                if (data && data.length > 0) {
-                    const lat = parseFloat(data[0].lat);
-                    const lon = parseFloat(data[0].lon);
-                    map.setView([lat, lon], 16);
-                    L.marker([lat, lon]).addTo(map)
-                        .bindPopup(data[0].display_name)
-                        .openPopup();
-                    document.getElementById('searchInput').style.display = 'none';
-                } else {
-                    alert('Location not found');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while searching');
-            });
-    }
-
-    // Use Web Worker for heavy computations
-    function calculateSuitabilityScores(gridSize, challengeCategory) {
-        return new Promise((resolve) => {
-            worker.postMessage({
-                type: 'calculateSuitabilityScores',
-                gridSize,
-                challengeCategory,
-                solutionCriteria,
-                challengeCategories,
-                solutionCosts,
-                criteriaRasters
-            });
-
-            worker.onmessage = (e) => {
-                if (e.data.type === 'suitabilityScores') {
-                    resolve(e.data.scores);
-                }
-            };
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.length > 0) {
+                const lat = parseFloat(data[0].lat);
+                const lon = parseFloat(data[0].lon);
+                map.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(map)
+                    .bindPopup(data[0].display_name)
+                    .openPopup();
+                document.getElementById('searchInput').style.display = 'none';
+            } else {
+                alert('Location not found');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while searching');
         });
-    }
+}
 
-    function debounce(func, wait) {
+// Use Web Worker for heavy computations
+function calculateSuitabilityScores(gridSize, challengeCategory) {
+    return new Promise((resolve) => {
+        worker.postMessage({
+            type: 'calculateSuitabilityScores',
+            gridSize,
+            challengeCategory,
+            solutionCriteria,
+            challengeCategories,
+            solutionCosts,
+            criteriaRasters
+        });
+
+        worker.onmessage = (e) => {
+            if (e.data.type === 'suitabilityScores') {
+                resolve(e.data.scores);
+            }
+        };
+    });
+}
+
+function debounce(func, wait) {
     let timeout;
-    return function(...args) {
+    return function (...args) {
         const context = this;
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(context, args), wait);
@@ -1719,24 +1717,24 @@ const debouncedUpdateMap = debounce((category) => {
     updateMap(category);
 }, 250);
 
-    // Initialize the application
-    document.addEventListener('DOMContentLoaded', initializeApp);
+// Initialize the application
+document.addEventListener('DOMContentLoaded', initializeApp);
 
-    // Global functions that need to be accessible from HTML
-    window.toggleRanking = toggleRanking;
-    window.clearSelection = clearSelection;
-    window.toggleDrawMode = toggleDrawMode;
-    window.toggleDarkMode = toggleDarkMode;
-    window.toggleSearch = toggleSearch;
-    window.searchLocation = searchLocation;
-    window.generateReport = generateReport;
+// Global functions that need to be accessible from HTML
+window.toggleRanking = toggleRanking;
+window.clearSelection = clearSelection;
+window.toggleDrawMode = toggleDrawMode;
+window.toggleDarkMode = toggleDarkMode;
+window.toggleSearch = toggleSearch;
+window.searchLocation = searchLocation;
+window.generateReport = generateReport;
 
-    // Add this event listener to allow searching when the Enter key is pressed
-    document.getElementById('searchInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            searchLocation();
-        }
-    });
+// Add this event listener to allow searching when the Enter key is pressed
+document.getElementById('searchInput').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+        searchLocation();
+    }
+});
     </script>
     
 </body>

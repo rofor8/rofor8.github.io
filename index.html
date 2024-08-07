@@ -280,6 +280,14 @@
             color: #f0f0f0;
         }
 
+        .criteria-key {
+    font-size: 12px;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
         @media (min-width: 768px) {
             #app-container {
                 flex-direction: row;
@@ -886,11 +894,21 @@
         return;
     }
 
+    const barHeight = 20;
+    const barSpacing = 5;
+    const groupHeight = (barHeight + barSpacing) * 3 + 25;
+    const groupSpacing = 20;
+    const toggleWidth = 30;
+    const valueWidth = 70;
+    const barWidth = 250;
+    const totalWidth = toggleWidth + valueWidth + barWidth + 20;
+
     let totalImpact = 0;
     let totalCost = 0;
     let totalCount = 0;
 
     const rankTotals = {};
+    const rasterCounts = {};
     selectedCellKeys.forEach(key => {
         const cellData = allCells.find(cell => cell.key === key);
         if (cellData) {
@@ -919,18 +937,21 @@
                 totalImpact += scores.impact;
                 totalCost += scores.cost;
                 totalCount++;
+
+                // Count rasters for this solution
+                const criteria = solutionCriteria[solution] || [];
+                criteria.forEach(criterion => {
+                    if (!rasterCounts[criterion]) {
+                        rasterCounts[criterion] = 0;
+                    }
+                    rasterCounts[criterion]++;
+                });
             }
         }
     });
 
-    const barHeight = 20;
-    const barSpacing = 5;
-    const groupHeight = (barHeight + barSpacing) * 3 + 25;
-    const groupSpacing = 20;
-    const toggleWidth = 30;
-    const valueWidth = 70;
-    const barWidth = 250;
-    const totalWidth = toggleWidth + valueWidth + barWidth + 20;
+    // Calculate overlap
+    const overlapCount = Object.values(rasterCounts).reduce((min, count) => Math.min(min, count), Infinity);
 
     // Display totals graph
     const totalsSvg = selectionTotals.append("svg")
@@ -942,6 +963,11 @@
 
     const isDarkMode = document.body.classList.contains('dark-mode');
     const textColor = isDarkMode ? 'white' : 'black';
+
+    // Scale for totals bars
+    const totalsBarScale = d3.scaleLinear()
+        .domain([0, Math.max(totalImpact, totalCost, totalCount)])
+        .range([0, barWidth * 1.2]);  // Make totals bars 20% wider
 
     // Total Impact
     totalsG.append("text")
@@ -955,7 +981,7 @@
     totalsG.append("rect")
         .attr("x", toggleWidth + valueWidth + 5)
         .attr("y", 0)
-        .attr("width", barWidth)
+        .attr("width", totalsBarScale(totalImpact))
         .attr("height", barHeight)
         .attr("fill", "steelblue");
 
@@ -978,7 +1004,7 @@
     totalsG.append("rect")
         .attr("x", toggleWidth + valueWidth + 5)
         .attr("y", barHeight + barSpacing)
-        .attr("width", barWidth)
+        .attr("width", totalsBarScale(totalCost))
         .attr("height", barHeight)
         .attr("fill", "darkseagreen");
 
@@ -1001,7 +1027,7 @@
     totalsG.append("rect")
         .attr("x", toggleWidth + valueWidth + 5)
         .attr("y", (barHeight + barSpacing) * 2)
-        .attr("width", barWidth)
+        .attr("width", totalsBarScale(totalCount))
         .attr("height", barHeight)
         .attr("fill", "lightcoral");
 
@@ -1046,9 +1072,10 @@
             .attr("height", 20)
             .html(`<input type="checkbox" class="criteria-toggle" data-solution="${solution}" ${activeCriteriaRasters.has(solution) ? 'checked' : ''}>`);
 
-        g.append("text")
-            .attr("x", toggleWidth + 5)
-            .attr("y", yOffset + 15)
+        const solutionGroup = g.append("g")
+            .attr("transform", `translate(${toggleWidth + 5}, ${yOffset + 15})`);
+
+        solutionGroup.append("text")
             .attr("text-anchor", "start")
             .attr("font-weight", "bold")
             .attr("fill", textColor)
@@ -1058,86 +1085,166 @@
         const barStartX = valueStartX + valueWidth + 5;
         const barStartY = yOffset + 25;
 
-        const impactWidth = (rankTotals[solution].impact / maxValues.impact) * barWidth;
-        g.append("text")
-            .attr("x", valueStartX)
-            .attr("y", barStartY + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("text-anchor", "start")
-            .attr("fill", textColor)
-            .text(`${rankTotals[solution].impact.toFixed(0)}`);
+        const isToggled = activeCriteriaRasters.has(solution);
+        const solutionBars = solutionGroup.append("g")
+            .attr("class", "solution-bars")
+            .attr("transform", `translate(0, ${barStartY - yOffset - 15})`);
 
-        g.append("rect")
-            .attr("x", barStartX)
-            .attr("y", barStartY)
-            .attr("width", impactWidth)
-            .attr("height", barHeight)
-            .attr("fill", colorScale(solution));
+        if (isToggled) {
+            // Display raster counts and overlap
+            const criteria = solutionCriteria[solution] || [];
+            const maxRasterCount = Math.max(...criteria.map(c => rasterCounts[c] || 0), overlapCount);
 
-        g.append("text")
-            .attr("x", barStartX + 5)
-            .attr("y", barStartY + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("fill", "white")
-            .text("Impact");
+            criteria.forEach((criterion, i) => {
+                const count = rasterCounts[criterion] || 0;
+                const rasterBarWidth = (count / maxRasterCount) * barWidth;
 
-        const costWidth = (rankTotals[solution].cost / maxValues.cost) * barWidth;
-        g.append("text")
-            .attr("x", valueStartX)
-            .attr("y", barStartY + barHeight + barSpacing + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("text-anchor", "start")
-            .attr("fill", textColor)
-            .text(`£${rankTotals[solution].cost.toFixed(0)}`);
+                solutionBars.append("text")
+                    .attr("x", valueStartX)
+                    .attr("y", (barHeight + barSpacing) * i + barHeight / 2)
+                    .attr("dominant-baseline", "middle")
+                    .attr("text-anchor", "start")
+                    .attr("fill", textColor)
+                    .text(count);
 
-        g.append("rect")
-            .attr("x", barStartX)
-            .attr("y", barStartY + barHeight + barSpacing)
-            .attr("width", costWidth)
-            .attr("height", barHeight)
-            .attr("fill", d3.color(colorScale(solution)).darker(0.5));
+                solutionBars.append("rect")
+                    .attr("x", barStartX)
+                    .attr("y", (barHeight + barSpacing) * i)
+                    .attr("width", rasterBarWidth)
+                    .attr("height", barHeight)
+                    .attr("fill", criteriaColorScale(criterion));
 
-        g.append("text")
-            .attr("x", barStartX + 5)
-            .attr("y", barStartY + barHeight + barSpacing + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("fill", "white")
-            .text("Cost");
+                solutionBars.append("text")
+                    .attr("x", barStartX + 5)
+                    .attr("y", (barHeight + barSpacing) * i + barHeight / 2)
+                    .attr("dominant-baseline", "middle")
+                    .attr("fill", "white")
+                    .text(criterion);
+            });
 
-        const countWidth = (rankTotals[solution].count / maxValues.count) * barWidth;
-        g.append("text")
-            .attr("x", valueStartX)
-            .attr("y", barStartY + (barHeight + barSpacing) * 2 + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("text-anchor", "start")
-            .attr("fill", textColor)
-            .text(`${rankTotals[solution].count}`);
+            // Overlap bar
+            const overlapBarWidth = (overlapCount / maxRasterCount) * barWidth;
+            solutionBars.append("text")
+                .attr("x", valueStartX)
+                .attr("y", (barHeight + barSpacing) * criteria.length + barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("text-anchor", "start")
+                .attr("fill", textColor)
+                .text(overlapCount);
 
-        g.append("rect")
-            .attr("x", barStartX)
-            .attr("y", barStartY + (barHeight + barSpacing) * 2)
-            .attr("width", countWidth)
-            .attr("height", barHeight)
-            .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
+            solutionBars.append("rect")
+                .attr("x", barStartX)
+                .attr("y", (barHeight + barSpacing) * criteria.length)
+                .attr("width", overlapBarWidth)
+                .attr("height", barHeight)
+                .attr("fill", "purple");
 
-        g.append("text")
-            .attr("x", barStartX + 5)
-            .attr("y", barStartY + (barHeight + barSpacing) * 2 + barHeight / 2)
-            .attr("dominant-baseline", "middle")
-            .attr("fill", "white")
-            .text("Count");
+            solutionBars.append("text")
+                .attr("x", barStartX + 5)
+                .attr("y", (barHeight + barSpacing) * criteria.length + barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("fill", "white")
+                .text("Overlap");
+
+        } else {
+            // Display original impact, cost, and count bars
+            const impactWidth = (rankTotals[solution].impact / maxValues.impact) * barWidth;
+            solutionBars.append("text")
+                .attr("x", valueStartX)
+                .attr("y", barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("text-anchor", "start")
+                .attr("fill", textColor)
+                .text(`${rankTotals[solution].impact.toFixed(0)}`);
+
+            solutionBars.append("rect")
+                .attr("x", barStartX)
+                .attr("y", 0)
+                .attr("width", impactWidth)
+                .attr("height", barHeight)
+                .attr("fill", colorScale(solution));
+
+            solutionBars.append("text")
+                .attr("x", barStartX + 5)
+                .attr("y", barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("fill", "white")
+                .text("Impact");
+
+            const costWidth = (rankTotals[solution].cost / maxValues.cost) * barWidth;
+            solutionBars.append("text")
+                .attr("x", valueStartX)
+                .attr("y", barHeight + barSpacing + barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("text-anchor", "start")
+                .attr("fill", textColor)
+                .text(`£${rankTotals[solution].cost.toFixed(0)}`);
+
+            solutionBars.append("rect")
+                .attr("x", barStartX)
+                .attr("y", barHeight + barSpacing)
+                .attr("width", costWidth)
+                .attr("height", barHeight)
+                .attr("fill", d3.color(colorScale(solution)).darker(0.5));
+
+            solutionBars.append("text")
+                .attr("x", barStartX + 5)
+                .attr("y", barHeight + barSpacing + barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("fill", "white")
+                .text("Cost");
+
+            const countWidth = (rankTotals[solution].count / maxValues.count) * barWidth;
+            solutionBars.append("text")
+                .attr("x", valueStartX)
+                .attr("y", (barHeight + barSpacing) * 2 + barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("text-anchor", "start")
+                .attr("fill", textColor)
+                .text(`${rankTotals[solution].count}`);
+
+            solutionBars.append("rect")
+                .attr("x", barStartX)
+                .attr("y", (barHeight + barSpacing) * 2)
+                .attr("width", countWidth)
+                .attr("height", barHeight)
+                .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
+
+            solutionBars.append("text")
+                .attr("x", barStartX + 5)
+                .attr("y", (barHeight + barSpacing) * 2 + barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("fill", "white")
+                .text("Count");
+        }
     });
 
     infoPanel.selectAll(".criteria-toggle")
         .on("change", function() {
             const solution = this.getAttribute("data-solution");
-            if (this.checked) {
+            const isChecked = this.checked;
+            if (isChecked) {
                 activeCriteriaRasters.add(solution);
             } else {
                 activeCriteriaRasters.delete(solution);
             }
+            updateScores();
             updateCriteriaRasters();
         });
+}
+
+function createCriteriaKey(solution) {
+    const criteria = solutionCriteria[solution] || [];
+    return criteria.map(criterion => 
+        `<span style="color:${criteriaColorScale(criterion)}">■</span> ${criterion}`
+    ).join(', ');
+}
+
+function createCriteriaKey(solution) {
+    const criteria = solutionCriteria[solution] || [];
+    return criteria.map(criterion => 
+        `<span style="color:${criteriaColorScale(criterion)}">■</span> ${criterion}`
+    ).join(', ');
 }
 
     function toggleRanking() {

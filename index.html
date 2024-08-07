@@ -460,25 +460,22 @@ async function loadVisibleTiles() {
 }
 
 function getVisibleTiles(bounds) {
-  const tiles = [];
-  const tileSize = 256; // Assuming 256x256 tiles
-  const zoom = map.getZoom();
-  const tileBounds = L.bounds(
-    L.point(bounds.getSouthWest().lng, bounds.getSouthWest().lat),
-    L.point(bounds.getNorthEast().lng, bounds.getNorthEast().lat)
-  );
-  const nwPoint = tileBounds.getNorthWest();
-  const sePoint = tileBounds.getSouthEast();
-  const nwTile = map.project(nwPoint, zoom).divideBy(tileSize).floor();
-  const seTile = map.project(sePoint, zoom).divideBy(tileSize).floor();
+    const tiles = [];
+    const tileSize = 256; // Assuming 256x256 tiles
+    const zoom = map.getZoom();
+    const nwPoint = bounds.getNorthWest();
+    const sePoint = bounds.getSouthEast();
+    const nwTile = map.project(nwPoint, zoom).divideBy(tileSize).floor();
+    const seTile = map.project(sePoint, zoom).divideBy(tileSize).floor();
 
-  for (let x = nwTile.x; x <= seTile.x; x++) {
-    for (let y = nwTile.y; y <= seTile.y; y++) {
-      tiles.push({ x, y, zoom });
+    for (let x = nwTile.x; x <= seTile.x; x++) {
+        for (let y = nwTile.y; y <= seTile.y; y++) {
+            tiles.push({ x, y, zoom });
+        }
     }
-  }
-  return tiles;
+    return tiles;
 }
+
 
 async function fetchTileData(tile) {
   const { x, y, zoom } = tile;

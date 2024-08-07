@@ -908,7 +908,7 @@
     let totalCount = 0;
 
     const rankTotals = {};
-    const rasterCounts = {};
+    const allRasterCounts = {};
     const solutionOverlaps = {};
 
     selectedCellKeys.forEach(key => {
@@ -940,25 +940,26 @@
                 totalCost += scores.cost;
                 totalCount++;
 
+                // Count all rasters
+                const [x, y] = key.split(',').map(Number);
+                Object.keys(criteriaRasters).forEach(criterion => {
+                    if (!allRasterCounts[criterion]) {
+                        allRasterCounts[criterion] = 0;
+                    }
+                    if (criteriaRasters[criterion] && criteriaRasters[criterion][y] && criteriaRasters[criterion][y][x] === 1) {
+                        allRasterCounts[criterion]++;
+                    }
+                });
+
                 // Count rasters for this solution
                 const criteria = solutionCriteria[solution] || [];
                 if (!solutionOverlaps[solution]) {
                     solutionOverlaps[solution] = 0;
                 }
                 
-                const [x, y] = key.split(',').map(Number);
-                let allCriteriaPresent = true;
-                
-                criteria.forEach(criterion => {
-                    if (!rasterCounts[criterion]) {
-                        rasterCounts[criterion] = 0;
-                    }
-                    if (criteriaRasters[criterion] && criteriaRasters[criterion][y] && criteriaRasters[criterion][y][x] === 1) {
-                        rasterCounts[criterion]++;
-                    } else {
-                        allCriteriaPresent = false;
-                    }
-                });
+                let allCriteriaPresent = criteria.every(criterion => 
+                    criteriaRasters[criterion] && criteriaRasters[criterion][y] && criteriaRasters[criterion][y][x] === 1
+                );
 
                 if (allCriteriaPresent) {
                     solutionOverlaps[solution]++;
@@ -966,6 +967,11 @@
             }
         }
     });
+
+    // Add toggle for totals
+    const totalsToggle = selectionTotals.append("div")
+        .attr("class", "totals-toggle")
+        .html(`<input type="checkbox" id="totalsToggle"> <label for="totalsToggle">Show All Rasters</label>`);
 
     // Display totals graph
     const totalsSvg = selectionTotals.append("svg")
@@ -978,79 +984,124 @@
     const isDarkMode = document.body.classList.contains('dark-mode');
     const textColor = isDarkMode ? 'white' : 'black';
 
-    // Scale for totals bars
-    const totalsBarScale = d3.scaleLinear()
-        .domain([0, Math.max(totalImpact, totalCost, totalCount)])
-        .range([0, barWidth * 1.2]);  // Make totals bars 20% wider
+    function updateTotalsGraph(showAllRasters) {
+        totalsG.selectAll("*").remove();  // Clear previous content
 
-    // Total Impact
-    totalsG.append("text")
-        .attr("x", toggleWidth)
-        .attr("y", barHeight / 2)
-        .attr("dominant-baseline", "middle")
-        .attr("text-anchor", "start")
-        .attr("fill", textColor)
-        .text(`${totalImpact.toFixed(0)}`);
+        if (showAllRasters) {
+            const maxRasterCount = Math.max(...Object.values(allRasterCounts));
+            const rasterBarScale = d3.scaleLinear()
+                .domain([0, maxRasterCount])
+                .range([0, barWidth]);
 
-    totalsG.append("rect")
-        .attr("x", toggleWidth + valueWidth + 5)
-        .attr("y", 0)
-        .attr("width", totalsBarScale(totalImpact))
-        .attr("height", barHeight)
-        .attr("fill", "steelblue");
+            Object.entries(allRasterCounts).forEach(([raster, count], index) => {
+                totalsG.append("text")
+                    .attr("x", toggleWidth)
+                    .attr("y", (barHeight + barSpacing) * index + barHeight / 2)
+                    .attr("dominant-baseline", "middle")
+                    .attr("text-anchor", "start")
+                    .attr("fill", textColor)
+                    .text(count);
 
-    totalsG.append("text")
-        .attr("x", toggleWidth + valueWidth + 10)
-        .attr("y", barHeight / 2)
-        .attr("dominant-baseline", "middle")
-        .attr("fill", "white")
-        .text("Total Impact");
+                totalsG.append("rect")
+                    .attr("x", toggleWidth + valueWidth + 5)
+                    .attr("y", (barHeight + barSpacing) * index)
+                    .attr("width", rasterBarScale(count))
+                    .attr("height", barHeight)
+                    .attr("fill", criteriaColorScale(raster));
 
-    // Total Cost
-    totalsG.append("text")
-        .attr("x", toggleWidth)
-        .attr("y", barHeight + barSpacing + barHeight / 2)
-        .attr("dominant-baseline", "middle")
-        .attr("text-anchor", "start")
-        .attr("fill", textColor)
-        .text(`£${totalCost.toFixed(0)}`);
+                totalsG.append("text")
+                    .attr("x", toggleWidth + valueWidth + 10)
+                    .attr("y", (barHeight + barSpacing) * index + barHeight / 2)
+                    .attr("dominant-baseline", "middle")
+                    .attr("fill", "white")
+                    .text(raster);
+            });
 
-    totalsG.append("rect")
-        .attr("x", toggleWidth + valueWidth + 5)
-        .attr("y", barHeight + barSpacing)
-        .attr("width", totalsBarScale(totalCost))
-        .attr("height", barHeight)
-        .attr("fill", "darkseagreen");
+            totalsSvg.attr("height", (barHeight + barSpacing) * Object.keys(allRasterCounts).length);
+        } else {
+            // Original totals display code
+            const totalsBarScale = d3.scaleLinear()
+                .domain([0, Math.max(totalImpact, totalCost, totalCount)])
+                .range([0, barWidth * 1.2]);
 
-    totalsG.append("text")
-        .attr("x", toggleWidth + valueWidth + 10)
-        .attr("y", barHeight + barSpacing + barHeight / 2)
-        .attr("dominant-baseline", "middle")
-        .attr("fill", "white")
-        .text("Total Cost");
+            // Total Impact
+            totalsG.append("text")
+                .attr("x", toggleWidth)
+                .attr("y", barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("text-anchor", "start")
+                .attr("fill", textColor)
+                .text(`${totalImpact.toFixed(0)}`);
 
-    // Total Count
-    totalsG.append("text")
-        .attr("x", toggleWidth)
-        .attr("y", (barHeight + barSpacing) * 2 + barHeight / 2)
-        .attr("dominant-baseline", "middle")
-        .attr("text-anchor", "start")
-        .attr("fill", textColor)
-        .text(`${totalCount}`);
+            totalsG.append("rect")
+                .attr("x", toggleWidth + valueWidth + 5)
+                .attr("y", 0)
+                .attr("width", totalsBarScale(totalImpact))
+                .attr("height", barHeight)
+                .attr("fill", "steelblue");
 
-    totalsG.append("rect")
-        .attr("x", toggleWidth + valueWidth + 5)
-        .attr("y", (barHeight + barSpacing) * 2)
-        .attr("width", totalsBarScale(totalCount))
-        .attr("height", barHeight)
-        .attr("fill", "lightcoral");
+            totalsG.append("text")
+                .attr("x", toggleWidth + valueWidth + 10)
+                .attr("y", barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("fill", "white")
+                .text("Total Impact");
 
-    totalsG.append("text")
-        .attr("x", toggleWidth + valueWidth + 10)
-        .attr("y", (barHeight + barSpacing) * 2 + barHeight / 2)
-        .attr("dominant-baseline", "middle")
-        .attr("fill", "white")
-        .text("Total Count");
+            // Total Cost
+            totalsG.append("text")
+                .attr("x", toggleWidth)
+                .attr("y", barHeight + barSpacing + barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("text-anchor", "start")
+                .attr("fill", textColor)
+                .text(`£${totalCost.toFixed(0)}`);
+
+            totalsG.append("rect")
+                .attr("x", toggleWidth + valueWidth + 5)
+                .attr("y", barHeight + barSpacing)
+                .attr("width", totalsBarScale(totalCost))
+                .attr("height", barHeight)
+                .attr("fill", "darkseagreen");
+
+            totalsG.append("text")
+                .attr("x", toggleWidth + valueWidth + 10)
+                .attr("y", barHeight + barSpacing + barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("fill", "white")
+                .text("Total Cost");
+
+            // Total Count
+            totalsG.append("text")
+                .attr("x", toggleWidth)
+                .attr("y", (barHeight + barSpacing) * 2 + barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("text-anchor", "start")
+                .attr("fill", textColor)
+                .text(`${totalCount}`);
+
+            totalsG.append("rect")
+                .attr("x", toggleWidth + valueWidth + 5)
+                .attr("y", (barHeight + barSpacing) * 2)
+                .attr("width", totalsBarScale(totalCount))
+                .attr("height", barHeight)
+                .attr("fill", "lightcoral");
+
+            totalsG.append("text")
+                .attr("x", toggleWidth + valueWidth + 10)
+                .attr("y", (barHeight + barSpacing) * 2 + barHeight / 2)
+                .attr("dominant-baseline", "middle")
+                .attr("fill", "white")
+                .text("Total Count");
+
+            totalsSvg.attr("height", groupHeight);
+        }
+    }
+
+    updateTotalsGraph(false);  // Initial display of original totals
+
+    d3.select("#totalsToggle").on("change", function() {
+        updateTotalsGraph(this.checked);
+    });
 
     // Individual solutions
     const solutions = Object.keys(rankTotals).sort((a, b) => {
@@ -1107,10 +1158,10 @@
         if (isToggled) {
             // Display raster counts and overlap
             const criteria = solutionCriteria[solution] || [];
-            const maxRasterCount = Math.max(...Object.values(rasterCounts), solutionOverlaps[solution] || 0);
+            const maxRasterCount = Math.max(...criteria.map(c => allRasterCounts[c] || 0), solutionOverlaps[solution] || 0);
 
             criteria.forEach((criterion, i) => {
-                const count = rasterCounts[criterion] || 0;
+                const count = allRasterCounts[criterion] || 0;
                 const rasterBarWidth = (count / maxRasterCount) * barWidth;
 
                 solutionBars.append("text")
@@ -1195,7 +1246,7 @@
                 .attr("fill", textColor)
                 .text(`£${rankTotals[solution].cost.toFixed(0)}`);
 
-            solutionBars.append("rect")
+                solutionBars.append("rect")
                 .attr("x", barStartX)
                 .attr("y", barHeight + barSpacing)
                 .attr("width", costWidth)

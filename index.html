@@ -443,6 +443,8 @@ map.on('zoomend', () => {
 });
 }
 
+const currentlyLoadingTiles = new Set();
+
 async function loadVisibleTiles() {
   const bounds = map.getBounds();
   const visibleTiles = getVisibleTiles(bounds);
@@ -458,24 +460,24 @@ async function loadVisibleTiles() {
 }
 
 function getVisibleTiles(bounds) {
-    const tiles = [];
-    const tileSize = 256; // Assuming 256x256 tiles
-    const zoom = map.getZoom();
-    const tileBounds = L.bounds(
-        L.point(bounds.getSouthWest().lng, bounds.getSouthWest().lat),
-        L.point(bounds.getNorthEast().lng, bounds.getNorthEast().lat)
-    );
-    const nwPoint = tileBounds.getNorthWest();
-    const sePoint = tileBounds.getSouthEast();
-    const nwTile = map.project(nwPoint, zoom).divideBy(tileSize).floor();
-    const seTile = map.project(sePoint, zoom).divideBy(tileSize).floor();
+  const tiles = [];
+  const tileSize = 256; // Assuming 256x256 tiles
+  const zoom = map.getZoom();
+  const tileBounds = L.bounds(
+    L.point(bounds.getSouthWest().lng, bounds.getSouthWest().lat),
+    L.point(bounds.getNorthEast().lng, bounds.getNorthEast().lat)
+  );
+  const nwPoint = tileBounds.getNorthWest();
+  const sePoint = tileBounds.getSouthEast();
+  const nwTile = map.project(nwPoint, zoom).divideBy(tileSize).floor();
+  const seTile = map.project(sePoint, zoom).divideBy(tileSize).floor();
 
-    for (let x = nwTile.x; x <= seTile.x; x++) {
-        for (let y = nwTile.y; y <= seTile.y; y++) {
-            tiles.push({ x, y, zoom });
-        }
+  for (let x = nwTile.x; x <= seTile.x; x++) {
+    for (let y = nwTile.y; y <= seTile.y; y++) {
+      tiles.push({ x, y, zoom });
     }
-    return tiles;
+  }
+  return tiles;
 }
 
 async function fetchTileData(tile) {
@@ -510,37 +512,35 @@ async function fetchTileData(tile) {
   return tileData;
 }
 
-
-
 const tileCanvas = document.createElement('canvas');
 const tileCtx = tileCanvas.getContext('2d');
 
 function renderTile(tile, rasterData) {
-    const { x, y, zoom } = tile;
-    const tileSize = 256;
-    const bounds = L.latLngBounds([
-        [y * tileSize, x * tileSize],
-        [(y + 1) * tileSize, (x + 1) * tileSize]
-    ]);
+  const { x, y, zoom } = tile;
+  const tileSize = 256;
+  const bounds = L.latLngBounds([
+    [y * tileSize, x * tileSize],
+    [(y + 1) * tileSize, (x + 1) * tileSize]
+  ]);
 
-    tileCanvas.width = tileSize;
-    tileCanvas.height = tileSize;
-    tileCtx.clearRect(0, 0, tileSize, tileSize);
+  tileCanvas.width = tileSize;
+  tileCanvas.height = tileSize;
+  tileCtx.clearRect(0, 0, tileSize, tileSize);
 
-    Object.entries(rasterData).forEach(([criterion, data]) => {
-        const imageData = tileCtx.createImageData(tileSize, tileSize);
-        for (let i = 0; i < data.length; i++) {
-            const value = data[i];
-            imageData.data[i * 4] = value; // Red
-            imageData.data[i * 4 + 1] = value; // Green
-            imageData.data[i * 4 + 2] = value; // Blue
-            imageData.data[i * 4 + 3] = 255; // Alpha
-        }
-        tileCtx.putImageData(imageData, 0, 0);
-    });
+  Object.entries(rasterData).forEach(([criterion, data]) => {
+    const imageData = tileCtx.createImageData(tileSize, tileSize);
+    for (let i = 0; i < data.length; i++) {
+      const value = data[i];
+      imageData.data[i * 4] = value; // Red
+      imageData.data[i * 4 + 1] = value; // Green
+      imageData.data[i * 4 + 2] = value; // Blue
+      imageData.data[i * 4 + 3] = 255; // Alpha
+    }
+    tileCtx.putImageData(imageData, 0, 0);
+  });
 
-    const canvasLayer = L.imageOverlay(tileCanvas.toDataURL(), bounds);
-    gridLayer.addLayer(canvasLayer);
+  const canvasLayer = L.imageOverlay(tileCanvas.toDataURL(), bounds);
+  gridLayer.addLayer(canvasLayer);
 }
 
 async function cacheTile(tile, criterion, rasterData) {
@@ -603,21 +603,32 @@ async function loadCOGs() {
         if (cachedRaster) {
             criteriaRasters[criterion] = cachedRaster;
         } else {
-            const response = await fetch(`rasters/${criterion}.tif`);
-            const arrayBuffer = await response.arrayBuffer();
-            const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
-            const image = await tiff.getImage();
-            const rasterData = await image.readRasters();
+            try {
+                const response = await fetch(`rasters/${criterion}.tif`);
+                const arrayBuffer = await response.arrayBuffer();
+                const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+                const image = await tiff.getImage();
+                const width = image.getWidth();
+                const height = image.getHeight();
 
-            criteriaRasters[criterion] = Array.from({ length: GRID_SIZE }, (_, y) =>
-                Array.from({ length: GRID_SIZE }, (_, x) =>
-                    rasterData[0][y * GRID_SIZE + x] > 0 ? 1 : 0
-                )
-            );
-            await cacheRaster(criterion, criteriaRasters[criterion]);
+                console.log(`Image properties for ${criterion}: width=${width}, height=${height}`);
+
+                const rasterData = await image.readRasters();
+
+                criteriaRasters[criterion] = Array.from({ length: GRID_SIZE }, (_, y) =>
+                    Array.from({ length: GRID_SIZE }, (_, x) =>
+                        rasterData[0][y * GRID_SIZE + x] > 0 ? 1 : 0
+                    )
+                );
+                await cacheRaster(criterion, criteriaRasters[criterion]);
+            } catch (error) {
+                console.error(`Error loading raster for criterion ${criterion}:`, error);
+                console.error('Stack trace:', error.stack);
+            }
         }
     }
 }
+
 
 async function getCachedRaster(criterion) {
     const db = await dbPromise;
@@ -843,77 +854,101 @@ function setupUI() {
 }
 
 async function updateMap(challengeCategory) {
-    if (!map) return;
+  if (!map) return;
 
-    const currentCenter = map.getCenter();
-    const currentZoom = map.getZoom();
+  const currentCenter = map.getCenter();
+  const currentZoom = map.getZoom();
 
-    const suitabilityScores = await calculateSuitabilityScores(GRID_SIZE, challengeCategory);
+  const suitabilityScores = await calculateSuitabilityScores(GRID_SIZE, challengeCategory);
 
-    if (gridLayer) {
-        map.removeLayer(gridLayer);
-    }
+  if (gridLayer) {
+    map.removeLayer(gridLayer);
+  }
 
-    gridLayer = L.layerGroup().addTo(map);
+  gridLayer = L.layerGroup().addTo(map);
 
-    if (!gridOrigin) {
-        gridOrigin = currentCenter;
-    }
+  if (!gridOrigin) {
+    gridOrigin = currentCenter;
+  }
 
-    const mapCenter = currentCenter;
+  const mapCenter = currentCenter;
 
-    const gridSizeMeters = 2000;
+  const gridSizeMeters = 2000;
 
-    const latDegreeSize = 111000;
-    const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180);
+  const latDegreeSize = 111000;
+  const lngDegreeSize = 111000 * Math.cos(mapCenter.lat * Math.PI / 180);
 
-    const cellSizeMeters = gridSizeMeters / GRID_SIZE;
-    cellSizeLat = cellSizeMeters / latDegreeSize;
-    cellSizeLng = cellSizeMeters / lngDegreeSize;
+  const cellSizeMeters = gridSizeMeters / GRID_SIZE;
+  cellSizeLat = cellSizeMeters / latDegreeSize;
+  cellSizeLng = cellSizeMeters / lngDegreeSize;
 
-    gridExtent = {
-        north: gridOrigin.lat + (gridSizeMeters / latDegreeSize) / 2,
-        south: gridOrigin.lat - (gridSizeMeters / latDegreeSize) / 2,
-        east: gridOrigin.lng + (gridSizeMeters / lngDegreeSize) / 2,
-        west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
-    };
+  gridExtent = {
+    north: gridOrigin.lat + (gridSizeMeters / latDegreeSize) / 2,
+    south: gridOrigin.lat - (gridSizeMeters / latDegreeSize) / 2,
+    east: gridOrigin.lng + (gridSizeMeters / lngDegreeSize) / 2,
+    west: gridOrigin.lng - (gridSizeMeters / lngDegreeSize) / 2
+  };
 
-    allCells = [];
+  allCells = [];
 
-    suitabilityScores.forEach((row, y) => {
-        row.forEach((cell, x) => {
-            const cellBounds = [
-                [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-            ];
+  suitabilityScores.forEach((row, y) => {
+    row.forEach((cell, x) => {
+      const cellBounds = [
+        [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
+        [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
+      ];
 
-            const key = `${x},${y}`;
+      const key = `${x},${y}`;
 
-            allCells.push({ key, cell, bounds: cellBounds });
-        });
+      allCells.push({ key, cell, bounds: cellBounds });
     });
+  });
 
-    renderCells();
+  renderCells();
 
-    const maxRank = Math.max(...suitabilityScores.flat().map(cell =>
-        Object.entries(cell)
-            .filter(([sol, scores]) => {
-                if (currentRanking === 'impact') {
-                    return scores.impact > 0;
-                } else {
-                    return scores.cost > 0;
-                }
-            })
-            .length
-    ));
-    const rankSlider = document.getElementById('rankSlider');
-    rankSlider.max = maxRank;
-    rankSlider.value = Math.min(currentRank, maxRank);
-    document.getElementById('rankValue').textContent = rankSlider.value;
+  const maxRank = Math.max(...suitabilityScores.flat().map(cell =>
+    Object.entries(cell)
+      .filter(([sol, scores]) => {
+        if (currentRanking === 'impact') {
+          return scores.impact > 0;
+        } else {
+          return scores.cost > 0;
+        }
+      })
+      .length
+  ));
+  const rankSlider = document.getElementById('rankSlider');
+  rankSlider.max = maxRank;
+  rankSlider.value = Math.min(currentRank, maxRank);
+  document.getElementById('rankValue').textContent = rankSlider.value;
 
-    updateScores();
-    updateCriteriaRasters();
+  updateScores();
+  updateCriteriaRasters();
+
+  // Load visible tiles after updating the map
+  loadVisibleTiles();
 }
+
+// ... (other code remains unchanged)
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', initializeApp);
+
+// Global functions that need to be accessible from HTML
+window.toggleRanking = toggleRanking;
+window.clearSelection = clearSelection;
+window.toggleDrawMode = toggleDrawMode;
+window.toggleDarkMode = toggleDarkMode;
+window.toggleSearch = toggleSearch;
+window.searchLocation = searchLocation;
+window.generateReport = generateReport;
+
+// Add this event listener to allow searching when the Enter key is pressed
+document.getElementById('searchInput').addEventListener('keypress', function (e) {
+  if (e.key === 'Enter') {
+    searchLocation();
+  }
+});
 
 function renderCells() {
     if (!map) return;

@@ -1154,47 +1154,51 @@
     }
 
     function updateCriteriaRasters() {
-        Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-        rasterLayers = {};
+    Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
+    rasterLayers = {};
 
-        activeCriteriaRasters.forEach(solution => {
-            const criteria = solutionCriteria[solution];
-            criteria.forEach((criterion, index) => {
-                const raster = criteriaRasters[criterion];
-                const rasterLayer = L.layerGroup().addTo(map);
-                rasterLayers[`${solution}_${criterion}`] = rasterLayer;
+    activeCriteriaRasters.forEach((solution, solutionIndex) => {
+        const criteria = solutionCriteria[solution];
+        criteria.forEach((criterion, criterionIndex) => {
+            const raster = criteriaRasters[criterion];
+            const rasterLayer = L.layerGroup().addTo(map);
+            rasterLayers[`${solution}_${criterion}`] = rasterLayer;
 
-                const criterionColor = criteriaColorScale(criterion);
+            const criterionColor = criteriaColorScale(criterion);
+            
+            // Calculate offsets
+            const xOffset = (criterionIndex % 2) * cellSizeLng / 2;
+            const yOffset = Math.floor(criterionIndex / 2) * cellSizeLat / 2;
 
-                raster.forEach((row, y) => {
-                    row.forEach((value, x) => {
-                        if (value) {
-                            const cellBounds = [
-                                [gridExtent.north - y * cellSizeLat, gridExtent.west + x * cellSizeLng],
-                                [gridExtent.north - (y + 1) * cellSizeLat, gridExtent.west + (x + 1) * cellSizeLng]
-                            ];
-                            L.polyline([
-                                [cellBounds[0][0], cellBounds[0][1]],
-                                [cellBounds[1][0], cellBounds[1][1]]
-                            ], {
-                                color: criterionColor,
-                                weight: 2,
-                                opacity: 0.8
-                            }).addTo(rasterLayer);
-                            L.polyline([
-                                [cellBounds[0][0], cellBounds[1][1]],
-                                [cellBounds[1][0], cellBounds[0][1]]
-                            ], {
-                                color: criterionColor,
-                                weight: 2,
-                                opacity: 0.8
-                            }).addTo(rasterLayer);
-                        }
-                    });
+            raster.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        const cellBounds = [
+                            [gridExtent.north - y * cellSizeLat - yOffset, gridExtent.west + x * cellSizeLng + xOffset],
+                            [gridExtent.north - (y + 1) * cellSizeLat - yOffset, gridExtent.west + (x + 1) * cellSizeLng + xOffset]
+                        ];
+                        L.polyline([
+                            [cellBounds[0][0], cellBounds[0][1]],
+                            [cellBounds[1][0], cellBounds[1][1]]
+                        ], {
+                            color: criterionColor,
+                            weight: 2,
+                            opacity: 0.8
+                        }).addTo(rasterLayer);
+                        L.polyline([
+                            [cellBounds[0][0], cellBounds[1][1]],
+                            [cellBounds[1][0], cellBounds[0][1]]
+                        ], {
+                            color: criterionColor,
+                            weight: 2,
+                            opacity: 0.8
+                        }).addTo(rasterLayer);
+                    }
                 });
             });
         });
-    }
+    });
+}
 
     function toggleDarkMode() {
         const isDarkMode = document.body.classList.toggle('dark-mode');

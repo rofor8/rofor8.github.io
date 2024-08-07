@@ -12,7 +12,7 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
 
 
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
@@ -552,78 +552,124 @@
     function generateReport() {
     const reportData = gatherReportData();
     
-    // Check if jsPDF is available
     if (typeof jsPDF === 'undefined') {
         console.error('jsPDF is not loaded. Make sure the library is included correctly.');
         alert('Unable to generate PDF. Please try again later.');
         return;
     }
     
-    // Create a new document
     const doc = new jsPDF();
-
     let yOffset = 20;
 
-    // Title
-    doc.setFontSize(20);
+    // Cover page
+    doc.setFontSize(24);
+    doc.setTextColor(0, 102, 204);
     doc.text("Nature Based Solutions Report", 20, yOffset);
+    yOffset += 10;
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, yOffset);
+    yOffset += 20;
+
+    // Table of contents
+    doc.setFontSize(16);
+    doc.text("Table of Contents", 20, yOffset);
+    yOffset += 10;
+    doc.setFontSize(12);
+    doc.text("1. Executive Summary", 25, yOffset);
+    yOffset += 7;
+    doc.text("2. Solution Breakdown", 25, yOffset);
+    yOffset += 7;
+    doc.text("3. Selected Cells Details", 25, yOffset);
+    yOffset += 7;
+    doc.text("4. Methodology Overview", 25, yOffset);
     yOffset += 15;
 
-    // Summary
-    doc.setFontSize(14);
-    doc.text(`Category: ${reportData.currentCategory}`, 20, yOffset);
+    // Executive Summary
+    doc.addPage();
+    yOffset = 20;
+    doc.setFontSize(18);
+    doc.text("1. Executive Summary", 20, yOffset);
     yOffset += 10;
-    doc.text(`Ranking: ${reportData.currentRanking}`, 20, yOffset);
-    yOffset += 10;
-    doc.text(`Rank: ${reportData.currentRank}`, 20, yOffset);
-    yOffset += 10;
-    doc.text(`Total Impact: ${reportData.totalImpact.toFixed(2)}`, 20, yOffset);
-    yOffset += 10;
-    doc.text(`Total Cost: £${reportData.totalCost.toFixed(2)}`, 20, yOffset);
-    yOffset += 15;
+    doc.setFontSize(12);
+    
+    // Summary table
+    const summaryData = [
+        ["Category", reportData.currentCategory],
+        ["Ranking", reportData.currentRanking],
+        ["Rank", reportData.currentRank],
+        ["Total Impact", reportData.totalImpact.toFixed(2)],
+        ["Total Cost", `£${reportData.totalCost.toFixed(2)}`]
+    ];
+    doc.autoTable({
+        startY: yOffset,
+        head: [['Metric', 'Value']],
+        body: summaryData,
+        theme: 'grid'
+    });
+    yOffset = doc.lastAutoTable.finalY + 10;
+
+    // Brief executive summary
+    doc.text("This report summarizes the Nature Based Solutions (NBS) identified for the selected area. " +
+             "The solutions are ranked based on their impact and cost effectiveness, providing a comprehensive " +
+             "overview of potential interventions to address environmental challenges.", 20, yOffset, {maxWidth: 170});
 
     // Solution Breakdown
-    doc.setFontSize(16);
-    doc.text("Solution Breakdown", 20, yOffset);
+    doc.addPage();
+    yOffset = 20;
+    doc.setFontSize(18);
+    doc.text("2. Solution Breakdown", 20, yOffset);
     yOffset += 10;
 
-    doc.setFontSize(12);
-    Object.entries(reportData.solutionBreakdown).forEach(([solution, data]) => {
-        doc.text(`${solution}:`, 20, yOffset);
-        yOffset += 5;
-        doc.text(`  Count: ${data.count}`, 30, yOffset);
-        yOffset += 5;
-        doc.text(`  Total Impact: ${data.totalImpact.toFixed(2)}`, 30, yOffset);
-        yOffset += 5;
-        doc.text(`  Total Cost: £${data.totalCost.toFixed(2)}`, 30, yOffset);
-        yOffset += 10;
+    // Create data for solution breakdown table
+    const breakdownData = Object.entries(reportData.solutionBreakdown).map(([solution, data]) => [
+        solution,
+        data.count,
+        data.totalImpact.toFixed(2),
+        `£${data.totalCost.toFixed(2)}`,
+        `${((data.totalImpact / reportData.totalImpact) * 100).toFixed(1)}%`,
+        `${((data.totalCost / reportData.totalCost) * 100).toFixed(1)}%`
+    ]);
+
+    doc.autoTable({
+        startY: yOffset,
+        head: [['Solution', 'Count', 'Total Impact', 'Total Cost', '% of Impact', '% of Cost']],
+        body: breakdownData,
+        theme: 'grid'
     });
 
     // Selected Cells Details
-    if (yOffset > 250) {
-        doc.addPage();
-        yOffset = 20;
-    }
-
-    doc.setFontSize(16);
-    doc.text("Selected Cells Details", 20, yOffset);
+    doc.addPage();
+    yOffset = 20;
+    doc.setFontSize(18);
+    doc.text("3. Selected Cells Details", 20, yOffset);
     yOffset += 10;
 
-    doc.setFontSize(12);
-    reportData.selectedCells.forEach((cell, index) => {
-        if (yOffset > 250) {
-            doc.addPage();
-            yOffset = 20;
-        }
-        doc.text(`Cell ${index + 1} (${cell.key}):`, 20, yOffset);
-        yOffset += 5;
-        doc.text(`  Solution: ${cell.solution}`, 30, yOffset);
-        yOffset += 5;
-        doc.text(`  Impact: ${cell.impact.toFixed(2)}`, 30, yOffset);
-        yOffset += 5;
-        doc.text(`  Cost: £${cell.cost.toFixed(2)}`, 30, yOffset);
-        yOffset += 10;
+    const cellsData = reportData.selectedCells.map((cell, index) => [
+        `Cell ${index + 1}`,
+        cell.key,
+        cell.solution,
+        cell.impact.toFixed(2),
+        `£${cell.cost.toFixed(2)}`
+    ]);
+
+    doc.autoTable({
+        startY: yOffset,
+        head: [['Cell', 'Key', 'Solution', 'Impact', 'Cost']],
+        body: cellsData,
+        theme: 'grid'
     });
+
+    // Methodology Overview
+    doc.addPage();
+    yOffset = 20;
+    doc.setFontSize(18);
+    doc.text("4. Methodology Overview", 20, yOffset);
+    yOffset += 10;
+    doc.setFontSize(12);
+    doc.text("This report uses a multi-criteria analysis approach to identify and rank Nature Based Solutions. " +
+             "The analysis considers various environmental factors, potential impacts, and costs to provide a " +
+             "comprehensive assessment of each solution's suitability for the selected area.", 20, yOffset, {maxWidth: 170});
 
     // Save the PDF
     doc.save("NBS_Report.pdf");

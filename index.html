@@ -364,7 +364,7 @@
 
     <script>
 
-// Web Worker for heavy computations
+
 const worker = new Worker('worker.js');
 
 let solutionCriteria = {};
@@ -502,6 +502,9 @@ async function fetchTileData(tile) {
     return tileData;
 }
 
+const tileCanvas = document.createElement('canvas');
+const tileCtx = tileCanvas.getContext('2d');
+
 function renderTile(tile, rasterData) {
     const { x, y, zoom } = tile;
     const tileSize = 256;
@@ -510,13 +513,12 @@ function renderTile(tile, rasterData) {
         [(y + 1) * tileSize, (x + 1) * tileSize]
     ]);
 
-    const canvas = document.createElement('canvas');
-    canvas.width = tileSize;
-    canvas.height = tileSize;
-    const ctx = canvas.getContext('2d');
+    tileCanvas.width = tileSize;
+    tileCanvas.height = tileSize;
+    tileCtx.clearRect(0, 0, tileSize, tileSize);
 
     Object.entries(rasterData).forEach(([criterion, data]) => {
-        const imageData = ctx.createImageData(tileSize, tileSize);
+        const imageData = tileCtx.createImageData(tileSize, tileSize);
         for (let i = 0; i < data.length; i++) {
             const value = data[i];
             imageData.data[i * 4] = value; // Red
@@ -524,10 +526,10 @@ function renderTile(tile, rasterData) {
             imageData.data[i * 4 + 2] = value; // Blue
             imageData.data[i * 4 + 3] = 255; // Alpha
         }
-        ctx.putImageData(imageData, 0, 0);
+        tileCtx.putImageData(imageData, 0, 0);
     });
 
-    const canvasLayer = L.imageOverlay(canvas.toDataURL(), bounds);
+    const canvasLayer = L.imageOverlay(tileCanvas.toDataURL(), bounds);
     gridLayer.addLayer(canvasLayer);
 }
 
@@ -561,6 +563,10 @@ async function fetchJSONData() {
                 fetch('solutionCosts.json')
             ]);
 
+            if (!solutionCriteriaResponse.ok || !challengeCategoriesResponse.ok || !solutionCostsResponse.ok) {
+                throw new Error('Failed to fetch JSON data');
+            }
+
             solutionCriteria = await solutionCriteriaResponse.json();
             challengeCategories = await challengeCategoriesResponse.json();
             solutionCosts = await solutionCostsResponse.json();
@@ -575,6 +581,7 @@ async function fetchJSONData() {
         await loadCOGs();
     } catch (error) {
         console.error('Error loading JSON data:', error);
+        alert('Failed to load JSON data. Please try again later.');
         throw error;
     }
 }

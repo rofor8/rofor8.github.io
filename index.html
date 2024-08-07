@@ -909,6 +909,8 @@
 
     const rankTotals = {};
     const rasterCounts = {};
+    const solutionOverlaps = {};
+
     selectedCellKeys.forEach(key => {
         const cellData = allCells.find(cell => cell.key === key);
         if (cellData) {
@@ -940,18 +942,30 @@
 
                 // Count rasters for this solution
                 const criteria = solutionCriteria[solution] || [];
+                if (!solutionOverlaps[solution]) {
+                    solutionOverlaps[solution] = 0;
+                }
+                
+                const [x, y] = key.split(',').map(Number);
+                let allCriteriaPresent = true;
+                
                 criteria.forEach(criterion => {
                     if (!rasterCounts[criterion]) {
                         rasterCounts[criterion] = 0;
                     }
-                    rasterCounts[criterion]++;
+                    if (criteriaRasters[criterion] && criteriaRasters[criterion][y] && criteriaRasters[criterion][y][x] === 1) {
+                        rasterCounts[criterion]++;
+                    } else {
+                        allCriteriaPresent = false;
+                    }
                 });
+
+                if (allCriteriaPresent) {
+                    solutionOverlaps[solution]++;
+                }
             }
         }
     });
-
-    // Calculate overlap
-    const overlapCount = Object.values(rasterCounts).reduce((min, count) => Math.min(min, count), Infinity);
 
     // Display totals graph
     const totalsSvg = selectionTotals.append("svg")
@@ -1093,7 +1107,7 @@
         if (isToggled) {
             // Display raster counts and overlap
             const criteria = solutionCriteria[solution] || [];
-            const maxRasterCount = Math.max(...criteria.map(c => rasterCounts[c] || 0), overlapCount);
+            const maxRasterCount = Math.max(...Object.values(rasterCounts), solutionOverlaps[solution] || 0);
 
             criteria.forEach((criterion, i) => {
                 const count = rasterCounts[criterion] || 0;
@@ -1123,6 +1137,7 @@
             });
 
             // Overlap bar
+            const overlapCount = solutionOverlaps[solution] || 0;
             const overlapBarWidth = (overlapCount / maxRasterCount) * barWidth;
             solutionBars.append("text")
                 .attr("x", valueStartX)
@@ -1560,15 +1575,12 @@ function createCriteriaKey(solution) {
     window.searchLocation = searchLocation;
     window.generateReport = generateReport;
 
-
-
     // Add this event listener to allow searching when the Enter key is pressed
     document.getElementById('searchInput').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             searchLocation();
         }
     });
-
     </script>
     
 </body>

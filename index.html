@@ -432,29 +432,29 @@ function setupMap() {
         className: 'map-tiles'
     }).addTo(map);
 
-    // Add event listeners for pan and zoom
-    map.on('moveend', () => debouncedUpdateMap(currentCategory));
-    map.on('zoomend', () => debouncedUpdateMap(currentCategory));
+    map.on('moveend', () => {
+  loadVisibleTiles();
+  debouncedUpdateMap(currentCategory);
+});
 
-    // Add event listener for tile loading
-    map.on('moveend', loadVisibleTiles);
-    map.on('zoomend', loadVisibleTiles);
+map.on('zoomend', () => {
+  loadVisibleTiles();
+  debouncedUpdateMap(currentCategory);
+});
 }
 
 async function loadVisibleTiles() {
-    const bounds = map.getBounds();
-    const visibleTiles = getVisibleTiles(bounds);
+  const bounds = map.getBounds();
+  const visibleTiles = getVisibleTiles(bounds);
 
-    for (const tile of visibleTiles) {
-        const cachedTile = await getCachedTile(tile);
-        if (cachedTile) {
-            renderTile(tile, cachedTile);
-        } else {
-            const rasterData = await fetchTileData(tile);
-            renderTile(tile, rasterData);
-            await cacheTile(tile, rasterData);
-        }
+  for (const tile of visibleTiles) {
+    if (!currentlyLoadingTiles.has(tile)) {
+      currentlyLoadingTiles.add(tile);
+      const rasterData = await fetchTileData(tile);
+      renderTile(tile, rasterData);
+      currentlyLoadingTiles.delete(tile);
     }
+  }
 }
 
 function getVisibleTiles(bounds) {
@@ -479,28 +479,38 @@ function getVisibleTiles(bounds) {
 }
 
 async function fetchTileData(tile) {
-    const { x, y, zoom } = tile;
-    const criteria = new Set(Object.values(solutionCriteria).flat());
-    const tileData = {};
+  const { x, y, zoom } = tile;
+  const criteria = new Set(Object.values(solutionCriteria).flat());
+  const tileData = {};
 
-    for (const criterion of criteria) {
-        const response = await fetch(`rasters/${criterion}.tif`);
-        const arrayBuffer = await response.arrayBuffer();
-        const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
-        const image = await tiff.getImage();
+  for (const criterion of criteria) {
+    const cachedRaster = await getCachedTile(tile, criterion);
+    if (cachedRaster) {
+      tileData[criterion] = cachedRaster;
+    } else {
+      const response = await fetch(`rasters/${criterion}.tif`);
+      const arrayBuffer = await response.arrayBuffer();
+      const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+      const image = await tiff.getImage();
 
-        // Read the tile data
-        const tileWidth = image.getTileWidth();
-        const tileHeight = image.getTileHeight();
-        const raster = await image.readRasters({
-            window: [x * tileWidth, y * tileHeight, tileWidth, tileHeight]
-        });
+      // Read the tile data
+      const tileWidth = image.getTileWidth();
+      const tileHeight = image.getTileHeight();
+      const raster = await image.readRasters({
+        window: [x * tileWidth, y * tileHeight, tileWidth, tileHeight],
+      });
 
-        tileData[criterion] = raster[0];
+      tileData[criterion] = raster[0];
+
+      // Cache the tile data
+      await cacheTile(tile, criterion, raster[0]);
     }
+  }
 
-    return tileData;
+  return tileData;
 }
+
+
 
 const tileCanvas = document.createElement('canvas');
 const tileCtx = tileCanvas.getContext('2d');
@@ -533,16 +543,16 @@ function renderTile(tile, rasterData) {
     gridLayer.addLayer(canvasLayer);
 }
 
-async function cacheTile(tile, rasterData) {
-    const db = await dbPromise;
-    const key = `${tile.x}_${tile.y}_${tile.zoom}`;
-    await db.put('raster-data', rasterData, key);
+async function cacheTile(tile, criterion, rasterData) {
+  const db = await dbPromise;
+  const key = `${tile.x}_${tile.y}_${tile.zoom}_${criterion}`;
+  await db.put('raster-data', rasterData, key);
 }
 
-async function getCachedTile(tile) {
-    const db = await dbPromise;
-    const key = `${tile.x}_${tile.y}_${tile.zoom}`;
-    return db.get('raster-data', key);
+async function getCachedTile(tile, criterion) {
+  const db = await dbPromise;
+  const key = `${tile.x}_${tile.y}_${tile.zoom}_${criterion}`;
+  return db.get('raster-data', key);
 }
 
 async function fetchJSONData() {

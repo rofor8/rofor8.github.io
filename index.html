@@ -469,12 +469,74 @@ function getVisibleTiles(bounds) {
     const nwTile = map.project(nwPoint, zoom).divideBy(tileSize).floor();
     const seTile = map.project(sePoint, zoom).divideBy(tileSize).floor();
 
-    for (let x = nwTile.x; x <= seTile.x; x++) {
-        for (let y = nwTile.y; y <= seTile.y; y++) {
+    // Ensure tile coordinates are within valid range
+    const maxTile = Math.pow(2, zoom) - 1;
+    const minX = Math.max(0, nwTile.x);
+    const maxX = Math.min(maxTile, seTile.x);
+    const minY = Math.max(0, nwTile.y);
+    const maxY = Math.min(maxTile, seTile.y);
+
+    console.log(`Tile bounds: minX=${minX}, maxX=${maxX}, minY=${minY}, maxY=${maxY}`);
+
+    for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
             tiles.push({ x, y, zoom });
         }
     }
     return tiles;
+}
+
+
+async function fetchTileData(tile) {
+    const { x, y, zoom } = tile;
+    const criteria = new Set(Object.values(solutionCriteria).flat());
+    const tileData = {};
+
+    for (const criterion of criteria) {
+        const cachedRaster = await getCachedTile(tile, criterion);
+        if (cachedRaster) {
+            tileData[criterion] = cachedRaster;
+        } else {
+            try {
+                const response = await fetch(`rasters/${criterion}.tif`);
+                const arrayBuffer = await response.arrayBuffer();
+                const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+                const image = await tiff.getImage();
+
+                // Get the dimensions of the GeoTIFF
+                const imageWidth = image.getWidth();
+                const imageHeight = image.getHeight();
+                const tileWidth = 256; // Assuming 256x256 tiles
+                const tileHeight = 256; // Assuming 256x256 tiles
+
+                // Calculate the tile offsets and dimensions
+                const tileXOffset = x * tileWidth;
+                const tileYOffset = y * tileHeight;
+                const tileXSize = Math.min(tileWidth, imageWidth - tileXOffset);
+                const tileYSize = Math.min(tileHeight, imageHeight - tileYOffset);
+
+                // Check if the tile coordinates and dimensions are valid
+                if (tileXOffset >= imageWidth || tileYOffset >= imageHeight || tileXSize <= 0 || tileYSize <= 0) {
+                    console.warn(`Invalid tile coordinates or dimensions: x=${x}, y=${y}, zoom=${zoom}`);
+                    continue;
+                }
+
+                // Read the tile data
+                const raster = await image.readRasters({
+                    window: [tileXOffset, tileYOffset, tileXSize, tileYSize],
+                });
+
+                tileData[criterion] = raster[0];
+
+                // Cache the tile data
+                await cacheTile(tile, criterion, raster[0]);
+            } catch (error) {
+                console.error(`Error loading tile data for criterion ${criterion}:`, error);
+            }
+        }
+    }
+
+    return tileData;
 }
 
 

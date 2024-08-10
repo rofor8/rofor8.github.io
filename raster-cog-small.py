@@ -10,7 +10,7 @@ from pyproj import CRS
 
 # Define the center point and area size
 center_lat, center_lon = 51.454514, -2.587910
-width_km, height_km = 500, 500  # Updated to 500km by 500km
+width_km, height_km = 10, 10
 
 # Define the CRS (WGS84)
 wgs84 = CRS('EPSG:4326')
@@ -29,8 +29,8 @@ xmax = center_lon + lon_offset
 ymax = center_lat + lat_offset
 
 # Define the grid
-width = 500  # Updated to match the new area size
-height = 500  # Updated to match the new area size
+width = 100
+height = 100
 res = max((xmax - xmin) / width, (ymax - ymin) / height)
 
 transform = from_origin(xmin, ymax, res, res)
@@ -70,23 +70,18 @@ def generate_raster(criterion):
     raster = np.zeros((height, width), dtype=np.uint8)
 
     # Generate random points within the bounding box
-    n_points = np.random.randint(55, 200)  # Random number of points between 55 and 200
+    n_points = np.random.randint(5, 20)  # Random number of points between 5 and 20
     random_points = gpd.GeoDataFrame(
         geometry=[Point(np.random.uniform(xmin, xmax), np.random.uniform(ymin, ymax)) for _ in range(n_points)],
         crs=wgs84
     )
 
-    # Re-project to a projected CRS (e.g., UTM Zone 30N for the given area)
-    utm_crs = CRS('EPSG:32630')
-    random_points_utm = random_points.to_crs(utm_crs)
-
     # Buffer the points to create circular areas
-    buffer_km = np.random.uniform(1, 7.0)  # Random radius between 1 and 7 km
-    buffer_distance = buffer_km * 1000  # Convert km to meters
-    buffered_points_utm = random_points_utm.buffer(buffer_distance)
-
-    # Re-project back to the original CRS
-    buffered_points = buffered_points_utm.to_crs(wgs84)
+    # Convert the buffer distance from km to degrees (approximate)
+    buffer_km = np.random.uniform(0.5, 1.0)  # Random radius between 0.5-1.0 km
+    buffer_deg_lat = buffer_km / km_per_degree_lat
+    buffer_deg_lon = buffer_km / km_per_degree_lon
+    buffered_points = random_points.buffer(np.sqrt(buffer_deg_lat * buffer_deg_lon))
 
     # Rasterize the buffered points
     shapes = ((geom, 1) for geom in buffered_points.geometry)

@@ -1,3 +1,4 @@
+// Web Worker for heavy computations
 const worker = new Worker('worker.js');
 
 let solutionCriteria = {};
@@ -51,6 +52,7 @@ function setupRankSlider() {
 async function initializeApp() {
     try {
         await fetchJSONData();
+        await loadCOGs();
         setupMap();
         setupUI();
         setTimeout(() => {
@@ -199,47 +201,55 @@ async function loadCOGs() {
             const arrayBuffer = await response.arrayBuffer();
             const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
             const image = await tiff.getImage();
+            const rasterData = await image.readRasters();
             const width = image.getWidth();
             const height = image.getHeight();
-            const bounds = image.getBoundingBox();
-
-            console.log(`Image properties for ${criterion}: width=${width}, height=${height}`);
+            const [minX, minY, maxX, maxY] = image.getBoundingBox();
 
             criteriaRasters[criterion] = {
-                tiff: tiff,
-                image: image,
+                data: rasterData[0],
                 width: width,
                 height: height,
-                bounds: bounds
+                bounds: [minX, minY, maxX, maxY]
             };
+            console.log(`Loaded raster for ${criterion}:`, criteriaRasters[criterion]);
         } catch (error) {
             console.error(`Error loading raster for criterion ${criterion}:`, error);
-            console.error('Stack trace:', error.stack);
         }
     }
 }
 
-async function getCachedRaster(criterion) {
-    const db = await dbPromise;
-    return db.get('raster-data', criterion);
+// Modify the setupUI function to include the rank slider setup
+function setupUI() {
+    createButtons("categoryButtons", Object.keys(challengeCategories), "category-button");
+
+    d3.select("#categoryDropdown .dropbtn").text(currentCategory);
+
+    d3.select("#categoryButtons")
+        .selectAll("button")
+        .filter(d => d === currentCategory)
+        .classed("active", true);
+
+    document.querySelector('.dropbtn').addEventListener('click', function (e) {
+        e.stopPropagation();
+        document.getElementById('categoryButtons').classList.toggle('show');
+    });
+
+    window.addEventListener('click', function (e) {
+        if (!e.target.matches('.dropbtn')) {
+            var dropdowns = document.getElementsByClassName("dropdown-content");
+            for (var d = 0; d < dropdowns.length; d++) {
+                var openDropdown = dropdowns[d];
+                if (openDropdown.classList.contains('show')) {
+                    openDropdown.classList.remove('show');
+                }
+            }
+        }
+    });
+
+    setupRankSlider(); // Add this line
 }
 
-async function cacheRaster(criterion, rasterData) {
-    const db = await dbPromise;
-    await db.put('raster-data', rasterData, criterion);
-}
-
-async function cacheTile(tile, criterion, rasterData) {
-    const db = await dbPromise;
-    const key = `${tile.x}_${tile.y}_${tile.zoom}_${criterion}`;
-    await db.put('raster-data', rasterData, key);
-}
-
-async function getCachedTile(tile, criterion) {
-    const db = await dbPromise;
-    const key = `${tile.x}_${tile.y}_${tile.zoom}_${criterion}`;
-    return db.get('raster-data', key);
-}
 
 async function updateMap(challengeCategory) {
     if (!map) return;
@@ -248,9 +258,9 @@ async function updateMap(challengeCategory) {
     const bounds = map.getBounds();
 
     await calculateSuitabilityScores(bounds, challengeCategory);
-
+    
     // Calculate the maximum rank
-    const maxRank = Math.max(...Array.from(allCells.values()).map(cell =>
+    const maxRank = Math.max(...Array.from(allCells.values()).map(cell => 
         Object.values(cell.scores || {}).filter(score => score.impact > 0 || score.cost > 0).length
     ));
 
@@ -325,6 +335,7 @@ function toggleCellSelection(key) {
     renderCells();
     updateScores();
 }
+
 
 function updateScores() {
     const infoPanel = d3.select("#rankInfo");
@@ -648,7 +659,7 @@ async function calculateOverlapArea(lat, lng, criteria) {
         const raster = criteriaRasters[criterion];
         if (raster) {
             try {
-                const value = await getRasterValueAtPoint(raster, lat, lng);
+                const value = getRasterValueAtPoint(raster, lat, lng);
                 if (value !== undefined) {
                     totalValue += value;
                     validCriteria++;
@@ -663,15 +674,15 @@ async function calculateOverlapArea(lat, lng, criteria) {
     return validCriteria > 0 ? totalValue / validCriteria : 0;
 }
 
-async function getRasterValueAtPoint(raster, lat, lng) {
+function getRasterValueAtPoint(raster, lat, lng) {
     if (!raster || !raster.bounds) {
         console.warn('Invalid raster data', raster);
         return 0;
     }
 
-    const { tiff, image, width, height, bounds } = raster;
+    const { data, width, height, bounds } = raster;
     const [minX, minY, maxX, maxY] = bounds;
-
+    
     if (lng < minX || lng > maxX || lat < minY || lat > maxY) {
         console.log('Point outside raster bounds', { lat, lng, bounds });
         return 0;
@@ -679,54 +690,12 @@ async function getRasterValueAtPoint(raster, lat, lng) {
 
     const x = Math.floor((lng - minX) / (maxX - minX) * width);
     const y = Math.floor((maxY - lat) / (maxY - minY) * height);
-
+    
     if (x >= 0 && x < width && y >= 0 && y < height) {
-        const tile = await getTileForPoint(tiff, image, x, y);
-        if (tile) {
-            const tileX = x % tile.width;
-            const tileY = y % tile.height;
-            return tile[tileY * tile.width + tileX];
-        }
+        return data[y * width + x];
     }
     console.log('Invalid raster coordinates', { x, y, width, height });
     return 0;
-}
-
-async function getTileForPoint(tiff, image, x, y) {
-    const tileWidth = image.getTileWidth();
-    const tileHeight = image.getTileHeight();
-    const tileX = Math.floor(x / tileWidth);
-    const tileY = Math.floor(y / tileHeight);
-
-    const cachedTile = await getCachedTile({ x: tileX, y: tileY, zoom: map.getZoom() }, image.fileDirectory.GDAL_NODATA);
-    if (cachedTile) {
-        return cachedTile;
-    } else {
-        const window = [
-            tileX * tileWidth,
-            tileY * tileHeight,
-            tileWidth,
-            tileHeight
-        ];
-        const tile = await image.readRasters({ window });
-        await cacheTile({ x: tileX, y: tileY, zoom: map.getZoom() }, image.fileDirectory.GDAL_NODATA, tile[0]);
-        return tile[0];
-    }
-}
-
-async function getTileForPoint(tiff, image, x, y) {
-    const tileSize = 256; // Assuming 256x256 tile size
-    const tileX = Math.floor(x / tileSize);
-    const tileY = Math.floor(y / tileSize);
-
-    const cachedTile = await getCachedTile({ x: tileX, y: tileY, zoom: map.getZoom() }, criterion);
-    if (cachedTile) {
-        return cachedTile;
-    } else {
-        const tile = await tiff.getTile(tileX, tileY);
-        await cacheTile({ x: tileX, y: tileY, zoom: map.getZoom() }, criterion, tile);
-        return tile;
-    }
 }
 
 function toggleRanking() {
@@ -897,9 +866,9 @@ function updateCriteriaRasters() {
 
             const criterionColor = criteriaColorScale(criterion);
 
-            visibleCells.forEach(async (cell) => {
+            visibleCells.forEach(cell => {
                 const [lat, lng] = cell.key.split(',').map(Number);
-                const rasterValue = await getRasterValueAtPoint(raster, lat, lng);
+                const rasterValue = getRasterValueAtPoint(raster, lat, lng);
                 if (rasterValue > 0) {
                     const xOffset = (criterionIndex % 2) * (cell.bounds[1][1] - cell.bounds[0][1]) / 2;
                     const yOffset = Math.floor(criterionIndex / 2) * (cell.bounds[1][0] - cell.bounds[0][0]) / 2;

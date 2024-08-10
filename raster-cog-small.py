@@ -70,7 +70,7 @@ def generate_raster(criterion):
     raster = np.zeros((height, width), dtype=np.uint8)
 
     # Generate random points within the bounding box
-    n_points = np.random.randint(5, 20)  # Random number of points between 5 and 20
+    n_points = np.random.randint(20, 400)  # Random number of points between 5 and 20
     random_points = gpd.GeoDataFrame(
         geometry=[Point(np.random.uniform(xmin, xmax), np.random.uniform(ymin, ymax)) for _ in range(n_points)],
         crs=wgs84

@@ -78,6 +78,12 @@ body {
     margin-bottom: 10px;
 }
 
+.bar-graph {
+    height: 20px;
+    background-color: #4CAF50;
+    margin-top: 5px;
+  }
+  
 .dropbtn {
     background-color: #f1f1f1;
     color: black;
@@ -152,6 +158,14 @@ body {
     cursor: pointer;
     border-radius: 50%;
     transition-duration: 0.4s;
+}
+
+.criteria-key {
+    font-size: 12px;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .map-button:hover {

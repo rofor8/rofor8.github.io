@@ -199,8 +199,10 @@ async function fetchTileData(tile) {
     const tileData = {};
 
     for (const criterion of Object.values(solutionCriteria).flat()) {
+        const url = `rasters/${encodeURIComponent(criterion)}_${z}_${x}_${y}.tif`;
+        console.log(`Fetching tile data from: ${url}`);
         try {
-            const response = await fetch(`rasters/${encodeURIComponent(criterion)}_${z}_${x}_${y}.tif`);
+            const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -217,6 +219,7 @@ async function fetchTileData(tile) {
 
     return tileData;
 }
+
 
 async function getCachedTile(key) {
     const db = await dbPromise;

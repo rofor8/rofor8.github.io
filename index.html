@@ -1,10 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NBS Tool</title>
-    
+
     <!-- Link to external CSS file -->
     <link rel="stylesheet" href="styles.css"/>
 
@@ -19,6 +20,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+     <!-- IndexedDB (idb) -->
+     <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
+
     <script>
         window.jsPDF = window.jspdf.jsPDF;
     </script>
@@ -33,26 +37,26 @@
                 <button id="clearSelection" class="map-button" onclick="clearSelection()"><i class="fas fa-trash-alt"></i></button>
             </div>
         </div>
-        
+
         <div id="infoPanel">
             <div id="categoryDropdown" class="dropdown">
                 <button class="dropbtn">Biodiversity and soils</button>
                 <div id="categoryButtons" class="dropdown-content"></div>
             </div>
             <button id="rankingToggle" class="toggle-button" onclick="toggleRanking()">Ranked by: Impact</button>
-           
+
             <div class="slider-container">
                 <label for="rankSlider">Rank:</label>
                 <input type="range" id="rankSlider" min="1" max="1" step="1" value="1">
                 <div id="rankValue" class="slider-value">1</div>
             </div>
-            <div id="selectionTotals"></div> 
+            <div id="selectionTotals"></div>
             <div id="rankInfo"></div>
         </div>
     </div>
 
     <!-- Link to your external JavaScript file -->
-    <script src="app.js"></script>
-    
+    <script type="module" src="app.js"></script>
+
 </body>
 </html>

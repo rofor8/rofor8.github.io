@@ -7,11 +7,6 @@
     
     <!-- Link to external CSS file -->
     <link rel="stylesheet" href="styles.css"/>
-
-    <!-- Other external styles and scripts -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"/>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -19,18 +14,28 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Include other necessary scripts and styles -->
     <script>
         window.jsPDF = window.jspdf.jsPDF;
     </script>
     <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
+
 </head>
 <body>
     <div id="app-container">
         <div id="mapContainer">
             <div id="map"></div>
+            <div id="searchContainer" style="position: absolute; top: 20px; left: 20px; z-index: 1000;">
+                <button id="searchButton" onclick="toggleSearch()"><i class="fas fa-search"></i></button>
+                <input type="text" id="searchInput" placeholder="Enter location" style="display: none;">
+            </div>
             <div id="mapButtons">
                 <button id="drawToggle" class="map-button" onclick="toggleDrawMode()"><i class="fas fa-draw-polygon"></i></button>
                 <button id="clearSelection" class="map-button" onclick="clearSelection()"><i class="fas fa-trash-alt"></i></button>
+                <button id="darkModeToggle" class="map-button" onclick="toggleDarkMode()"><i class="fas fa-moon"></i></button>
             </div>
         </div>
         
@@ -40,19 +45,19 @@
                 <div id="categoryButtons" class="dropdown-content"></div>
             </div>
             <button id="rankingToggle" class="toggle-button" onclick="toggleRanking()">Ranked by: Impact</button>
-           
+            <button id="downloadReport" class="map-button" onclick="window.generateReport()"><i class="fas fa-file-pdf"></i></button>
+
+
+
             <div class="slider-container">
                 <label for="rankSlider">Rank:</label>
                 <input type="range" id="rankSlider" min="1" max="1" step="1" value="1">
                 <div id="rankValue" class="slider-value">1</div>
             </div>
-            <div id="selectionTotals"></div> 
+            <div id="selectionTotals"></div> <!-- New div for totals -->
             <div id="rankInfo"></div>
         </div>
     </div>
-
-    <!-- Link to your external JavaScript file -->
-    <script src="app.js"></script>
-    
+    <script type="module" src="app.js"></script>
 </body>
 </html>

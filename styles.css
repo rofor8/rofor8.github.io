@@ -8,31 +8,33 @@ body {
 
 #app-container {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     height: 100vh;
+    width: 100vw;
+    overflow: hidden;
 }
 
 #mapContainer {
-    flex-grow: 1;
+    flex: 1;
     position: relative;
+}
+
+#infoPanel {
+    width: 300px;
+    height: 100vh;
+    overflow-y: auto;
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: white;
+    z-index: 1000;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
 }
 
 #map {
     width: 100%;
     height: 100%;
 }
-
-.criteria-toggle {
-    cursor: pointer;
-    margin-left: 10px;
-    display: flex;
-    align-items: center;
-}
-
-.criteria-toggle input {
-    margin-right: 5px;
-}
-
 
 #infoPanel {
     width: 100%;
@@ -78,12 +80,6 @@ body {
     margin-bottom: 10px;
 }
 
-.bar-graph {
-    height: 20px;
-    background-color: #4CAF50;
-    margin-top: 5px;
-  }
-  
 .dropbtn {
     background-color: #f1f1f1;
     color: black;
@@ -160,14 +156,6 @@ body {
     transition-duration: 0.4s;
 }
 
-.criteria-key {
-    font-size: 12px;
-    line-height: 1.2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .map-button:hover {
     background-color: #4CAF50;
     color: white;
@@ -191,7 +179,105 @@ body {
 }
 
 .leaflet-tile-pane {
-    filter: grayscale(100%) brightness(105%) contrast(105%);
+    z-index: 1;
+}
+
+.leaflet-overlay-pane {
+    z-index: 2;
+}
+
+
+
+#infoPanel {
+    z-index: 1000;
+}
+
+body.dark-mode {
+    background-color: #333;
+    color: #f0f0f0;
+}
+
+.dark-mode #map {
+    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
+.dark-mode .leaflet-control-attribution {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #f0f0f0;
+}
+
+.dark-mode #infoPanel {
+    background-color: #222;
+    color: #f0f0f0;
+}
+
+.dark-mode .toggle-button {
+    background-color: #555;
+}
+
+.dark-mode .toggle-button.active {
+    background-color: #777;
+}
+
+.dark-mode .dropbtn {
+    background-color: #444;
+    color: #f0f0f0;
+}
+
+.dark-mode .dropdown-content {
+    background-color: #333;
+}
+
+.dark-mode .dropdown-content button {
+    background-color: #444;
+    color: #f0f0f0;
+}
+
+.dark-mode .dropdown-content button:hover {
+    background-color: #555;
+}
+
+#searchContainer {
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+#searchButton {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+    font-size: 18px;
+    color: #4CAF50;
+}
+
+#searchButton:hover {
+    color: #45a049;
+}
+
+#searchInput {
+    padding: 5px;
+    width: 200px;
+    border: none;
+    outline: none;
+}
+
+.dark-mode #searchContainer {
+    background-color: #333;
+}
+
+.dark-mode #searchButton {
+    color: #4CAF50;
+}
+
+.dark-mode #searchButton:hover {
+    color: #45a049;
+}
+
+.dark-mode #searchInput {
+    background-color: #444;
+    color: #f0f0f0;
 }
 
 .criteria-key {
@@ -238,4 +324,60 @@ white-space: nowrap;
         padding: 8px 16px;
         font-size: 14px;
     }
+}
+
+.grid-cell {
+    stroke: #fff;
+    stroke-width: 1px;
+    transition: fill-opacity 0.3s ease;
+}
+
+.grid-cell:hover {
+    stroke-width: 2px;
+    stroke: #000;
+}
+
+.grid-cell.selected {
+    stroke: red;
+    stroke-width: 2px;
+}
+
+.leaflet-draw-tooltip {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid #000;
+    color: #fff;
+    font-size: 12px;
+    padding: 4px 8px;
+    white-space: nowrap;
+    border-radius: 4px;
+}
+
+.leaflet-draw-actions {
+    display: none;
+}
+
+#infoPanel svg {
+    display: block;
+    margin: 10px 0;
+}
+
+#infoPanel .solution-bars rect {
+    transition: width 0.3s ease;
+}
+
+#infoPanel .solution-bars text {
+    font-size: 12px;
+}
+
+#infoPanel .totals-toggle {
+    margin-bottom: 10px;
+}
+
+.dark-mode .leaflet-control {
+    background-color: #333;
+    color: #f0f0f0;
+}
+
+.dark-mode .leaflet-control a {
+    color: #f0f0f0;
 }

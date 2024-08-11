@@ -1,3 +1,7 @@
+
+import { updateScores } from './updateScores.js';
+
+
 // Web Worker for heavy computations
 const worker = new Worker('worker.js');
 
@@ -20,8 +24,6 @@ let drawStartTime;
 let drawingPath = [];
 let viewportOverlay;
 let tileLayer;
-
-import { updateScores } from './updateScores.js';
 
 const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
@@ -211,7 +213,7 @@ async function fetchTileData(tile) {
             const arrayBuffer = await response.arrayBuffer();
             const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
             const image = await tiff.getImage();
-            const rasterData = await image.readRasters();
+            const rasterData = await image.readRasters({ window: [x * 256, y * 256, 256, 256] });
             tileData[criterion] = rasterData[0];
         } catch (error) {
             console.warn(`Failed to load raster for criterion ${criterion} at tile ${z}/${x}/${y}:`, error);
@@ -221,7 +223,6 @@ async function fetchTileData(tile) {
 
     return tileData;
 }
-
 
 async function getCachedTile(key) {
     const db = await dbPromise;
@@ -340,7 +341,7 @@ async function updateMap(challengeCategory) {
     document.getElementById('rankValue').textContent = rankSlider.value;
 
     renderCells();
-    updateScores();
+    updateScores(selectedCellKeys); // Pass selectedCellKeys here
 }
 
 function renderCells() {
@@ -411,359 +412,354 @@ function toggleCellSelection(key) {
     updateScores();
 }
 
+async function calculateSuitabilityScores(bounds, challengeCategory) {
+    console.log('Calculating suitability scores');
+    const visibleCells = Array.from(allCells.values()).filter(cell =>
+        bounds.intersects(L.latLngBounds(cell.bounds))
+    );
+    console.log('Number of visible cells:', visibleCells.length);
 
-
-    async function calculateSuitabilityScores(bounds, challengeCategory) {
-        console.log('Calculating suitability scores');
-        const visibleCells = Array.from(allCells.values()).filter(cell =>
-            bounds.intersects(L.latLngBounds(cell.bounds))
-        );
-        console.log('Number of visible cells:', visibleCells.length);
-
-        for (const cell of visibleCells) {
-            const [lat, lng] = cell.key.split(',').map(Number);
-            const cellScores = {};
-            for (const [solution, criteria] of Object.entries(solutionCriteria)) {
-                const area = await calculateOverlapArea(lat, lng, criteria);
-                const weight = challengeCategories[challengeCategory]?.[solution] || 0;
-                cellScores[solution] = {
-                    impact: area * weight * 100,
-                    cost: area * (solutionCosts[solution] || 0),
-                    area: area
-                };
-            }
-            cell.scores = cellScores;
+    for (const cell of visibleCells) {
+        const [lat, lng] = cell.key.split(',').map(Number);
+        const cellScores = {};
+        for (const [solution, criteria] of Object.entries(solutionCriteria)) {
+            const area = await calculateOverlapArea(lat, lng, criteria);
+            const weight = challengeCategories[challengeCategory]?.[solution] || 0;
+            cellScores[solution] = {
+                impact: area * weight * 100,
+                cost: area * (solutionCosts[solution] || 0),
+                area: area
+            };
         }
-
-        console.log('Suitability scores calculated');
+        cell.scores = cellScores;
     }
 
-    async function calculateOverlapArea(lat, lng, criteria) {
-        let totalValue = 0;
-        let validCriteria = 0;
-        for (const criterion of criteria) {
-            const raster = criteriaRasters[criterion];
-            if (raster) {
-                try {
-                    const value = getRasterValueAtPoint(raster, lat, lng);
-                    if (value !== undefined) {
-                        totalValue += value;
-                        validCriteria++;
-                    }
-                } catch (error) {
-                    console.error(`Error calculating overlap for ${criterion}:`, error);
+    console.log('Suitability scores calculated');
+}
+
+async function calculateOverlapArea(lat, lng, criteria) {
+    let totalValue = 0;
+    let validCriteria = 0;
+    for (const criterion of criteria) {
+        const raster = criteriaRasters[criterion];
+        if (raster) {
+            try {
+                const value = getRasterValueAtPoint(raster, lat, lng);
+                if (value !== undefined) {
+                    totalValue += value;
+                    validCriteria++;
                 }
-            } else {
-                console.warn(`Raster not found for criterion: ${criterion}`);
+            } catch (error) {
+                console.error(`Error calculating overlap for ${criterion}:`, error);
             }
+        } else {
+            console.warn(`Raster not found for criterion: ${criterion}`);
         }
-        return validCriteria > 0 ? totalValue / validCriteria : 0;
     }
+    return validCriteria > 0 ? totalValue / validCriteria : 0;
+}
 
-    function getRasterValueAtPoint(raster, lat, lng) {
-        if (!raster || !raster.bounds) {
-            console.warn('Invalid raster data', raster);
-            return 0;
-        }
-    
-        const { data, width, height, bounds } = raster;
-        const [minX, minY, maxX, maxY] = bounds;
-        
-        if (lng < minX || lng > maxX || lat < minY || lat > maxY) {
-            return 0;
-        }
-    
-        const x = Math.floor((lng - minX) / (maxX - minX) * width);
-        const y = Math.floor((maxY - lat) / (maxY - minY) * height);
-        
-        if (x >= 0 && x < width && y >= 0 && y < height) {
-            return data[y * width + x];
-        }
+function getRasterValueAtPoint(raster, lat, lng) {
+    if (!raster || !raster.bounds) {
+        console.warn('Invalid raster data', raster);
         return 0;
     }
-    
 
-    
-    
-    function toggleRanking() {
-        currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
-        const toggleButton = document.getElementById('rankingToggle');
-        toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
-        toggleButton.classList.toggle('active');
-    
-        renderCells();
-        updateScores();
-    }
-    
-    async function loadCOGs() {
-        const criteria = new Set(Object.values(solutionCriteria).flat());
-        for (const criterion of criteria) {
-            try {
-                const response = await fetch(`rasters/${criterion}.tif`);
-                const arrayBuffer = await response.arrayBuffer();
-                const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
-                const image = await tiff.getImage();
-                const rasterData = await image.readRasters();
-                const width = image.getWidth();
-                const height = image.getHeight();
-                const [minX, minY, maxX, maxY] = image.getBoundingBox();
-    
-                criteriaRasters[criterion] = {
-                    data: rasterData[0],
-                    width: width,
-                    height: height,
-                    bounds: [minX, minY, maxX, maxY]
-                };
-                console.log(`Loaded COG for ${criterion}:`, criteriaRasters[criterion]);
-            } catch (error) {
-                console.error(`Error loading raster for criterion ${criterion}:`, error);
-            }
-        }
+    const { data, width, height, bounds } = raster;
+    const [minX, minY, maxX, maxY] = bounds;
+
+    if (lng < minX || lng > maxX || lat < minY || lat > maxY) {
+        return 0;
     }
 
-    function createButtons(containerId, dataArray, buttonClass) {
-        const container = d3.select(`#${containerId}`);
-        container.selectAll("button")
-            .data(dataArray)
-            .enter().append("button")
-            .attr("class", buttonClass)
-            .text(d => d)
-            .on("click", function (event, d) {
-                d3.selectAll(".category-button").classed("active", false);
-                d3.select(this).classed("active", true);
-                d3.select("#categoryDropdown .dropbtn").text(d);
-                currentCategory = d;
-    
-                updateMap(currentCategory);
-            });
+    const x = Math.floor((lng - minX) / (maxX - minX) * width);
+    const y = Math.floor((maxY - lat) / (maxY - minY) * height);
+
+    if (x >= 0 && x < width && y >= 0 && y < height) {
+        return data[y * width + x];
     }
-    
-    function toggleDrawMode() {
-        isDrawMode = !isDrawMode;
-        const drawToggle = document.getElementById('drawToggle');
-        drawToggle.classList.toggle('active');
-    
-        if (isDrawMode) {
-            map.dragging.disable();
-            map.touchZoom.disable();
-            map.doubleClickZoom.disable();
-            map.scrollWheelZoom.disable();
-            map.boxZoom.disable();
-            map.keyboard.disable();
-    
-            map.getContainer().addEventListener('mousedown', handleDrawStart);
-            map.getContainer().addEventListener('mousemove', handleDrawMove);
-            map.getContainer().addEventListener('mouseup', handleDrawEnd);
-            map.getContainer().addEventListener('touchstart', handleDrawStart);
-            map.getContainer().addEventListener('touchmove', handleDrawMove);
-            map.getContainer().addEventListener('touchend', handleDrawEnd);
-        } else {
-            map.dragging.enable();
-            map.touchZoom.enable();
-            map.doubleClickZoom.enable();
-            map.scrollWheelZoom.enable();
-            map.boxZoom.enable();
-            map.keyboard.enable();
-    
-            map.getContainer().removeEventListener('mousedown', handleDrawStart);
-            map.getContainer().removeEventListener('mousemove', handleDrawMove);
-            map.getContainer().removeEventListener('mouseup', handleDrawEnd);
-            map.getContainer().removeEventListener('touchstart', handleDrawStart);
-            map.getContainer().removeEventListener('touchmove', handleDrawMove);
-            map.getContainer().removeEventListener('touchend', handleDrawEnd);
-    
-            if (drawLayer) {
-                map.removeLayer(drawLayer);
-                drawLayer = null;
-            }
+    return 0;
+}
+
+function toggleRanking() {
+    currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
+    const toggleButton = document.getElementById('rankingToggle');
+    toggleButton.textContent = `Ranked by: ${currentRanking.charAt(0).toUpperCase() + currentRanking.slice(1)}`;
+    toggleButton.classList.toggle('active');
+
+    renderCells();
+    updateScores();
+}
+
+async function loadCOGs() {
+    const criteria = new Set(Object.values(solutionCriteria).flat());
+    for (const criterion of criteria) {
+        try {
+            const response = await fetch(`rasters/${criterion}.tif`);
+            const arrayBuffer = await response.arrayBuffer();
+            const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+            const image = await tiff.getImage();
+            const rasterData = await image.readRasters();
+            const width = image.getWidth();
+            const height = image.getHeight();
+            const [minX, minY, maxX, maxY] = image.getBoundingBox();
+
+            criteriaRasters[criterion] = {
+                data: rasterData[0],
+                width: width,
+                height: height,
+                bounds: [minX, minY, maxX, maxY]
+            };
+            console.log(`Loaded COG for ${criterion}:`, criteriaRasters[criterion]);
+        } catch (error) {
+            console.error(`Error loading raster for criterion ${criterion}:`, error);
         }
     }
-    
-    function handleDrawStart(e) {
-        if (!isDrawMode) return;
-        e.preventDefault();
-        drawStartTime = new Date().getTime();
-        const point = e.touches ? e.touches[0] : e;
-        const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
-        drawingPath = [latlng];
-    
+}
+
+function createButtons(containerId, dataArray, buttonClass) {
+    const container = d3.select(`#${containerId}`);
+    container.selectAll("button")
+        .data(dataArray)
+        .enter().append("button")
+        .attr("class", buttonClass)
+        .text(d => d)
+        .on("click", function (event, d) {
+            d3.selectAll(".category-button").classed("active", false);
+            d3.select(this).classed("active", true);
+            d3.select("#categoryDropdown .dropbtn").text(d);
+            currentCategory = d;
+
+            updateMap(currentCategory);
+        });
+}
+
+function toggleDrawMode() {
+    isDrawMode = !isDrawMode;
+    const drawToggle = document.getElementById('drawToggle');
+    drawToggle.classList.toggle('active');
+
+    if (isDrawMode) {
+        map.dragging.disable();
+        map.touchZoom.disable();
+        map.doubleClickZoom.disable();
+        map.scrollWheelZoom.disable();
+        map.boxZoom.disable();
+        map.keyboard.disable();
+
+        map.getContainer().addEventListener('mousedown', handleDrawStart);
+        map.getContainer().addEventListener('mousemove', handleDrawMove);
+        map.getContainer().addEventListener('mouseup', handleDrawEnd);
+        map.getContainer().addEventListener('touchstart', handleDrawStart);
+        map.getContainer().addEventListener('touchmove', handleDrawMove);
+        map.getContainer().addEventListener('touchend', handleDrawEnd);
+    } else {
+        map.dragging.enable();
+        map.touchZoom.enable();
+        map.doubleClickZoom.enable();
+        map.scrollWheelZoom.enable();
+        map.boxZoom.enable();
+        map.keyboard.enable();
+
+        map.getContainer().removeEventListener('mousedown', handleDrawStart);
+        map.getContainer().removeEventListener('mousemove', handleDrawMove);
+        map.getContainer().removeEventListener('mouseup', handleDrawEnd);
+        map.getContainer().removeEventListener('touchstart', handleDrawStart);
+        map.getContainer().removeEventListener('touchmove', handleDrawMove);
+        map.getContainer().removeEventListener('touchend', handleDrawEnd);
+
         if (drawLayer) {
             map.removeLayer(drawLayer);
+            drawLayer = null;
         }
-        drawLayer = L.polyline(drawingPath, { color: 'red' }).addTo(map);
     }
-    
-    function handleDrawMove(e) {
-        if (!isDrawMode || !drawLayer) return;
-        e.preventDefault();
-        const point = e.touches ? e.touches[0] : e;
-        const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
-        drawingPath.push(latlng);
+}
+
+function handleDrawStart(e) {
+    if (!isDrawMode) return;
+    e.preventDefault();
+    drawStartTime = new Date().getTime();
+    const point = e.touches ? e.touches[0] : e;
+    const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
+    drawingPath = [latlng];
+
+    if (drawLayer) {
+        map.removeLayer(drawLayer);
+    }
+    drawLayer = L.polyline(drawingPath, { color: 'red' }).addTo(map);
+}
+
+function handleDrawMove(e) {
+    if (!isDrawMode || !drawLayer) return;
+    e.preventDefault();
+    const point = e.touches ? e.touches[0] : e;
+    const latlng = map.containerPointToLatLng(L.point(point.clientX, point.clientY));
+    drawingPath.push(latlng);
+    drawLayer.setLatLngs(drawingPath);
+}
+
+function handleDrawEnd(e) {
+    if (!isDrawMode) return;
+    e.preventDefault();
+    const drawEndTime = new Date().getTime();
+    const drawDuration = drawEndTime - drawStartTime;
+
+    if (drawDuration < 500 && drawingPath.length < 3) {
+        map.removeLayer(drawLayer);
+        drawLayer = null;
+        return;
+    }
+
+    drawingPath.push(drawingPath[0]);
+    if (drawLayer) {
         drawLayer.setLatLngs(drawingPath);
+        selectCellsInShape(drawLayer);
     }
-    
-    function handleDrawEnd(e) {
-        if (!isDrawMode) return;
-        e.preventDefault();
-        const drawEndTime = new Date().getTime();
-        const drawDuration = drawEndTime - drawStartTime;
+    toggleDrawMode();
+}
 
-        if (drawDuration < 500 && drawingPath.length < 3) {
-            map.removeLayer(drawLayer);
-            drawLayer = null;
-            return;
+function selectCellsInShape(shape) {
+    if (!gridLayer) return;
+
+    const bounds = L.latLngBounds(drawingPath);
+
+    allCells.forEach((cell, key) => {
+        const cellCenter = L.latLngBounds(cell.bounds).getCenter();
+        if (bounds.contains(cellCenter) && pointInPolygon(cellCenter, drawingPath)) {
+            selectedCellKeys.add(key);
         }
-    
-        drawingPath.push(drawingPath[0]);
-        if (drawLayer) {
-            drawLayer.setLatLngs(drawingPath);
-            selectCellsInShape(drawLayer);
-        }
-        toggleDrawMode();
+    });
+
+    renderCells();
+    updateScores();
+}
+
+function pointInPolygon(point, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].lat, yi = polygon[i].lng;
+        const xj = polygon[j].lat, yj = polygon[j].lng;
+
+        const intersect = ((yi > point.lng) !== (yj > point.lng))
+            && (point.lat < (xj - xi) * (point.lng - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
     }
-    
-    function selectCellsInShape(shape) {
-        if (!gridLayer) return;
-    
-        const bounds = L.latLngBounds(drawingPath);
-    
-        allCells.forEach((cell, key) => {
-            const cellCenter = L.latLngBounds(cell.bounds).getCenter();
-            if (bounds.contains(cellCenter) && pointInPolygon(cellCenter, drawingPath)) {
-                selectedCellKeys.add(key);
-            }
-        });
-    
-        renderCells();
-        updateScores();
+    return inside;
+}
+
+function clearSelection() {
+    selectedCellKeys.clear();
+    if (drawLayer) {
+        map.removeLayer(drawLayer);
+        drawLayer = null;
     }
-    
-    function pointInPolygon(point, polygon) {
-        let inside = false;
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-            const xi = polygon[i].lat, yi = polygon[i].lng;
-            const xj = polygon[j].lat, yj = polygon[j].lng;
-    
-            const intersect = ((yi > point.lng) !== (yj > point.lng))
-                && (point.lat < (xj - xi) * (point.lng - yi) / (yj - yi) + xi);
-            if (intersect) inside = !inside;
-        }
-        return inside;
-    }
-    
-    function clearSelection() {
-        selectedCellKeys.clear();
-        if (drawLayer) {
-            map.removeLayer(drawLayer);
-            drawLayer = null;
-        }
-        renderCells();
-        updateScores();
-    }
-    
-    function updateCriteriaRasters() {
-        Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-        rasterLayers = {};
-    
-        const bounds = map.getBounds();
-        const visibleCells = Array.from(allCells.values()).filter(cell =>
-            bounds.intersects(L.latLngBounds(cell.bounds))
-        );
-    
-        activeCriteriaRasters.forEach((solution) => {
-            const criteria = solutionCriteria[solution];
-            criteria.forEach((criterion, criterionIndex) => {
-                const raster = criteriaRasters[criterion];
-                const rasterLayer = L.layerGroup().addTo(map);
-                rasterLayers[`${solution}_${criterion}`] = rasterLayer;
-    
-                const criterionColor = criteriaColorScale(criterion);
-    
-                visibleCells.forEach(cell => {
-                    const [lat, lng] = cell.key.split(',').map(Number);
-                    const rasterValue = getRasterValueAtPoint(raster, lat, lng);
-                    if (rasterValue > 0) {
-                        const xOffset = (criterionIndex % 2) * (cell.bounds[1][1] - cell.bounds[0][1]) / 2;
-                        const yOffset = Math.floor(criterionIndex / 2) * (cell.bounds[1][0] - cell.bounds[0][0]) / 2;
-                        const adjustedBounds = [
-                            [cell.bounds[0][0] + yOffset, cell.bounds[0][1] + xOffset],
-                            [cell.bounds[1][0] + yOffset, cell.bounds[1][1] + xOffset]
-                        ];
-                        L.polyline([
-                            [adjustedBounds[0][0], adjustedBounds[0][1]],
-                            [adjustedBounds[1][0], adjustedBounds[1][1]]
-                        ], {
-                            color: criterionColor,
-                            weight: 2,
-                            opacity: 0.8
-                        }).addTo(rasterLayer);
-                        L.polyline([
-                            [adjustedBounds[0][0], adjustedBounds[1][1]],
-                            [adjustedBounds[1][0], adjustedBounds[0][1]]
-                        ], {
-                            color: criterionColor,
-                            weight: 2,
-                            opacity: 0.8
-                        }).addTo(rasterLayer);
-                    }
-                });
+    renderCells();
+    updateScores();
+}
+
+function updateCriteriaRasters() {
+    Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
+    rasterLayers = {};
+
+    const bounds = map.getBounds();
+    const visibleCells = Array.from(allCells.values()).filter(cell =>
+        bounds.intersects(L.latLngBounds(cell.bounds))
+    );
+
+    activeCriteriaRasters.forEach((solution) => {
+        const criteria = solutionCriteria[solution];
+        criteria.forEach((criterion, criterionIndex) => {
+            const raster = criteriaRasters[criterion];
+            const rasterLayer = L.layerGroup().addTo(map);
+            rasterLayers[`${solution}_${criterion}`] = rasterLayer;
+
+            const criterionColor = criteriaColorScale(criterion);
+
+            visibleCells.forEach(cell => {
+                const [lat, lng] = cell.key.split(',').map(Number);
+                const rasterValue = getRasterValueAtPoint(raster, lat, lng);
+                if (rasterValue > 0) {
+                    const xOffset = (criterionIndex % 2) * (cell.bounds[1][1] - cell.bounds[0][1]) / 2;
+                    const yOffset = Math.floor(criterionIndex / 2) * (cell.bounds[1][0] - cell.bounds[0][0]) / 2;
+                    const adjustedBounds = [
+                        [cell.bounds[0][0] + yOffset, cell.bounds[0][1] + xOffset],
+                        [cell.bounds[1][0] + yOffset, cell.bounds[1][1] + xOffset]
+                    ];
+                    L.polyline([
+                        [adjustedBounds[0][0], adjustedBounds[0][1]],
+                        [adjustedBounds[1][0], adjustedBounds[1][1]]
+                    ], {
+                        color: criterionColor,
+                        weight: 2,
+                        opacity: 0.8
+                    }).addTo(rasterLayer);
+                    L.polyline([
+                        [adjustedBounds[0][0], adjustedBounds[1][1]],
+                        [adjustedBounds[1][0], adjustedBounds[0][1]]
+                    ], {
+                        color: criterionColor,
+                        weight: 2,
+                        opacity: 0.8
+                    }).addTo(rasterLayer);
+                }
             });
         });
+    });
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), wait);
+    };
+}
+
+const debouncedUpdateMap = debounce((category) => {
+    updateMap(category);
+}, 250);
+
+function searchLocation() {
+    const searchInput = document.getElementById('searchInput');
+    const query = searchInput.value;
+
+    if (query) {
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.length > 0) {
+                    const { lat, lon } = data[0];
+                    map.setView([lat, lon], 15);
+                } else {
+                    alert('Location not found');
+                }
+            })
+            .catch(error => {
+                console.error('Error searching for location:', error);
+                alert('An error occurred while searching for the location');
+            });
     }
-    
-    function debounce(func, wait) {
-        let timeout;
-        return function (...args) {
-            const context = this;
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(context, args), wait);
-        };
-    }
-    
-    const debouncedUpdateMap = debounce((category) => {
-        updateMap(category);
-    }, 250);
-    
-    function searchLocation() {
-        const searchInput = document.getElementById('searchInput');
-        const query = searchInput.value;
-    
-        if (query) {
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.length > 0) {
-                        const { lat, lon } = data[0];
-                        map.setView([lat, lon], 15);
-                    } else {
-                        alert('Location not found');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error searching for location:', error);
-                    alert('An error occurred while searching for the location');
-                });
-        }
-    }
-    
-    // Initialize the application
-    document.addEventListener('DOMContentLoaded', initializeApp);
-    
-    // Export functions to global scope for use in HTML
-    window.toggleRanking = toggleRanking;
-    window.clearSelection = clearSelection;
-    window.toggleDrawMode = toggleDrawMode;
-    window.updateMap = updateMap;
-    window.renderCells = renderCells;
-    window.updateScores = updateScores;
-    window.createButtons = createButtons;
-    window.toggleCellSelection = toggleCellSelection;
-    window.pointInPolygon = pointInPolygon;
-    window.selectCellsInShape = selectCellsInShape;
-    window.updateCriteriaRasters = updateCriteriaRasters;
-    window.calculateSuitabilityScores = calculateSuitabilityScores;
-    window.calculateOverlapArea = calculateOverlapArea;
-    window.handleDrawStart = handleDrawStart;
-    window.handleDrawMove = handleDrawMove;
-    window.handleDrawEnd = handleDrawEnd;
-    window.searchLocation = searchLocation;
+}
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', initializeApp);
+
+// Export functions to global scope for use in HTML
+window.toggleRanking = toggleRanking;
+window.clearSelection = clearSelection;
+window.toggleDrawMode = toggleDrawMode;
+window.updateMap = updateMap;
+window.renderCells = renderCells;
+window.updateScores = updateScores;
+window.createButtons = createButtons;
+window.toggleCellSelection = toggleCellSelection;
+window.pointInPolygon = pointInPolygon;
+window.selectCellsInShape = selectCellsInShape;
+window.updateCriteriaRasters = updateCriteriaRasters;
+window.calculateSuitabilityScores = calculateSuitabilityScores;
+window.calculateOverlapArea = calculateOverlapArea;
+window.handleDrawStart = handleDrawStart;
+window.handleDrawMove = handleDrawMove;
+window.handleDrawEnd = handleDrawEnd;
+window.searchLocation = searchLocation;

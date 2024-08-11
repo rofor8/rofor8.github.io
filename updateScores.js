@@ -1,5 +1,5 @@
 // updateScores.js
-function updateScores() {
+function updateScores(selectedCellKeys) {
     const infoPanel = d3.select("#rankInfo");
     infoPanel.html("");
 
@@ -294,4 +294,4 @@ function updateScores() {
         });
     }
 
-    export { updateScores };
+export { updateScores };

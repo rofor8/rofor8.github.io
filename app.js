@@ -21,7 +21,7 @@ let drawingPath = [];
 let viewportOverlay;
 let tileLayer;
 
-
+import { updateScores } from './updateScores.js';
 
 const criteriaColorScale = d3.scaleOrdinal(d3.schemeCategory10);
 

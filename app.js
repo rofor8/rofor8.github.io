@@ -89,7 +89,6 @@ async function initializeApp() {
     }
 }
 
-
 function setupMap() {
     if (map) {
         map.remove();
@@ -118,11 +117,13 @@ function setupMap() {
     map.on('moveend', () => {
         updateGrid();
         debouncedUpdateMap(currentCategory);
+        loadVisibleTiles(); // Add this line to load visible tiles on moveend
     });
 
     map.on('zoomend', () => {
         updateGrid();
         debouncedUpdateMap(currentCategory);
+        loadVisibleTiles(); // Add this line to load visible tiles on zoomend
     });
 
     map.on('click', handleMapClick);
@@ -323,8 +324,8 @@ async function updateMap(challengeCategory) {
     const bounds = map.getBounds();
 
     await calculateSuitabilityScores(bounds, challengeCategory);
-    
-    const maxRank = Math.max(...Array.from(allCells.values()).map(cell => 
+
+    const maxRank = Math.max(...Array.from(allCells.values()).map(cell =>
         Object.values(cell.scores || {}).filter(score => score.impact > 0 || score.cost > 0).length
     ));
 
@@ -472,138 +473,138 @@ function updateScores() {
                             allRasterCounts[criterion]++;
                         }
                     });
-    
+
                     const criteria = solutionCriteria[solution] || [];
                     if (!solutionOverlaps[solution]) {
                         solutionOverlaps[solution] = 0;
                     }
-    
+
                     let allCriteriaPresent = criteria.every(criterion =>
                         getRasterValueAtPoint(criteriaRasters[criterion], lat, lng) > 0
                     );
-    
+
                     if (allCriteriaPresent) {
                         solutionOverlaps[solution]++;
                     }
                 }
             }
         });
-    
+
         // Display totals
         const totalsToggle = selectionTotals.append("div")
             .attr("class", "totals-toggle")
             .html(`<input type="checkbox" id="totalsToggle"> <label for="totalsToggle">Show all rasters</label>`);
-    
+
         const totalsSvg = selectionTotals.append("svg")
             .attr("width", totalWidth)
             .attr("height", groupHeight);
-    
+
         const totalsG = totalsSvg.append("g")
             .attr("transform", "translate(0,10)");
-    
+
         function updateTotalsGraph(showAllRasters) {
             totalsG.selectAll("*").remove();
-    
+
             if (showAllRasters) {
                 const maxRasterCount = Math.max(...Object.values(allRasterCounts));
                 const rasterBarScale = d3.scaleLinear()
                     .domain([0, maxRasterCount])
                     .range([0, barWidth]);
-    
+
                 Object.entries(allRasterCounts).forEach(([raster, count], index) => {
                     totalsG.append("text")
                         .attr("x", toggleWidth)
                         .attr("y", index * 25 + 15)
                         .attr("fill", "black")
                         .text(count);
-    
+
                     totalsG.append("rect")
                         .attr("x", toggleWidth + valueWidth)
                         .attr("y", index * 25)
                         .attr("width", rasterBarScale(count))
                         .attr("height", barHeight)
                         .attr("fill", criteriaColorScale(raster));
-    
+
                     totalsG.append("text")
                         .attr("x", toggleWidth + valueWidth + 5)
                         .attr("y", index * 25 + 15)
                         .attr("fill", "white")
                         .text(raster);
                 });
-    
+
                 totalsSvg.attr("height", Object.keys(allRasterCounts).length * 25);
             } else {
                 const totalsBarScale = d3.scaleLinear()
                     .domain([0, Math.max(totalImpact, totalCost, totalCount)])
                     .range([0, barWidth]);
-    
+
                 totalsG.append("text")
                     .attr("x", toggleWidth)
                     .attr("y", 15)
                     .attr("fill", "black")
                     .text(`${totalImpact.toFixed(0)}`);
-    
+
                 totalsG.append("rect")
                     .attr("x", toggleWidth + valueWidth)
                     .attr("y", 0)
                     .attr("width", totalsBarScale(totalImpact))
                     .attr("height", barHeight)
                     .attr("fill", "steelblue");
-    
+
                 totalsG.append("text")
                     .attr("x", toggleWidth + valueWidth + 5)
                     .attr("y", 15)
                     .attr("fill", "white")
                     .text("Total Impact");
-    
+
                 totalsG.append("text")
                     .attr("x", toggleWidth)
                     .attr("y", 40)
                     .attr("fill", "black")
                     .text(`£${totalCost.toFixed(0)}`);
-    
+
                 totalsG.append("rect")
                     .attr("x", toggleWidth + valueWidth)
                     .attr("y", 25)
                     .attr("width", totalsBarScale(totalCost))
                     .attr("height", barHeight)
                     .attr("fill", "darkseagreen");
-    
+
                 totalsG.append("text")
                     .attr("x", toggleWidth + valueWidth + 5)
                     .attr("y", 40)
                     .attr("fill", "white")
                     .text("Total Cost");
-    
+
                 totalsG.append("text")
                     .attr("x", toggleWidth)
                     .attr("y", 65)
                     .attr("fill", "black")
                     .text(`${totalCount}`);
-    
+
                 totalsG.append("rect")
                     .attr("x", toggleWidth + valueWidth)
                     .attr("y", 50)
                     .attr("width", totalsBarScale(totalCount))
                     .attr("height", barHeight)
                     .attr("fill", "lightcoral");
-    
+
                 totalsG.append("text")
                     .attr("x", toggleWidth + valueWidth + 5)
                     .attr("y", 65)
                     .attr("fill", "white")
                     .text("Total Count");
-    
+
                 totalsSvg.attr("height", groupHeight);
             }
         }
-    
+
         updateTotalsGraph(false);
-    
+
         d3.select("#totalsToggle").on("change", function () {
             updateTotalsGraph(this.checked);
         });
-    
+
         // Display solution breakdowns
         const solutions = Object.keys(rankTotals).sort((a, b) => {
             if (currentRanking === 'impact') {
@@ -612,86 +613,86 @@ function updateScores() {
                 return rankTotals[a].cost - rankTotals[b].cost;
             }
         });
-    
+
         const maxValues = {
             impact: d3.max(solutions, s => rankTotals[s].impact),
             cost: d3.max(solutions, s => rankTotals[s].cost),
             count: d3.max(solutions, s => rankTotals[s].count)
         };
-    
+
         const solutionSvg = infoPanel.append("svg")
             .attr("width", totalWidth)
             .attr("height", solutions.length * groupHeight);
-    
+
         solutions.forEach((solution, index) => {
             const solutionG = solutionSvg.append("g")
                 .attr("transform", `translate(0,${index * groupHeight})`);
-    
+
             solutionG.append("text")
                 .attr("x", 0)
                 .attr("y", 15)
                 .attr("font-weight", "bold")
                 .attr("fill", "black")
                 .text(solution);
-    
+
             const barScale = d3.scaleLinear()
                 .domain([0, d3.max([maxValues.impact, maxValues.cost, maxValues.count])])
                 .range([0, barWidth]);
-    
+
             // Impact bar
             solutionG.append("text")
                 .attr("x", toggleWidth)
                 .attr("y", 40)
                 .attr("fill", "black")
                 .text(`${rankTotals[solution].impact.toFixed(0)}`);
-    
+
             solutionG.append("rect")
                 .attr("x", toggleWidth + valueWidth)
                 .attr("y", 25)
                 .attr("width", barScale(rankTotals[solution].impact))
                 .attr("height", barHeight)
                 .attr("fill", colorScale(solution));
-    
+
             solutionG.append("text")
                 .attr("x", toggleWidth + valueWidth + 5)
                 .attr("y", 40)
                 .attr("fill", "white")
                 .text("Impact");
-    
+
             // Cost bar
             solutionG.append("text")
                 .attr("x", toggleWidth)
                 .attr("y", 65)
                 .attr("fill", "black")
                 .text(`£${rankTotals[solution].cost.toFixed(0)}`);
-    
+
             solutionG.append("rect")
                 .attr("x", toggleWidth + valueWidth)
                 .attr("y", 50)
                 .attr("width", barScale(rankTotals[solution].cost))
                 .attr("height", barHeight)
                 .attr("fill", d3.color(colorScale(solution)).darker(0.5));
-    
+
             solutionG.append("text")
                 .attr("x", toggleWidth + valueWidth + 5)
                 .attr("y", 65)
                 .attr("fill", "white")
                 .text("Cost");
-    
+
             // Count bar
             solutionG.append("text")
                 .attr("x", toggleWidth)
                 .attr("y", 90)
                 .attr("fill", "black")
                 .text(`${rankTotals[solution].count}`);
-    
+
             solutionG.append("rect")
                 .attr("x", toggleWidth + valueWidth)
                 .attr("y", 75)
                 .attr("width", barScale(rankTotals[solution].count))
                 .attr("height", barHeight)
                 .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
-    
+
             solutionG.append("text")
                 .attr("x", toggleWidth + valueWidth + 5)
                 .attr("y", 90)
@@ -699,14 +700,14 @@ function updateScores() {
                 .text("Count");
         });
     }
-    
+
     async function calculateSuitabilityScores(bounds, challengeCategory) {
         console.log('Calculating suitability scores');
         const visibleCells = Array.from(allCells.values()).filter(cell =>
             bounds.intersects(L.latLngBounds(cell.bounds))
         );
         console.log('Number of visible cells:', visibleCells.length);
-    
+
         for (const cell of visibleCells) {
             const [lat, lng] = cell.key.split(',').map(Number);
             const cellScores = {};
@@ -721,10 +722,10 @@ function updateScores() {
             }
             cell.scores = cellScores;
         }
-    
+
         console.log('Suitability scores calculated');
     }
-    
+
     async function calculateOverlapArea(lat, lng, criteria) {
         let totalValue = 0;
         let validCriteria = 0;
@@ -745,6 +746,28 @@ function updateScores() {
             }
         }
         return validCriteria > 0 ? totalValue / validCriteria : 0;
+    }
+
+    function getRasterValueAtPoint(raster, lat, lng) {
+        if (!raster || !raster.bounds) {
+            console.warn('Invalid raster data', raster);
+            return 0;
+        }
+    
+        const { data, width, height, bounds } = raster;
+        const [minX, minY, maxX, maxY] = bounds;
+        
+        if (lng < minX || lng > maxX || lat < minY || lat > maxY) {
+            return 0;
+        }
+    
+        const x = Math.floor((lng - minX) / (maxX - minX) * width);
+        const y = Math.floor((maxY - lat) / (maxY - minY) * height);
+        
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+            return data[y * width + x];
+        }
+        return 0;
     }
     
     function getRasterValueAtPoint(raster, lat, lng) {

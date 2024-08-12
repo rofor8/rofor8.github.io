@@ -1,4 +1,7 @@
+// Import updateScores from separate file
+import { updateScores } from './updateScores.js';
 
+// Global variables
 let solutionCriteria = {};
 let challengeCategories = {};
 let solutionCosts = {};
@@ -6,14 +9,13 @@ let map;
 let gridLayer;
 let rasterLayers = {};
 let selectedCellKeys = new Set();
-let allCells = new Map(); // Changed to Map for efficient lookups
+let allCells = new Map();
 let currentRanking = 'impact';
 let currentRank = 1;
 const CELL_SIZE = 100; // meters
 let currentCategory = "Biodiversity and soils";
 let drawLayer;
 let isDrawMode = false;
-let activeCriteriaRasters = new Set();
 let drawStartTime;
 let drawingPath = [];
 let viewportOverlay;
@@ -34,30 +36,14 @@ const dbPromise = idb.openDB('nbs-tool-cache', 1, {
     },
 });
 
-// Add this function to setup the rank slider
-function setupRankSlider() {
-    const rankSlider = document.getElementById('rankSlider');
-    const rankValue = document.getElementById('rankValue');
-
-    rankSlider.addEventListener('input', function() {
-        currentRank = parseInt(this.value);
-        rankValue.textContent = currentRank;
-        renderCells();
-        updateScores();
-    });
-}
-
 async function initializeApp() {
     try {
         await fetchJSONData();
         await loadCOGs();
         setupMap();
         setupUI();
-        setTimeout(() => {
-            console.log('Forcing initial render');
-            updateGrid();
-            updateMap(currentCategory);
-        }, 500);
+        updateGrid();
+        updateMap(currentCategory);
     } catch (error) {
         console.error('Error initializing app:', error);
     }
@@ -82,30 +68,9 @@ function setupMap() {
 
     gridLayer = L.layerGroup().addTo(map);
 
-    map.on('load', function() {
-        console.log('Map loaded');
-        updateGrid();
-        updateMap(currentCategory);
-    });
-
-    map.on('moveend', () => {
-        updateGrid();
-        debouncedUpdateMap(currentCategory);
-    });
-
-    map.on('zoomend', () => {
-        updateGrid();
-        debouncedUpdateMap(currentCategory);
-    });
-
-    // Add click event listener to the map
+    map.on('moveend', debouncedUpdateGrid);
+    map.on('zoomend', debouncedUpdateGrid);
     map.on('click', handleMapClick);
-}
-
-function getCellKeyFromLatLng(lat, lng) {
-    const cellLat = Math.floor(lat / (CELL_SIZE / 111111)) * (CELL_SIZE / 111111);
-    const cellLng = Math.floor(lng / (CELL_SIZE / (111111 * Math.cos(lat * Math.PI / 180)))) * (CELL_SIZE / (111111 * Math.cos(lat * Math.PI / 180)));
-    return `${cellLat.toFixed(6)},${cellLng.toFixed(6)}`;
 }
 
 function handleMapClick(e) {
@@ -118,36 +83,136 @@ function handleMapClick(e) {
     }
 }
 
+function getCellKeyFromLatLng(lat, lng) {
+    const cellLat = Math.floor(lat / (CELL_SIZE / 111111)) * (CELL_SIZE / 111111);
+    const cellLng = Math.floor(lng / (CELL_SIZE / (111111 * Math.cos(lat * Math.PI / 180)))) * (CELL_SIZE / (111111 * Math.cos(lat * Math.PI / 180)));
+    return `${cellLat.toFixed(6)},${cellLng.toFixed(6)}`;
+}
+
 function updateGrid() {
     console.log('Updating grid');
     const bounds = map.getBounds();
-    gridLayer.clearLayers();
-    allCells.clear();
-
-    const zoom = map.getZoom();
+    
     const cellSizeMeters = CELL_SIZE;
-
     const cellSizeLat = cellSizeMeters / 111111;
     const cellSizeLng = cellSizeMeters / (111111 * Math.cos(bounds.getCenter().lat * Math.PI / 180));
 
-    const minLat = bounds.getSouth();
-    const maxLat = bounds.getNorth();
-    const minLng = bounds.getWest();
-    const maxLng = bounds.getEast();
+    const minLat = Math.floor(bounds.getSouth() / cellSizeLat) * cellSizeLat;
+    const maxLat = Math.ceil(bounds.getNorth() / cellSizeLat) * cellSizeLat;
+    const minLng = Math.floor(bounds.getWest() / cellSizeLng) * cellSizeLng;
+    const maxLng = Math.ceil(bounds.getEast() / cellSizeLng) * cellSizeLng;
 
-    for (let lat = minLat; lat <= maxLat; lat += cellSizeLat) {
-        for (let lng = minLng; lng <= maxLng; lng += cellSizeLng) {
+    const newCells = new Map();
+
+    for (let lat = minLat; lat < maxLat; lat += cellSizeLat) {
+        for (let lng = minLng; lng < maxLng; lng += cellSizeLng) {
             const cellKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
             const cellBounds = [
                 [lat, lng],
                 [lat + cellSizeLat, lng + cellSizeLng]
             ];
-            allCells.set(cellKey, { key: cellKey, bounds: cellBounds, scores: null });
+            if (allCells.has(cellKey)) {
+                newCells.set(cellKey, allCells.get(cellKey));
+            } else {
+                newCells.set(cellKey, { key: cellKey, bounds: cellBounds, scores: null });
+            }
         }
     }
 
+    // Preserve selected cells that are no longer in view
+    selectedCellKeys.forEach(key => {
+        if (!newCells.has(key) && allCells.has(key)) {
+            newCells.set(key, allCells.get(key));
+        }
+    });
+
+    allCells = newCells;
     renderCells();
     console.log('Grid updated, cells rendered');
+}
+
+function renderCells() {
+    if (!map) return;
+    gridLayer.clearLayers();
+    const mapBounds = map.getBounds();
+    
+    allCells.forEach(({ key, bounds, scores }) => {
+        const cellBounds = L.latLngBounds(bounds);
+        if (!mapBounds.intersects(cellBounds)) return;
+
+        let fillColor = "rgba(200,200,200,0.5)";
+        let fillOpacity = 0.5;
+
+        if (scores) {
+            const validSolutions = Object.entries(scores)
+                .filter(([sol, scores]) => {
+                    if (currentRanking === 'impact') {
+                        return scores.impact > 0;
+                    } else {
+                        return scores.cost > 0;
+                    }
+                });
+
+            if (validSolutions.length > 0) {
+                let sortedSolutions = validSolutions.sort((a, b) =>
+                    currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
+                );
+
+                if (currentRank <= sortedSolutions.length) {
+                    const rankedSolution = sortedSolutions[currentRank - 1];
+                    fillColor = colorScale(rankedSolution[0]);
+                    fillOpacity = 0.7;
+                }
+            }
+        }
+
+        const isSelected = selectedCellKeys.has(key);
+
+        const rectangle = L.rectangle(cellBounds, {
+            color: isSelected ? 'red' : 'transparent',
+            weight: isSelected ? 2 : 1,
+            fillColor: fillColor,
+            fillOpacity: fillOpacity
+        }).addTo(gridLayer);
+
+        rectangle.on('click', function() {
+            if (!isDrawMode) {
+                toggleCellSelection(key);
+            }
+        });
+    });
+}
+
+function toggleCellSelection(key) {
+    if (selectedCellKeys.has(key)) {
+        selectedCellKeys.delete(key);
+    } else {
+        selectedCellKeys.add(key);
+    }
+    renderCells();
+    updateScores(selectedCellKeys);
+}
+
+async function updateMap(challengeCategory) {
+    if (!map) return;
+
+    console.log('Updating map for category:', challengeCategory);
+    const bounds = map.getBounds();
+
+    await loadTilesForViewport(bounds);
+    await calculateSuitabilityScores(bounds, challengeCategory);
+
+    const maxRank = Math.max(...Array.from(allCells.values()).map(cell =>
+        Object.values(cell.scores || {}).filter(score => score.impact > 0 || score.cost > 0).length
+    ));
+
+    const rankSlider = document.getElementById('rankSlider');
+    rankSlider.max = maxRank;
+    rankSlider.value = Math.min(currentRank, maxRank);
+    document.getElementById('rankValue').textContent = rankSlider.value;
+
+    renderCells();
+    updateScores(selectedCellKeys);
 }
 
 async function fetchJSONData() {
@@ -182,8 +247,6 @@ async function fetchJSONData() {
                 db.put('json-data', solutionCosts, 'solutionCosts')
             ]);
         }
-
-        await loadCOGs();
     } catch (error) {
         console.error('Error loading JSON data:', error);
         alert('Failed to load JSON data. Please try again later.');
@@ -216,8 +279,6 @@ async function loadCOGs() {
     }
 }
 
-
-// Modify the setupUI function to include the rank slider setup
 function setupUI() {
     createButtons("categoryButtons", Object.keys(challengeCategories), "category-button");
 
@@ -245,475 +306,20 @@ function setupUI() {
         }
     });
 
-    setupRankSlider(); // Add this line
+    setupRankSlider();
 }
 
-function calculateWindow(bounds, rasterBounds, imageWidth, imageHeight) {
-    const [minX, minY, maxX, maxY] = rasterBounds;
-    return [
-        Math.max(0, Math.floor((bounds.getWest() - minX) / (maxX - minX) * imageWidth)),
-        Math.max(0, Math.floor((maxY - bounds.getNorth()) / (maxY - minY) * imageHeight)),
-        Math.min(imageWidth, Math.ceil((bounds.getEast() - minX) / (maxX - minX) * imageWidth)),
-        Math.min(imageHeight, Math.ceil((maxY - bounds.getSouth()) / (maxY - minY) * imageHeight))
-    ];
-}
-
-async function updateMap(challengeCategory) {
-    if (!map) return;
-
-    console.log('Updating map for category:', challengeCategory);
-    const bounds = map.getBounds();
-
-    console.log("Calling loadTilesForViewport");
-    await loadTilesForViewport(bounds);
-
-    console.log("Calling calculateSuitabilityScores");
-    await calculateSuitabilityScores(bounds, challengeCategory);
-
-    const maxRank = Math.max(...Array.from(allCells.values()).map(cell =>
-        Object.values(cell.scores || {}).filter(score => score.impact > 0 || score.cost > 0).length
-    ));
-
-    console.log("Max rank:", maxRank);
-
+function setupRankSlider() {
     const rankSlider = document.getElementById('rankSlider');
-    rankSlider.max = maxRank;
-    rankSlider.value = Math.min(currentRank, maxRank);
-    document.getElementById('rankValue').textContent = rankSlider.value;
+    const rankValue = document.getElementById('rankValue');
 
-    console.log("Calling renderCells");
-    renderCells();
-
-    console.log("Calling updateScores");
-    updateScores();
-}
-
-
-function renderCells() {
-    if (!map) return;
-    gridLayer.clearLayers();
-    const bounds = map.getBounds();
-    const visibleCells = Array.from(allCells.values()).filter(cell =>
-        bounds.intersects(L.latLngBounds(cell.bounds))
-    );
-
-    visibleCells.forEach(({ key, bounds, scores }) => {
-        let fillColor = "rgba(200,200,200,0.5)";
-        let fillOpacity = 0.5;
-
-        if (scores) {
-            const validSolutions = Object.entries(scores)
-                .filter(([sol, scores]) => {
-                    if (currentRanking === 'impact') {
-                        return scores.impact > 0;
-                    } else {
-                        return scores.cost > 0;
-                    }
-                });
-
-            if (validSolutions.length > 0) {
-                let sortedSolutions = validSolutions.sort((a, b) =>
-                    currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-                );
-
-                if (currentRank <= sortedSolutions.length) {
-                    const rankedSolution = sortedSolutions[currentRank - 1];
-                    fillColor = colorScale(rankedSolution[0]);
-                    fillOpacity = 0.7;
-                }
-            }
-        }
-
-        const isSelected = selectedCellKeys.has(key);
-
-        const rectangle = L.rectangle(bounds, {
-            color: isSelected ? 'red' : 'transparent',
-            weight: isSelected ? 2 : 1,
-            fillColor: fillColor,
-            fillOpacity: fillOpacity
-        }).addTo(gridLayer);
-
-        rectangle.on('click', function() {
-            if (!isDrawMode) {
-                toggleCellSelection(key);
-            }
-        });
+    rankSlider.addEventListener('input', function() {
+        currentRank = parseInt(this.value);
+        rankValue.textContent = currentRank;
+        renderCells();
+        updateScores(selectedCellKeys);
     });
 }
-
-function toggleCellSelection(key) {
-    if (selectedCellKeys.has(key)) {
-        selectedCellKeys.delete(key);
-    } else {
-        selectedCellKeys.add(key);
-    }
-    renderCells();
-    updateScores();
-}
-
-
-function updateScores() {
-    const infoPanel = d3.select("#rankInfo");
-    infoPanel.html("");
-
-    const selectionTotals = d3.select("#selectionTotals");
-    selectionTotals.html("");
-
-    if (selectedCellKeys.size === 0) {
-        infoPanel.html("<p>No cells selected. Select cells on the map to see scores.</p>");
-        return;
-    }
-
-    const barHeight = 20;
-    const barSpacing = 5;
-    const groupHeight = (barHeight + barSpacing) * 3 + 25;
-    const groupSpacing = 20;
-    const toggleWidth = 30;
-    const valueWidth = 70;
-    const barWidth = 250;
-    const totalWidth = toggleWidth + valueWidth + barWidth + 20;
-
-    let totalImpact = 0;
-    let totalCost = 0;
-    let totalCount = 0;
-
-    const rankTotals = {};
-    const allRasterCounts = {};
-    const solutionOverlaps = {};
-
-    selectedCellKeys.forEach(key => {
-        const cellData = allCells.get(key);
-        if (cellData && cellData.scores) {
-            const validSolutions = Object.entries(cellData.scores)
-                .filter(([sol, scores]) => {
-                    if (currentRanking === 'impact') {
-                        return scores.impact > 0;
-                    } else {
-                        return scores.cost > 0;
-                    }
-                })
-                .sort((a, b) =>
-                    currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-                );
-
-            if (currentRank <= validSolutions.length) {
-                const [solution, scores] = validSolutions[currentRank - 1];
-                if (!rankTotals[solution]) {
-                    rankTotals[solution] = { impact: 0, cost: 0, count: 0 };
-                }
-                rankTotals[solution].impact += scores.impact;
-                rankTotals[solution].cost += scores.cost;
-                rankTotals[solution].count++;
-
-                totalImpact += scores.impact;
-                totalCost += scores.cost;
-                totalCount++;
-
-                const [lat, lng] = key.split(',').map(Number);
-                Object.keys(criteriaRasters).forEach(criterion => {
-                    if (!allRasterCounts[criterion]) {
-                        allRasterCounts[criterion] = 0;
-                    }
-                    if (getRasterValueAtPoint(criteriaRasters[criterion], lat, lng) > 0) {
-                        allRasterCounts[criterion]++;
-                    }
-                });
-
-                const criteria = solutionCriteria[solution] || [];
-                if (!solutionOverlaps[solution]) {
-                    solutionOverlaps[solution] = 0;
-                }
-
-                let allCriteriaPresent = criteria.every(criterion =>
-                    getRasterValueAtPoint(criteriaRasters[criterion], lat, lng) > 0
-                );
-
-                if (allCriteriaPresent) {
-                    solutionOverlaps[solution]++;
-                }
-            }
-        }
-    });
-
-    // Display totals
-    const totalsToggle = selectionTotals.append("div")
-        .attr("class", "totals-toggle")
-        .html(`<input type="checkbox" id="totalsToggle"> <label for="totalsToggle">Show all rasters</label>`);
-
-    const totalsSvg = selectionTotals.append("svg")
-        .attr("width", totalWidth)
-        .attr("height", groupHeight);
-
-    const totalsG = totalsSvg.append("g")
-        .attr("transform", "translate(0,10)");
-
-    function updateTotalsGraph(showAllRasters) {
-        totalsG.selectAll("*").remove();
-
-        if (showAllRasters) {
-            const maxRasterCount = Math.max(...Object.values(allRasterCounts));
-            const rasterBarScale = d3.scaleLinear()
-                .domain([0, maxRasterCount])
-                .range([0, barWidth]);
-
-            Object.entries(allRasterCounts).forEach(([raster, count], index) => {
-                totalsG.append("text")
-                    .attr("x", toggleWidth)
-                    .attr("y", index * 25 + 15)
-                    .attr("fill", "black")
-                    .text(count);
-
-                totalsG.append("rect")
-                    .attr("x", toggleWidth + valueWidth)
-                    .attr("y", index * 25)
-                    .attr("width", rasterBarScale(count))
-                    .attr("height", barHeight)
-                    .attr("fill", criteriaColorScale(raster));
-
-                totalsG.append("text")
-                    .attr("x", toggleWidth + valueWidth + 5)
-                    .attr("y", index * 25 + 15)
-                    .attr("fill", "white")
-                    .text(raster);
-            });
-
-            totalsSvg.attr("height", Object.keys(allRasterCounts).length * 25);
-        } else {
-            const totalsBarScale = d3.scaleLinear()
-                .domain([0, Math.max(totalImpact, totalCost, totalCount)])
-                .range([0, barWidth]);
-
-            totalsG.append("text")
-                .attr("x", toggleWidth)
-                .attr("y", 15)
-                .attr("fill", "black")
-                .text(`${totalImpact.toFixed(0)}`);
-
-            totalsG.append("rect")
-                .attr("x", toggleWidth + valueWidth)
-                .attr("y", 0)
-                .attr("width", totalsBarScale(totalImpact))
-                .attr("height", barHeight)
-                .attr("fill", "steelblue");
-
-            totalsG.append("text")
-                .attr("x", toggleWidth + valueWidth + 5)
-                .attr("y", 15)
-                .attr("fill", "white")
-                .text("Total Impact");
-
-            totalsG.append("text")
-                .attr("x", toggleWidth)
-                .attr("y", 40)
-                .attr("fill", "black")
-                .text(`£${totalCost.toFixed(0)}`);
-
-            totalsG.append("rect")
-                .attr("x", toggleWidth + valueWidth)
-                .attr("y", 25)
-                .attr("width", totalsBarScale(totalCost))
-                .attr("height", barHeight)
-                .attr("fill", "darkseagreen");
-
-            totalsG.append("text")
-                .attr("x", toggleWidth + valueWidth + 5)
-                .attr("y", 40)
-                .attr("fill", "white")
-                .text("Total Cost");
-
-            totalsG.append("text")
-                .attr("x", toggleWidth)
-                .attr("y", 65)
-                .attr("fill", "black")
-                .text(`${totalCount}`);
-
-            totalsG.append("rect")
-                .attr("x", toggleWidth + valueWidth)
-                .attr("y", 50)
-                .attr("width", totalsBarScale(totalCount))
-                .attr("height", barHeight)
-                .attr("fill", "lightcoral");
-
-            totalsG.append("text")
-                .attr("x", toggleWidth + valueWidth + 5)
-                .attr("y", 65)
-                .attr("fill", "white")
-                .text("Total Count");
-
-            totalsSvg.attr("height", groupHeight);
-        }
-    }
-
-    updateTotalsGraph(false);
-
-    d3.select("#totalsToggle").on("change", function () {
-        updateTotalsGraph(this.checked);
-    });
-
-    // Display solution breakdowns
-    const solutions = Object.keys(rankTotals).sort((a, b) => {
-        if (currentRanking === 'impact') {
-            return rankTotals[b].impact - rankTotals[a].impact;
-        } else {
-            return rankTotals[a].cost - rankTotals[b].cost;
-        }
-    });
-
-    const maxValues = {
-        impact: d3.max(solutions, s => rankTotals[s].impact),
-        cost: d3.max(solutions, s => rankTotals[s].cost),
-        count: d3.max(solutions, s => rankTotals[s].count)
-    };
-
-    const solutionSvg = infoPanel.append("svg")
-        .attr("width", totalWidth)
-        .attr("height", solutions.length * groupHeight);
-
-    solutions.forEach((solution, index) => {
-        const solutionG = solutionSvg.append("g")
-            .attr("transform", `translate(0,${index * groupHeight})`);
-
-        solutionG.append("text")
-            .attr("x", 0)
-            .attr("y", 15)
-            .attr("font-weight", "bold")
-            .attr("fill", "black")
-            .text(solution);
-
-        const barScale = d3.scaleLinear()
-            .domain([0, d3.max([maxValues.impact, maxValues.cost, maxValues.count])])
-            .range([0, barWidth]);
-
-        // Impact bar
-        solutionG.append("text")
-            .attr("x", toggleWidth)
-            .attr("y", 40)
-            .attr("fill", "black")
-            .text(`${rankTotals[solution].impact.toFixed(0)}`);
-
-        solutionG.append("rect")
-            .attr("x", toggleWidth + valueWidth)
-            .attr("y", 25)
-            .attr("width", barScale(rankTotals[solution].impact))
-            .attr("height", barHeight)
-            .attr("fill", colorScale(solution));
-
-        solutionG.append("text")
-            .attr("x", toggleWidth + valueWidth + 5)
-            .attr("y", 40)
-            .attr("fill", "white")
-            .text("Impact");
-
-        // Cost bar
-        solutionG.append("text")
-            .attr("x", toggleWidth)
-            .attr("y", 65)
-            .attr("fill", "black")
-            .text(`£${rankTotals[solution].cost.toFixed(0)}`);
-
-        solutionG.append("rect")
-            .attr("x", toggleWidth + valueWidth)
-            .attr("y", 50)
-            .attr("width", barScale(rankTotals[solution].cost))
-            .attr("height", barHeight)
-            .attr("fill", d3.color(colorScale(solution)).darker(0.5));
-
-        solutionG.append("text")
-            .attr("x", toggleWidth + valueWidth + 5)
-            .attr("y", 65)
-            .attr("fill", "white")
-            .text("Cost");
-
-        // Count bar
-        solutionG.append("text")
-            .attr("x", toggleWidth)
-            .attr("y", 90)
-            .attr("fill", "black")
-            .text(`${rankTotals[solution].count}`);
-
-        solutionG.append("rect")
-            .attr("x", toggleWidth + valueWidth)
-            .attr("y", 75)
-            .attr("width", barScale(rankTotals[solution].count))
-            .attr("height", barHeight)
-            .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
-
-        solutionG.append("text")
-            .attr("x", toggleWidth + valueWidth + 5)
-            .attr("y", 90)
-            .attr("fill", "white")
-            .text("Count");
-    });
-}
-
-async function calculateSuitabilityScores(bounds, challengeCategory) {
-    const visibleCells = Array.from(allCells.values()).filter(cell =>
-        bounds.intersects(L.latLngBounds(cell.bounds))
-    );
-
-    for (const cell of visibleCells) {
-        const [lat, lng] = cell.key.split(',').map(Number);
-        const cellScores = {};
-        for (const [solution, criteria] of Object.entries(solutionCriteria)) {
-            const area = await calculateOverlapArea(lat, lng, criteria);
-            const weight = challengeCategories[challengeCategory]?.[solution] || 0;
-            cellScores[solution] = {
-                impact: area * weight * 100,
-                cost: area * (solutionCosts[solution] || 0),
-                area: area
-            };
-        }
-        cell.scores = cellScores;
-    }
-}
-
-async function calculateOverlapArea(lat, lng, criteria) {
-    let totalValue = 0;
-    let validCriteria = 0;
-    for (const criterion of criteria) {
-        const raster = criteriaRasters[criterion];
-        if (raster) {
-            try {
-                const value = getRasterValueAtPoint(raster, lat, lng);
-                if (value !== undefined) {
-                    totalValue += value;
-                    validCriteria++;
-                }
-            } catch (error) {
-                console.error(`Error calculating overlap for ${criterion}:`, error);
-            }
-        } else {
-            console.warn(`Raster not found for criterion: ${criterion}`);
-        }
-    }
-    return validCriteria > 0 ? totalValue / validCriteria : 0;
-}
-
-function getRasterValueAtPoint(raster, lat, lng) {
-    if (!raster || !raster.bounds || !raster.data || !raster.windowBounds) {
-        console.warn('Invalid raster data', raster);
-        return 0;
-    }
-
-    const { data, width, height, windowBounds } = raster;
-    const [minX, minY, maxX, maxY] = windowBounds;
-
-    if (lng < minX || lng > maxX || lat < minY || lat > maxY) {
-        console.log('Point outside raster window bounds', { lat, lng, windowBounds });
-        return 0;
-    }
-
-    const x = Math.floor((lng - minX) / (maxX - minX) * width);
-    const y = Math.floor((maxY - lat) / (maxY - minY) * height);
-
-    if (x >= 0 && x < width && y >= 0 && y < height) {
-        return data[y * width + x];
-    }
-
-    console.log('Invalid raster coordinates', { x, y, width, height });
-    return 0;
-}
-
 
 function toggleRanking() {
     currentRanking = currentRanking === 'impact' ? 'cost' : 'impact';
@@ -722,7 +328,7 @@ function toggleRanking() {
     toggleButton.classList.toggle('active');
 
     renderCells();
-    updateScores();
+    updateScores(selectedCellKeys);
 }
 
 function createButtons(containerId, dataArray, buttonClass) {
@@ -797,57 +403,6 @@ function handleDrawStart(e) {
     drawLayer = L.polyline(drawingPath, { color: 'red' }).addTo(map);
 }
 
-async function loadTilesForViewport(bounds) {
-    const visibleCriteria = new Set();
-    Object.values(solutionCriteria).forEach(criteria => {
-        criteria.forEach(criterion => visibleCriteria.add(criterion));
-    });
-
-    const db = await dbPromise;
-
-    for (const criterion of visibleCriteria) {
-        const { tiff, bounds: rasterBounds } = criteriaRasters[criterion];
-        const [minX, minY, maxX, maxY] = rasterBounds;
-
-        if (!boundsIntersect(bounds, rasterBounds)) continue;
-
-        const image = await tiff.getImage();
-        const imageWidth = image.getWidth();
-        const imageHeight = image.getHeight();
-
-        const window = calculateWindow(bounds, rasterBounds, imageWidth, imageHeight);
-        const tileKey = `${criterion}_${window.join('_')}`;
-
-        let rasterData = await db.get('raster-data', tileKey);
-
-        if (!rasterData) {
-            rasterData = await image.readRasters({ window });
-            await db.put('raster-data', rasterData, tileKey);
-        }
-
-        criteriaRasters[criterion].data = rasterData[0];
-        criteriaRasters[criterion].width = window[2] - window[0];
-        criteriaRasters[criterion].height = window[3] - window[1];
-        criteriaRasters[criterion].windowBounds = calculateWindowBounds(window, rasterBounds, imageWidth, imageHeight);
-    }
-}
-
-function calculateWindowBounds(window, rasterBounds, imageWidth, imageHeight) {
-    const [minX, minY, maxX, maxY] = rasterBounds;
-    const [left, top, right, bottom] = window;
-    return [
-        minX + (left / imageWidth) * (maxX - minX),
-        maxY - (bottom / imageHeight) * (maxY - minY),
-        minX + (right / imageWidth) * (maxX - minX),
-        maxY - (top / imageHeight) * (maxY - minY)
-    ];
-}
-
-function boundsIntersect(bounds1, bounds2) {
-    return !(bounds1.getWest() > bounds2[2] || bounds1.getEast() < bounds2[0] ||
-             bounds1.getSouth() > bounds2[3] || bounds1.getNorth() < bounds2[1]);
-}
-
 function handleDrawMove(e) {
     if (!isDrawMode || !drawLayer) return;
     e.preventDefault();
@@ -890,7 +445,7 @@ function selectCellsInShape(shape) {
     });
 
     renderCells();
-    updateScores();
+    updateScores(selectedCellKeys);
 }
 
 function pointInPolygon(point, polygon) {
@@ -913,57 +468,121 @@ function clearSelection() {
         drawLayer = null;
     }
     renderCells();
-    updateScores();
+    updateScores(selectedCellKeys);
 }
 
-function updateCriteriaRasters() {
-    Object.values(rasterLayers).forEach(layer => map.removeLayer(layer));
-    rasterLayers = {};
+async function loadTilesForViewport(bounds) {
+    console.log("Loading tiles for viewport:", bounds);
+    const visibleCriteria = new Set();
+    Object.values(solutionCriteria).forEach(criteria => {
+        criteria.forEach(criterion => visibleCriteria.add(criterion));
+    });
 
-    const bounds = map.getBounds();
+    for (const criterion of visibleCriteria) {
+        if (!criteriaRasters[criterion]) {
+            console.warn(`Criterion ${criterion} not found in criteriaRasters`);
+            continue;
+        }
+
+        const { tiff, bounds: rasterBounds } = criteriaRasters[criterion];
+        const [minX, minY, maxX, maxY] = rasterBounds;
+
+        if (!boundsIntersect(bounds, rasterBounds)) {
+            console.log(`Viewport does not intersect with raster for ${criterion}`);
+            continue;
+        }
+
+        try {
+            const image = await tiff.getImage();
+            const imageWidth = image.getWidth();
+            const imageHeight = image.getHeight();
+
+            const window = calculateWindow(bounds, rasterBounds, imageWidth, imageHeight);
+            const rasterData = await image.readRasters({ window });
+
+            criteriaRasters[criterion].data = rasterData[0];
+            criteriaRasters[criterion].width = window[2] - window[0];
+            criteriaRasters[criterion].height = window[3] - window[1];
+            criteriaRasters[criterion].windowBounds = calculateWindowBounds(window, rasterBounds, imageWidth, imageHeight);
+
+            console.log(`Loaded data for ${criterion}:`, {
+                dataLength: criteriaRasters[criterion].data.length,
+                width: criteriaRasters[criterion].width,
+                height: criteriaRasters[criterion].height,
+                windowBounds: criteriaRasters[criterion].windowBounds
+            });
+        } catch (error) {
+            console.error(`Error loading raster data for ${criterion}:`, error);
+        }
+    }
+}
+
+async function calculateSuitabilityScores(bounds, challengeCategory) {
     const visibleCells = Array.from(allCells.values()).filter(cell =>
         bounds.intersects(L.latLngBounds(cell.bounds))
     );
 
-    activeCriteriaRasters.forEach((solution) => {
-        const criteria = solutionCriteria[solution];
-        criteria.forEach((criterion, criterionIndex) => {
-            const raster = criteriaRasters[criterion];
-            const rasterLayer = L.layerGroup().addTo(map);
-            rasterLayers[`${solution}_${criterion}`] = rasterLayer;
+    for (const cell of visibleCells) {
+        const [lat, lng] = cell.key.split(',').map(Number);
+        const cellScores = {};
+        for (const [solution, criteria] of Object.entries(solutionCriteria)) {
+            const area = await calculateOverlapArea(lat, lng, criteria);
+            const weight = challengeCategories[challengeCategory]?.[solution] || 0;
+            cellScores[solution] = {
+                impact: area * weight * 100,
+                cost: area * (solutionCosts[solution] || 0),
+                area: area
+            };
+        }
+        cell.scores = cellScores;
+    }
+}
 
-            const criterionColor = criteriaColorScale(criterion);
-
-            visibleCells.forEach(cell => {
-                const [lat, lng] = cell.key.split(',').map(Number);
-                const rasterValue = getRasterValueAtPoint(raster, lat, lng);
-                if (rasterValue > 0) {
-                    const xOffset = (criterionIndex % 2) * (cell.bounds[1][1] - cell.bounds[0][1]) / 2;
-                    const yOffset = Math.floor(criterionIndex / 2) * (cell.bounds[1][0] - cell.bounds[0][0]) / 2;
-                    const adjustedBounds = [
-                        [cell.bounds[0][0] + yOffset, cell.bounds[0][1] + xOffset],
-                        [cell.bounds[1][0] + yOffset, cell.bounds[1][1] + xOffset]
-                    ];
-                    L.polyline([
-                        [adjustedBounds[0][0], adjustedBounds[0][1]],
-                        [adjustedBounds[1][0], adjustedBounds[1][1]]
-                    ], {
-                        color: criterionColor,
-                        weight: 2,
-                        opacity: 0.8
-                    }).addTo(rasterLayer);
-                    L.polyline([
-                        [adjustedBounds[0][0], adjustedBounds[1][1]],
-                        [adjustedBounds[1][0], adjustedBounds[0][1]]
-                    ], {
-                        color: criterionColor,
-                        weight: 2,
-                        opacity: 0.8
-                    }).addTo(rasterLayer);
+async function calculateOverlapArea(lat, lng, criteria) {
+    let totalValue = 0;
+    let validCriteria = 0;
+    for (const criterion of criteria) {
+        const raster = criteriaRasters[criterion];
+        if (raster) {
+            try {
+                const value = getRasterValueAtPoint(raster, lat, lng);
+                if (value !== undefined) {
+                    totalValue += value;
+                    validCriteria++;
                 }
-            });
-        });
-    });
+            } catch (error) {
+                console.error(`Error calculating overlap for ${criterion}:`, error);
+            }
+        } else {
+            console.warn(`Raster not found for criterion: ${criterion}`);
+        }
+    }
+    return validCriteria > 0 ? totalValue / validCriteria : 0;
+}
+
+function getRasterValueAtPoint(raster, lat, lng) {
+    if (!raster || !raster.bounds || !raster.data || !raster.windowBounds) {
+        console.warn('Invalid raster data', raster);
+        return 0;
+    }
+
+    const { data, width, height, windowBounds } = raster;
+    const [minX, minY, maxX, maxY] = windowBounds;
+
+    if (lng < minX || lng > maxX || lat < minY || lat > maxY) {
+        console.log('Point outside raster window bounds', { lat, lng, windowBounds });
+        return 0;
+    }
+
+    const x = Math.floor((lng - minX) / (maxX - minX) * width);
+    const y = Math.floor((maxY - lat) / (maxY - minY) * height);
+
+    if (x >= 0 && x < width && y >= 0 && y < height) {
+        return data[y * width + x];
+    }
+
+    console.log('Invalid raster coordinates', { x, y, width, height });
+    return 0;
 }
 
 function debounce(func, wait) {
@@ -975,9 +594,36 @@ function debounce(func, wait) {
     };
 }
 
-const debouncedUpdateMap = debounce((category) => {
-    updateMap(category);
+const debouncedUpdateGrid = debounce(() => {
+    updateGrid();
+    updateMap(currentCategory);
 }, 250);
+
+function boundsIntersect(bounds1, bounds2) {
+    return !(bounds1.getWest() > bounds2[2] || bounds1.getEast() < bounds2[0] ||
+             bounds1.getSouth() > bounds2[3] || bounds1.getNorth() < bounds2[1]);
+}
+
+function calculateWindow(bounds, rasterBounds, imageWidth, imageHeight) {
+    const [minX, minY, maxX, maxY] = rasterBounds;
+    return [
+        Math.max(0, Math.floor((bounds.getWest() - minX) / (maxX - minX) * imageWidth)),
+        Math.max(0, Math.floor((maxY - bounds.getNorth()) / (maxY - minY) * imageHeight)),
+        Math.min(imageWidth, Math.ceil((bounds.getEast() - minX) / (maxX - minX) * imageWidth)),
+        Math.min(imageHeight, Math.ceil((maxY - bounds.getSouth()) / (maxY - minY) * imageHeight))
+    ];
+}
+
+function calculateWindowBounds(window, rasterBounds, imageWidth, imageHeight) {
+    const [minX, minY, maxX, maxY] = rasterBounds;
+    const [left, top, right, bottom] = window;
+    return [
+        minX + (left / imageWidth) * (maxX - minX),
+        maxY - (bottom / imageHeight) * (maxY - minY),
+        minX + (right / imageWidth) * (maxX - minX),
+        maxY - (top / imageHeight) * (maxY - minY)
+    ];
+}
 
 function searchLocation() {
     const searchInput = document.getElementById('searchInput');
@@ -1010,15 +656,23 @@ window.clearSelection = clearSelection;
 window.toggleDrawMode = toggleDrawMode;
 window.updateMap = updateMap;
 window.renderCells = renderCells;
-window.updateScores = updateScores;
 window.createButtons = createButtons;
 window.toggleCellSelection = toggleCellSelection;
 window.pointInPolygon = pointInPolygon;
 window.selectCellsInShape = selectCellsInShape;
-window.updateCriteriaRasters = updateCriteriaRasters;
 window.calculateSuitabilityScores = calculateSuitabilityScores;
 window.calculateOverlapArea = calculateOverlapArea;
 window.handleDrawStart = handleDrawStart;
 window.handleDrawMove = handleDrawMove;
 window.handleDrawEnd = handleDrawEnd;
 window.searchLocation = searchLocation;
+
+// Expose necessary variables and functions for updateScores.js
+window.allCells = allCells;
+window.currentRanking = currentRanking;
+window.currentRank = currentRank;
+window.criteriaRasters = criteriaRasters;
+window.solutionCriteria = solutionCriteria;
+window.colorScale = colorScale;
+window.criteriaColorScale = criteriaColorScale;
+window.getRasterValueAtPoint = getRasterValueAtPoint;

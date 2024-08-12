@@ -248,6 +248,15 @@ function setupUI() {
     setupRankSlider(); // Add this line
 }
 
+function calculateWindow(bounds, rasterBounds, imageWidth, imageHeight) {
+    const [minX, minY, maxX, maxY] = rasterBounds;
+    return [
+        Math.max(0, Math.floor((bounds.getWest() - minX) / (maxX - minX) * imageWidth)),
+        Math.max(0, Math.floor((maxY - bounds.getNorth()) / (maxY - minY) * imageHeight)),
+        Math.min(imageWidth, Math.ceil((bounds.getEast() - minX) / (maxX - minX) * imageWidth)),
+        Math.min(imageHeight, Math.ceil((maxY - bounds.getSouth()) / (maxY - minY) * imageHeight))
+    ];
+}
 
 async function updateMap(challengeCategory) {
     if (!map) return;
@@ -789,71 +798,55 @@ function handleDrawStart(e) {
 }
 
 async function loadTilesForViewport(bounds) {
-    console.log("Loading tiles for viewport:", bounds);
     const visibleCriteria = new Set();
     Object.values(solutionCriteria).forEach(criteria => {
         criteria.forEach(criterion => visibleCriteria.add(criterion));
     });
 
-    for (const criterion of visibleCriteria) {
-        if (!criteriaRasters[criterion]) {
-            console.warn(`Criterion ${criterion} not found in criteriaRasters`);
-            continue;
-        }
+    const db = await dbPromise;
 
+    for (const criterion of visibleCriteria) {
         const { tiff, bounds: rasterBounds } = criteriaRasters[criterion];
         const [minX, minY, maxX, maxY] = rasterBounds;
 
-        console.log(`Processing criterion: ${criterion}`);
-        console.log(`Raster bounds: ${rasterBounds}`);
-        console.log(`Viewport bounds: ${[bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]}`);
+        if (!boundsIntersect(bounds, rasterBounds)) continue;
 
-        // Check if the viewport intersects with the raster bounds
-        if (bounds.getWest() > maxX || bounds.getEast() < minX ||
-            bounds.getSouth() > maxY || bounds.getNorth() < minY) {
-            console.log(`Viewport does not intersect with raster for ${criterion}`);
-            continue;
+        const image = await tiff.getImage();
+        const imageWidth = image.getWidth();
+        const imageHeight = image.getHeight();
+
+        const window = calculateWindow(bounds, rasterBounds, imageWidth, imageHeight);
+        const tileKey = `${criterion}_${window.join('_')}`;
+
+        let rasterData = await db.get('raster-data', tileKey);
+
+        if (!rasterData) {
+            rasterData = await image.readRasters({ window });
+            await db.put('raster-data', rasterData, tileKey);
         }
 
-        try {
-            const image = await tiff.getImage();
-            const imageWidth = image.getWidth();
-            const imageHeight = image.getHeight();
-
-            // Calculate the window coordinates
-            const left = Math.max(0, Math.floor((bounds.getWest() - minX) / (maxX - minX) * imageWidth));
-            const top = Math.max(0, Math.floor((maxY - bounds.getNorth()) / (maxY - minY) * imageHeight));
-            const right = Math.min(imageWidth, Math.ceil((bounds.getEast() - minX) / (maxX - minX) * imageWidth));
-            const bottom = Math.min(imageHeight, Math.ceil((maxY - bounds.getSouth()) / (maxY - minY) * imageHeight));
-
-            const window = [left, top, right, bottom];
-            console.log(`Window for ${criterion}:`, window);
-
-            // Read only the required portion of the raster
-            const rasterData = await image.readRasters({ window });
-
-            criteriaRasters[criterion].data = rasterData[0];
-            criteriaRasters[criterion].width = right - left;
-            criteriaRasters[criterion].height = bottom - top;
-            criteriaRasters[criterion].windowBounds = [
-                minX + (left / imageWidth) * (maxX - minX),
-                maxY - (bottom / imageHeight) * (maxY - minY),
-                minX + (right / imageWidth) * (maxX - minX),
-                maxY - (top / imageHeight) * (maxY - minY)
-            ];
-
-            console.log(`Loaded data for ${criterion}:`, {
-                dataLength: criteriaRasters[criterion].data.length,
-                width: criteriaRasters[criterion].width,
-                height: criteriaRasters[criterion].height,
-                windowBounds: criteriaRasters[criterion].windowBounds
-            });
-        } catch (error) {
-            console.error(`Error loading raster data for ${criterion}:`, error);
-        }
+        criteriaRasters[criterion].data = rasterData[0];
+        criteriaRasters[criterion].width = window[2] - window[0];
+        criteriaRasters[criterion].height = window[3] - window[1];
+        criteriaRasters[criterion].windowBounds = calculateWindowBounds(window, rasterBounds, imageWidth, imageHeight);
     }
 }
 
+function calculateWindowBounds(window, rasterBounds, imageWidth, imageHeight) {
+    const [minX, minY, maxX, maxY] = rasterBounds;
+    const [left, top, right, bottom] = window;
+    return [
+        minX + (left / imageWidth) * (maxX - minX),
+        maxY - (bottom / imageHeight) * (maxY - minY),
+        minX + (right / imageWidth) * (maxX - minX),
+        maxY - (top / imageHeight) * (maxY - minY)
+    ];
+}
+
+function boundsIntersect(bounds1, bounds2) {
+    return !(bounds1.getWest() > bounds2[2] || bounds1.getEast() < bounds2[0] ||
+             bounds1.getSouth() > bounds2[3] || bounds1.getNorth() < bounds2[1]);
+}
 
 function handleDrawMove(e) {
     if (!isDrawMode || !drawLayer) return;

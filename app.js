@@ -541,14 +541,20 @@ async function loadTilesForViewport(bounds) {
 }
 
 async function calculateSuitabilityScores(bounds, challengeCategory) {
+    console.time('calculateSuitabilityScores');
+
+    const startTime = performance.now();
     const visibleCells = Array.from(allCells.values()).filter(cell =>
         bounds.intersects(L.latLngBounds(cell.bounds))
     );
+    console.log('Time to filter visible cells:', performance.now() - startTime, 'ms');
 
     for (const cell of visibleCells) {
         const [lat, lng] = cell.key.split(',').map(Number);
         const cellScores = {};
-        for (const [solution, criteria] of Object.entries(solutionCriteria)) {
+
+        const criteriaStartTime = performance.now();
+        const promises = Object.entries(solutionCriteria).map(async ([solution, criteria]) => {
             const area = await calculateOverlapArea(lat, lng, criteria);
             const weight = challengeCategories[challengeCategory]?.[solution] || 0;
             cellScores[solution] = {
@@ -556,10 +562,16 @@ async function calculateSuitabilityScores(bounds, challengeCategory) {
                 cost: area * (solutionCosts[solution] || 0),
                 area: area
             };
-        }
+        });
+        await Promise.all(promises);
+        console.log('Time to calculate scores for cell:', performance.now() - criteriaStartTime, 'ms');
+
         cell.scores = cellScores;
     }
+
+    console.timeEnd('calculateSuitabilityScores');
 }
+
 
 async function calculateOverlapArea(lat, lng, criteria) {
     let totalValue = 0;

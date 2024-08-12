@@ -29,8 +29,8 @@ xmax = center_lon + lon_offset
 ymax = center_lat + lat_offset
 
 # Define the grid resolution
-width = 1000  # Increased grid width
-height = 1000  # Increased grid height
+width = 10000  # Increased grid width
+height = 10000  # Increased grid height
 res = max((xmax - xmin) / width, (ymax - ymin) / height)
 
 transform = from_origin(xmin, ymax, res, res)
@@ -70,7 +70,7 @@ def generate_raster(criterion):
     raster = np.zeros((height, width), dtype=np.uint8)
 
     # Generate random points within the bounding box
-    n_points = np.random.randint(50000, 60000)  # Increased range to match the larger area
+    n_points = np.random.randint(70000, 80000)  # Increased range to match the larger area
     random_points = gpd.GeoDataFrame(
         geometry=[Point(np.random.uniform(xmin, xmax), np.random.uniform(ymin, ymax)) for _ in range(n_points)],
         crs=wgs84

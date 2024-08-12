@@ -2,6 +2,7 @@
 import { updateScores } from './updateScores.js';
 
 // Global variables
+let allCells = new Map();
 let solutionCriteria = {};
 let challengeCategories = {};
 let solutionCosts = {};
@@ -9,7 +10,7 @@ let map;
 let gridLayer;
 let rasterLayers = {};
 let selectedCellKeys = new Set();
-let allCells = new Map();
+
 let currentRanking = 'impact';
 let currentRank = 1;
 const CELL_SIZE = 100; // meters
@@ -190,7 +191,29 @@ function toggleCellSelection(key) {
         selectedCellKeys.add(key);
     }
     renderCells();
-    updateScores(selectedCellKeys);
+    callUpdateScores();
+}
+
+function callUpdateScores() {
+    console.log('Calling updateScores with:', {
+        selectedCellKeys,
+        allCells,
+        currentRanking,
+        currentRank,
+        criteriaRasters,
+        solutionCriteria
+    });
+    updateScores(
+        selectedCellKeys,
+        allCells,
+        currentRanking,
+        currentRank,
+        criteriaRasters,
+        solutionCriteria,
+        colorScale,
+        criteriaColorScale,
+        getRasterValueAtPoint
+    );
 }
 
 async function updateMap(challengeCategory) {
@@ -212,7 +235,7 @@ async function updateMap(challengeCategory) {
     document.getElementById('rankValue').textContent = rankSlider.value;
 
     renderCells();
-    updateScores(selectedCellKeys);
+    callUpdateScores();
 }
 
 async function fetchJSONData() {
@@ -317,7 +340,7 @@ function setupRankSlider() {
         currentRank = parseInt(this.value);
         rankValue.textContent = currentRank;
         renderCells();
-        updateScores(selectedCellKeys);
+        callUpdateScores();
     });
 }
 
@@ -328,7 +351,7 @@ function toggleRanking() {
     toggleButton.classList.toggle('active');
 
     renderCells();
-    updateScores(selectedCellKeys);
+    callUpdateScores();
 }
 
 function createButtons(containerId, dataArray, buttonClass) {
@@ -445,7 +468,7 @@ function selectCellsInShape(shape) {
     });
 
     renderCells();
-    updateScores(selectedCellKeys);
+    callUpdateScores();
 }
 
 function pointInPolygon(point, polygon) {
@@ -468,7 +491,7 @@ function clearSelection() {
         drawLayer = null;
     }
     renderCells();
-    updateScores(selectedCellKeys);
+    callUpdateScores();
 }
 
 async function loadTilesForViewport(bounds) {

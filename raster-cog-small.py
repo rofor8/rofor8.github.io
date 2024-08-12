@@ -10,7 +10,7 @@ from pyproj import CRS
 
 # Define the center point and area size
 center_lat, center_lon = 51.454514, -2.587910
-width_km, height_km = 100, 100  # Increased area size
+width_km, height_km = 1000, 1000  # Increased area size
 
 # Define the CRS (WGS84)
 wgs84 = CRS('EPSG:4326')
@@ -70,7 +70,7 @@ def generate_raster(criterion):
     raster = np.zeros((height, width), dtype=np.uint8)
 
     # Generate random points within the bounding box
-    n_points = np.random.randint(1000, 3000)  # Increased range to match the larger area
+    n_points = np.random.randint(50000, 60000)  # Increased range to match the larger area
     random_points = gpd.GeoDataFrame(
         geometry=[Point(np.random.uniform(xmin, xmax), np.random.uniform(ymin, ymax)) for _ in range(n_points)],
         crs=wgs84

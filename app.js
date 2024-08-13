@@ -13,7 +13,8 @@ async function initializeApp() {
         updateState({
             solutionCriteria: data.solutionCriteria,
             challengeCategories: data.challengeCategories,
-            solutionCosts: data.solutionCosts
+            solutionCosts: data.solutionCosts,
+            selectedSolutions: Object.fromEntries(Object.keys(data.solutionCriteria).map(solution => [solution, true]))
         });
         updateSelectedCellKeys(new Set()); // Ensure selectedCellKeys is initialized
 
@@ -86,5 +87,6 @@ Object.assign(window, {
     solutionCriteria: state.solutionCriteria,
     colorScale: state.colorScale,
     criteriaColorScale: state.criteriaColorScale,
-    getRasterValueAtPoint
+    getRasterValueAtPoint,
+    selectedSolutions: state.selectedSolutions
 });

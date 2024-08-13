@@ -33,6 +33,7 @@ export function setupUI() {
     });
 
     setupRankSlider();
+    setupSolutionCheckboxes();
 }
 
 function setupRankSlider() {
@@ -44,6 +45,30 @@ function setupRankSlider() {
         rankValue.textContent = state.currentRank;
         state.mapNeedsUpdate = true;
         state.callUpdateScores();
+    });
+}
+
+function setupSolutionCheckboxes() {
+    const solutionsContainer = d3.select("#solutionsContainer");
+    
+    Object.keys(state.solutionCriteria).forEach(solution => {
+        const checkbox = solutionsContainer.append("div")
+            .attr("class", "solution-checkbox")
+            .append("label")
+            .html(`<input type="checkbox" name="${solution}" checked> ${solution}`);
+
+        checkbox.select("input")
+            .on("change", function() {
+                const isChecked = this.checked;
+                updateState({ 
+                    selectedSolutions: {
+                        ...state.selectedSolutions,
+                        [solution]: isChecked
+                    }
+                });
+                state.mapNeedsUpdate = true;
+                updateMap(state.currentCategory);
+            });
     });
 }
 

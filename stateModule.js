@@ -3,7 +3,6 @@ import { loadTilesForViewport, calculateSuitabilityScores } from './dataModule.j
 import { updateUIForCategory } from './uiModule.js';
 import { updateScores } from './updateScores.js';
 
-// Create a single state object
 export const state = {
     allCells: new Map(),
     solutionCriteria: {},
@@ -27,10 +26,10 @@ export const state = {
     criteriaColorScale: d3.scaleOrdinal(d3.schemeCategory10),
     colorScale: d3.scaleOrdinal().range(d3.schemeCategory10),
     criteriaRasters: {},
-    callUpdateScores: null, // This will be set in app.js
+    callUpdateScores: null,
+    selectedSolutions: {} // New property for solution checkboxes
 };
 
-// Functions
 export function updateState(newState) {
     Object.assign(state, newState);
 }

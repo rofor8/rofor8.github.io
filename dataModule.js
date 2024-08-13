@@ -102,15 +102,17 @@ export async function calculateSuitabilityScores(bounds, challengeCategory) {
         const cellScores = {};
 
         const criteriaStartTime = performance.now();
-        const promises = Object.entries(state.solutionCriteria).map(async ([solution, criteria]) => {
-            const area = await calculateOverlapArea(lat, lng, criteria);
-            const weight = state.challengeCategories[challengeCategory]?.[solution] || 0;
-            cellScores[solution] = {
-                impact: area * weight * 100,
-                cost: area * (state.solutionCosts[solution] || 0),
-                area: area
-            };
-        });
+        const promises = Object.entries(state.solutionCriteria)
+            .filter(([solution]) => state.selectedSolutions[solution] !== false)
+            .map(async ([solution, criteria]) => {
+                const area = await calculateOverlapArea(lat, lng, criteria);
+                const weight = state.challengeCategories[challengeCategory]?.[solution] || 0;
+                cellScores[solution] = {
+                    impact: area * weight * 100,
+                    cost: area * (state.solutionCosts[solution] || 0),
+                    area: area
+                };
+            });
         await Promise.all(promises);
         console.log('Time to calculate scores for cell:', performance.now() - criteriaStartTime, 'ms');
 
@@ -146,6 +148,8 @@ function boundsIntersect(bounds1, bounds2) {
     return !(bounds1.getWest() > bounds2[2] || bounds1.getEast() < bounds2[0] ||
              bounds1.getSouth() > bounds2[3] || bounds1.getNorth() < bounds2[1]);
 }
+
+// dataModule.js (continued)
 
 function calculateWindow(bounds, rasterBounds, imageWidth, imageHeight) {
     const [minX, minY, maxX, maxY] = rasterBounds;

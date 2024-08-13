@@ -22,18 +22,6 @@ body {
     height: 100%;
 }
 
-.criteria-toggle {
-    cursor: pointer;
-    margin-left: 10px;
-    display: flex;
-    align-items: center;
-}
-
-.criteria-toggle input {
-    margin-right: 5px;
-}
-
-
 #infoPanel {
     width: 100%;
     background: white;
@@ -51,39 +39,75 @@ body {
     padding-bottom: 5px;
 }
 
-#infoPanel table {
+.solutions-table {
     width: 100%;
     border-collapse: collapse;
+    margin-bottom: 20px;
 }
 
-#infoPanel th, #infoPanel td {
+.solutions-table th, .solutions-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
     text-align: left;
-    padding: 5px;
-    border-bottom: 1px solid #ddd;
 }
 
-#infoPanel tr.current-rank {
-    background-color: #e0e0e0;
+.solutions-table th {
+    background-color: #f2f2f2;
+    cursor: pointer;
+}
+
+.solutions-table th:hover {
+    background-color: #ddd;
+}
+
+.bar-graph {
+    height: 20px;
+    transition: width 0.3s ease-in-out;
+}
+
+.impact-bar, .cost-bar {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 5px;
+}
+
+.value {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.solutions-table td:nth-child(3), .solutions-table td:nth-child(4) {
+    width: 30%;
+}
+
+.solutions-table input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
 }
 
 .slider-container {
     margin-bottom: 10px;
 }
 
+.slider-container label {
+    display: inline-block;
+    width: 100px;
+}
+
+.slider-container input[type="range"] {
+    width: calc(100% - 150px);
+}
+
 .slider-value {
-    font-size: 14px;
+    display: inline-block;
+    width: 50px;
+    text-align: right;
 }
 
 .dropdown {
     margin-bottom: 10px;
 }
 
-.bar-graph {
-    height: 20px;
-    background-color: #4CAF50;
-    margin-top: 5px;
-  }
-  
 .dropbtn {
     background-color: #f1f1f1;
     color: black;
@@ -102,23 +126,6 @@ body {
     z-index: 1;
     max-height: 200px;
     overflow-y: auto;
-}
-
-.solution-checkbox-container {
-    display: flex;
-    align-items: center;
-    margin-bottom: 5px;
-}
-
-.solution-checkbox-container input[type="checkbox"] {
-    margin-right: 5px;
-}
-
-.color-indicator {
-    width: 20px;
-    height: 20px;
-    margin-right: 10px;
-    border: 1px solid #ccc;
 }
 
 .dropdown-content button {
@@ -177,14 +184,6 @@ body {
     transition-duration: 0.4s;
 }
 
-.criteria-key {
-    font-size: 12px;
-    line-height: 1.2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .map-button:hover {
     background-color: #4CAF50;
     color: white;
@@ -202,21 +201,8 @@ body {
     z-index: 1000;
 }
 
-.criteria-toggle {
-    cursor: pointer;
-    margin-left: 10px;
-}
-
 .leaflet-tile-pane {
     filter: grayscale(100%) brightness(105%) contrast(105%);
-}
-
-.criteria-key {
-font-size: 12px;
-line-height: 1.2;
-overflow: hidden;
-text-overflow: ellipsis;
-white-space: nowrap;
 }
 
 @media (min-width: 768px) {

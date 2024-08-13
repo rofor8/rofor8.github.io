@@ -3,7 +3,8 @@ export function updateScores(
     selectedCellKeys,
     allCells,
     currentRanking,
-    currentRank,
+    impactFilter,
+    costFilter,
     criteriaRasters,
     solutionCriteria,
     colorScale,
@@ -48,18 +49,14 @@ export function updateScores(
         if (cellData && cellData.scores) {
             const validSolutions = Object.entries(cellData.scores)
                 .filter(([sol, scores]) => {
-                    if (currentRanking === 'impact') {
-                        return scores.impact > 0;
-                    } else {
-                        return scores.cost > 0;
-                    }
+                    return scores.impact >= impactFilter && scores.cost <= costFilter;
                 })
                 .sort((a, b) =>
                     currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
                 );
 
-            if (currentRank <= validSolutions.length) {
-                const [solution, scores] = validSolutions[currentRank - 1];
+            if (validSolutions.length > 0) {
+                const [solution, scores] = validSolutions[0];
                 if (!rankTotals[solution]) {
                     rankTotals[solution] = { impact: 0, cost: 0, count: 0 };
                 }
@@ -213,97 +210,98 @@ export function updateScores(
     });
 
     // Display solution breakdowns
-    const solutions = Object.keys(rankTotals).sort((a, b) => {
-        if (currentRanking === 'impact') {
-            return rankTotals[b].impact - rankTotals[a].impact;
-        } else {
-            return rankTotals[a].cost - rankTotals[b].cost;
-        }
-    });
+// Display solution breakdowns
+const solutions = Object.keys(rankTotals).sort((a, b) => {
+    if (currentRanking === 'impact') {
+        return rankTotals[b].impact - rankTotals[a].impact;
+    } else {
+        return rankTotals[a].cost - rankTotals[b].cost;
+    }
+});
 
-    const maxValues = {
-        impact: d3.max(solutions, s => rankTotals[s].impact),
-        cost: d3.max(solutions, s => rankTotals[s].cost),
-        count: d3.max(solutions, s => rankTotals[s].count)
-    };
+const maxValues = {
+    impact: d3.max(solutions, s => rankTotals[s].impact),
+    cost: d3.max(solutions, s => rankTotals[s].cost),
+    count: d3.max(solutions, s => rankTotals[s].count)
+};
 
-    const solutionSvg = infoPanel.append("svg")
-        .attr("width", totalWidth)
-        .attr("height", solutions.length * groupHeight);
+const solutionSvg = infoPanel.append("svg")
+    .attr("width", totalWidth)
+    .attr("height", solutions.length * groupHeight);
 
-    solutions.forEach((solution, index) => {
-        const solutionG = solutionSvg.append("g")
-            .attr("transform", `translate(0,${index * groupHeight})`);
+solutions.forEach((solution, index) => {
+    const solutionG = solutionSvg.append("g")
+        .attr("transform", `translate(0,${index * groupHeight})`);
 
-        solutionG.append("text")
-            .attr("x", 0)
-            .attr("y", 15)
-            .attr("font-weight", "bold")
-            .attr("fill", "black")
-            .text(solution);
+    solutionG.append("text")
+        .attr("x", 0)
+        .attr("y", 15)
+        .attr("font-weight", "bold")
+        .attr("fill", "black")
+        .text(solution);
 
-        const barScale = d3.scaleLinear()
-            .domain([0, d3.max([maxValues.impact, maxValues.cost, maxValues.count])])
-            .range([0, barWidth]);
+    const barScale = d3.scaleLinear()
+        .domain([0, d3.max([maxValues.impact, maxValues.cost, maxValues.count])])
+        .range([0, barWidth]);
 
-        // Impact bar
-        solutionG.append("text")
-            .attr("x", toggleWidth)
-            .attr("y", 40)
-            .attr("fill", "black")
-            .text(`${rankTotals[solution].impact.toFixed(0)}`);
+    // Impact bar
+    solutionG.append("text")
+        .attr("x", toggleWidth)
+        .attr("y", 40)
+        .attr("fill", "black")
+        .text(`${rankTotals[solution].impact.toFixed(0)}`);
 
-        solutionG.append("rect")
-            .attr("x", toggleWidth + valueWidth)
-            .attr("y", 25)
-            .attr("width", barScale(rankTotals[solution].impact))
-            .attr("height", barHeight)
-            .attr("fill", colorScale(solution));
+    solutionG.append("rect")
+        .attr("x", toggleWidth + valueWidth)
+        .attr("y", 25)
+        .attr("width", barScale(rankTotals[solution].impact))
+        .attr("height", barHeight)
+        .attr("fill", colorScale(solution));
 
-        solutionG.append("text")
-            .attr("x", toggleWidth + valueWidth + 5)
-            .attr("y", 40)
-            .attr("fill", "white")
-            .text("Impact");
+    solutionG.append("text")
+        .attr("x", toggleWidth + valueWidth + 5)
+        .attr("y", 40)
+        .attr("fill", "white")
+        .text("Impact");
 
-        // Cost bar
-        solutionG.append("text")
-            .attr("x", toggleWidth)
-            .attr("y", 65)
-            .attr("fill", "black")
-            .text(`£${rankTotals[solution].cost.toFixed(0)}`);
+    // Cost bar
+    solutionG.append("text")
+        .attr("x", toggleWidth)
+        .attr("y", 65)
+        .attr("fill", "black")
+        .text(`£${rankTotals[solution].cost.toFixed(0)}`);
 
-        solutionG.append("rect")
-            .attr("x", toggleWidth + valueWidth)
-            .attr("y", 50)
-            .attr("width", barScale(rankTotals[solution].cost))
-            .attr("height", barHeight)
-            .attr("fill", d3.color(colorScale(solution)).darker(0.5));
+    solutionG.append("rect")
+        .attr("x", toggleWidth + valueWidth)
+        .attr("y", 50)
+        .attr("width", barScale(rankTotals[solution].cost))
+        .attr("height", barHeight)
+        .attr("fill", d3.color(colorScale(solution)).darker(0.5));
 
-        solutionG.append("text")
-            .attr("x", toggleWidth + valueWidth + 5)
-            .attr("y", 65)
-            .attr("fill", "white")
-            .text("Cost");
+    solutionG.append("text")
+        .attr("x", toggleWidth + valueWidth + 5)
+        .attr("y", 65)
+        .attr("fill", "white")
+        .text("Cost");
 
-        // Count bar
-        solutionG.append("text")
-            .attr("x", toggleWidth)
-            .attr("y", 90)
-            .attr("fill", "black")
-            .text(`${rankTotals[solution].count}`);
+    // Count bar
+    solutionG.append("text")
+        .attr("x", toggleWidth)
+        .attr("y", 90)
+        .attr("fill", "black")
+        .text(`${rankTotals[solution].count}`);
 
-        solutionG.append("rect")
-            .attr("x", toggleWidth + valueWidth)
-            .attr("y", 75)
-            .attr("width", barScale(rankTotals[solution].count))
-            .attr("height", barHeight)
-            .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
+    solutionG.append("rect")
+        .attr("x", toggleWidth + valueWidth)
+        .attr("y", 75)
+        .attr("width", barScale(rankTotals[solution].count))
+        .attr("height", barHeight)
+        .attr("fill", d3.color(colorScale(solution)).brighter(0.5));
 
-        solutionG.append("text")
-            .attr("x", toggleWidth + valueWidth + 5)
-            .attr("y", 90)
-            .attr("fill", "white")
-            .text("Count");
-    });
+    solutionG.append("text")
+        .attr("x", toggleWidth + valueWidth + 5)
+        .attr("y", 90)
+        .attr("fill", "white")
+        .text("Count");
+});
 }

@@ -67,10 +67,11 @@ export function updateGrid(map) {
 
     updateState({ allCells: newCells, mapNeedsUpdate: true });
     console.log('Grid updated, cells rendered');
+    renderCells(); // Call renderCells directly after updating the grid
 }
 
 export function renderCells() {
-    if (!state.map) return;
+    if (!state.map || !state.gridLayer) return;
     state.gridLayer.clearLayers();
     const mapBounds = state.map.getBounds();
     
@@ -85,9 +86,9 @@ export function renderCells() {
             const validSolutions = Object.entries(scores)
                 .filter(([sol, scores]) => {
                     if (state.currentRanking === 'impact') {
-                        return scores.impact > 0;
+                        return scores.impact >= state.impactFilter && state.selectedSolutions[sol] !== false;
                     } else {
-                        return scores.cost > 0;
+                        return scores.cost <= state.costFilter && state.selectedSolutions[sol] !== false;
                     }
                 });
 
@@ -96,11 +97,9 @@ export function renderCells() {
                     state.currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
                 );
 
-                if (state.currentRank <= sortedSolutions.length) {
-                    const rankedSolution = sortedSolutions[state.currentRank - 1];
-                    fillColor = state.colorScale(rankedSolution[0]);
-                    fillOpacity = 0.7;
-                }
+                const rankedSolution = sortedSolutions[0];
+                fillColor = state.colorScale(rankedSolution[0]);
+                fillOpacity = 0.7;
             }
         }
 

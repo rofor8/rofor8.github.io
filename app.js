@@ -1,6 +1,6 @@
 // app.js
 import { initMap, updateGrid, renderCells } from './mapModule.js';
-import { setupUI } from './uiModule.js';
+import { setupUI, updateSolutionTable } from './uiModule.js';
 import { loadJSONData, loadAllRasters } from './dataModule.js';
 import { state, updateState, updateMap, getRasterValueAtPoint, updateSelectedCellKeys } from './stateModule.js';
 import { toggleRanking, clearSelection, toggleDrawMode, searchLocation } from './interactionModule.js';
@@ -36,18 +36,21 @@ async function initializeApp() {
                     state.selectedCellKeys,
                     state.allCells,
                     state.currentRanking,
-                    state.currentRank,
+                    state.impactFilter,
+                    state.costFilter,
                     state.criteriaRasters,
                     state.solutionCriteria,
                     state.colorScale,
                     state.criteriaColorScale,
                     getRasterValueAtPoint
                 );
+                updateSolutionTable();
             }
         });
 
         if (map) {
             updateGrid(map);
+            renderCells();
             await updateMap(state.currentCategory);
         } else {
             console.error('Map failed to initialize');
@@ -75,14 +78,13 @@ window.toggleRanking = toggleRanking;
 window.clearSelection = clearSelection;
 window.toggleDrawMode = toggleDrawMode;
 window.updateMap = updateMap;
-window.renderCells = renderCells;
 window.searchLocation = searchLocation;
+window.updateSolutionTable = updateSolutionTable;
 
 // Expose necessary variables and functions for updateScores.js
 Object.assign(window, {
     allCells: state.allCells,
     currentRanking: state.currentRanking,
-    currentRank: state.currentRank,
     criteriaRasters: state.criteriaRasters,
     solutionCriteria: state.solutionCriteria,
     colorScale: state.colorScale,

@@ -1,7 +1,6 @@
 // stateModule.js
 import { loadTilesForViewport, calculateSuitabilityScores } from './dataModule.js';
-import { updateUIForCategory } from './uiModule.js';
-import { updateScores } from './updateScores.js';
+import { updateUIForCategory, updateSolutionTable } from './uiModule.js';
 
 export const state = {
     allCells: new Map(),
@@ -13,7 +12,6 @@ export const state = {
     rasterLayers: {},
     selectedCellKeys: new Set(),
     currentRanking: 'impact',
-    currentRank: 1,
     CELL_SIZE: 100, // meters
     currentCategory: "Biodiversity and soils",
     drawLayer: null,
@@ -27,7 +25,9 @@ export const state = {
     colorScale: d3.scaleOrdinal().range(d3.schemeCategory10),
     criteriaRasters: {},
     callUpdateScores: null,
-    selectedSolutions: {} // New property for solution checkboxes
+    selectedSolutions: {},
+    impactFilter: 0,
+    costFilter: 0
 };
 
 export function updateState(newState) {
@@ -36,6 +36,13 @@ export function updateState(newState) {
 
 export function updateSelectedCellKeys(newSelectedCellKeys) {
     state.selectedCellKeys = new Set(newSelectedCellKeys);
+    if (state.callUpdateScores) {
+        state.callUpdateScores();
+    }
+    // Add this line to update the solution table when cells are selected/deselected
+    if (typeof window.updateSolutionTable === 'function') {
+        window.updateSolutionTable();
+    }
 }
 
 export async function updateMap(challengeCategory) {
@@ -63,6 +70,8 @@ export async function updateMap(challengeCategory) {
         } else {
             console.warn('callUpdateScores is not set');
         }
+
+        updateSolutionTable();
     } catch (error) {
         console.error('Error updating map:', error);
     }

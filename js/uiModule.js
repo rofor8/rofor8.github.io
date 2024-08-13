@@ -52,9 +52,21 @@ function setupSolutionCheckboxes() {
     const solutionsContainer = d3.select("#solutionsContainer");
     
     Object.keys(state.solutionCriteria).forEach(solution => {
-        const checkbox = solutionsContainer.append("div")
-            .attr("class", "solution-checkbox")
-            .append("label")
+        const checkboxContainer = solutionsContainer.append("div")
+            .attr("class", "solution-checkbox-container")
+            .style("display", "flex")
+            .style("align-items", "center")
+            .style("margin-bottom", "5px");
+
+        const colorIndicator = checkboxContainer.append("div")
+            .style("width", "20px")
+            .style("height", "20px")
+            .style("background-color", state.colorScale(solution))
+            .style("margin-right", "10px");
+
+        const checkbox = checkboxContainer.append("label")
+            .style("display", "flex")
+            .style("align-items", "center")
             .html(`<input type="checkbox" name="${solution}" checked> ${solution}`);
 
         checkbox.select("input")

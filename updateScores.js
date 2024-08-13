@@ -1,3 +1,4 @@
+// updateScores.js
 export function updateScores(
     selectedCellKeys,
     allCells,
@@ -24,15 +25,6 @@ export function updateScores(
         infoPanel.html("<p>No cells selected. Select cells on the map to see scores.</p>");
         return;
     }
-
-    selectedCellKeys.forEach(key => {
-        const cellData = allCells.get(key);
-        if (cellData && cellData.scores) {
-            // Existing code...
-        } else {
-            console.warn(`No data found for cell key: ${key}`);
-        }
-    });
 
     const barHeight = 20;
     const barSpacing = 5;

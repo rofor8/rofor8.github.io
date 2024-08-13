@@ -4,6 +4,7 @@ import { setupUI } from './uiModule.js';
 import { loadJSONData, loadAllRasters } from './dataModule.js';
 import { state, updateState, updateMap, getRasterValueAtPoint, updateSelectedCellKeys } from './stateModule.js';
 import { toggleRanking, clearSelection, toggleDrawMode, searchLocation } from './interactionModule.js';
+import { updateScores } from './updateScores.js';
 
 // Main initialization function
 async function initializeApp() {
@@ -27,6 +28,23 @@ async function initializeApp() {
         // Load rasters after state has been initialized
         await loadAllRasters();
         
+        // Set the callUpdateScores function
+        updateState({
+            callUpdateScores: () => {
+                updateScores(
+                    state.selectedCellKeys,
+                    state.allCells,
+                    state.currentRanking,
+                    state.currentRank,
+                    state.criteriaRasters,
+                    state.solutionCriteria,
+                    state.colorScale,
+                    state.criteriaColorScale,
+                    getRasterValueAtPoint
+                );
+            }
+        });
+
         if (map) {
             updateGrid(map);
             await updateMap(state.currentCategory);

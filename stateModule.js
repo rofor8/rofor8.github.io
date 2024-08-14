@@ -27,7 +27,9 @@ export const state = {
     callUpdateScores: null,
     selectedSolutions: {},
     impactFilter: 0,
-    costFilter: 0
+    costFilter: 0,
+    currentSortColumn: 'impact',
+    isAscending: false
 };
 
 export function updateState(newState) {
@@ -39,7 +41,6 @@ export function updateSelectedCellKeys(newSelectedCellKeys) {
     if (state.callUpdateScores) {
         state.callUpdateScores();
     }
-    // Add this line to update the solution table when cells are selected/deselected
     if (typeof window.updateSolutionTable === 'function') {
         window.updateSolutionTable();
     }

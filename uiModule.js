@@ -2,9 +2,6 @@
 import { state, updateState, updateMap } from './stateModule.js';
 import { renderCells } from './mapModule.js';
 
-let currentSortColumn = 'impact';
-let isAscending = false;
-
 export function setupUI() {
     if (state.challengeCategories && Object.keys(state.challengeCategories).length > 0) {
         createButtons("categoryButtons", Object.keys(state.challengeCategories), "category-button");
@@ -233,8 +230,7 @@ export function updateSolutionTable() {
     let maxImpact = 0;
     let maxCost = 0;
 
-    // First pass: calculate max values and collect row data
-    const rowData = [];
+    // First pass: calculate max values
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const solution = row.cells[1].textContent;
@@ -242,15 +238,24 @@ export function updateSolutionTable() {
         const cost = calculateTotalCost(solution);
         maxImpact = Math.max(maxImpact, impact);
         maxCost = Math.max(maxCost, cost);
-        rowData.push({ row, solution, impact, cost });
     }
 
-    // Sort rowData
-    sortRowData(rowData);
+    // Second pass: update cells and bar graphs
+    const rowData = [];
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const solution = row.cells[1].textContent;
+        const impact = calculateTotalImpact(solution);
+        const cost = calculateTotalCost(solution);
 
-    // Second pass: update cells and bar graphs, and reorder rows
-    const tbody = table.tBodies[0];
-    rowData.forEach(({ row, solution, impact, cost }) => {
+        // Skip solutions with both impact and cost as 0
+        if (impact === 0 && cost === 0) {
+            row.style.display = 'none';
+            continue;
+        } else {
+            row.style.display = '';
+        }
+
         const impactCell = row.cells[2];
         const costCell = row.cells[3];
 
@@ -268,12 +273,17 @@ export function updateSolutionTable() {
         impactBar.style.backgroundColor = state.colorScale(solution);
         costBar.style.backgroundColor = state.colorScale(solution);
 
-        // Move the row to its new position
-        tbody.appendChild(row);
-    });
+        rowData.push({ row, solution, impact, cost });
+    }
+
+    // Sort and reorder rows
+    sortRowData(rowData);
+    const tbody = table.tBodies[0];
+    rowData.forEach(({ row }) => tbody.appendChild(row));
 
     updateSliderRanges();
     filterSolutionTable();
+    renderCells(); // Re-render cells to update colors based on new sorting
 }
 
 function calculateTotalImpact(solution) {
@@ -297,20 +307,19 @@ function calculateTotalCost(solution) {
 }
 
 function toggleSort(column) {
-    if (currentSortColumn === column) {
-        isAscending = !isAscending;
+    if (state.currentSortColumn === column) {
+        updateState({ isAscending: !state.isAscending });
     } else {
-        currentSortColumn = column;
-        isAscending = false;
+        updateState({ currentSortColumn: column, isAscending: false });
     }
     updateSolutionTable();
 }
 
 function sortRowData(rowData) {
     rowData.sort((a, b) => {
-        const aValue = currentSortColumn === 'impact' ? a.impact : a.cost;
-        const bValue = currentSortColumn === 'impact' ? b.impact : b.cost;
-        return isAscending ? aValue - bValue : bValue - aValue;
+        const aValue = state.currentSortColumn === 'impact' ? a.impact : a.cost;
+        const bValue = state.currentSortColumn === 'impact' ? b.impact : b.cost;
+        return state.isAscending ? aValue - bValue : bValue - aValue;
     });
 }
 
@@ -330,7 +339,7 @@ function filterSolutionTable() {
         const row = rows[i];
         const impact = parseFloat(row.cells[2].querySelector('.value').textContent);
         const cost = parseFloat(row.cells[3].querySelector('.value').textContent);
-        row.style.display = (impact >= impactThreshold && cost <= costThreshold) ? "" : "none";
+        row.style.display = (impact >= impactThreshold && cost <= costThreshold && (impact > 0 || cost > 0)) ? "" : "none";
     }
 }
 

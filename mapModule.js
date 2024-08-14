@@ -85,20 +85,23 @@ export function renderCells() {
         if (scores) {
             const validSolutions = Object.entries(scores)
                 .filter(([sol, scores]) => {
-                    if (state.currentRanking === 'impact') {
-                        return scores.impact >= state.impactFilter && state.selectedSolutions[sol] !== false;
-                    } else {
-                        return scores.cost <= state.costFilter && state.selectedSolutions[sol] !== false;
-                    }
+                    return state.selectedSolutions[sol] !== false && 
+                           (scores.impact > 0 || scores.cost > 0);
                 });
 
             if (validSolutions.length > 0) {
-                let sortedSolutions = validSolutions.sort((a, b) =>
-                    state.currentRanking === 'impact' ? b[1].impact - a[1].impact : a[1].cost - b[1].cost
-                );
+                // Sort solutions based on the current sorting criteria
+                validSolutions.sort((a, b) => {
+                    const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
+                    const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
+                    // For cost, lower is better, so we invert the comparison
+                    const comparison = state.currentSortColumn === 'cost' ? aValue - bValue : bValue - aValue;
+                    return state.isAscending ? -comparison : comparison;
+                });
 
-                const rankedSolution = sortedSolutions[0];
-                fillColor = state.colorScale(rankedSolution[0]);
+                // Select the top solution for coloring
+                const selectedSolution = validSolutions[0];
+                fillColor = state.colorScale(selectedSolution[0]);
                 fillOpacity = 0.7;
             }
         }
@@ -149,3 +152,5 @@ const debouncedUpdateGrid = debounce((map) => {
     updateGrid(map);
     updateMap(state.currentCategory);
 }, 500);
+
+export { debouncedUpdateGrid };

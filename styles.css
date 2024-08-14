@@ -22,8 +22,17 @@ body {
     height: 100%;
 }
 
+ 
+.noUi-horizontal {
+    z-index: 0
+}
+
 .solutions-table tr.highlighted {
     background-color: rgba(255, 255, 0, 0.2);
+}
+
+.dropdown-content {
+    z-index: 7000; /* Ensure this is higher than the z-index of the sliders */
 }
 
 #infoPanel {

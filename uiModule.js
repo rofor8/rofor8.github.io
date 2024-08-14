@@ -9,16 +9,13 @@ export function setupUI() {
         console.warn('Challenge categories not loaded yet');
     }
 
-    const dropBtn = document.querySelector('#categoryDropdown .dropbtn');
-    if (dropBtn) {
-        dropBtn.innerHTML = `<span class="dropdown-title">Optimised for: </span>${state.currentCategory}`;
-    }
+    setupDropdown();
+    setupSolutionTable();
+    setupFilterSliders();
+    updateCategoryDropdown(state.currentCategory);
+}
 
-    d3.select("#categoryButtons")
-        .selectAll("button")
-        .filter(d => d === state.currentCategory)
-        .classed("active", true);
-
+function setupDropdown() {
     const dropdownBtn = document.querySelector('.dropbtn');
     if (dropdownBtn) {
         dropdownBtn.addEventListener('click', function (e) {
@@ -41,9 +38,6 @@ export function setupUI() {
             }
         }
     });
-
-    setupSolutionTable();
-    setupFilterSliders();
 }
 
 function setupSolutionTable() {
@@ -230,7 +224,8 @@ export function updateSolutionTable() {
     let maxImpact = 0;
     let maxCost = 0;
 
-    // First pass: calculate max values
+    // First pass: calculate max values and collect row data
+    const rowData = [];
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const solution = row.cells[1].textContent;
@@ -238,23 +233,33 @@ export function updateSolutionTable() {
         const cost = calculateTotalCost(solution);
         maxImpact = Math.max(maxImpact, impact);
         maxCost = Math.max(maxCost, cost);
+        rowData.push({ row, solution, impact, cost });
     }
 
-    // Second pass: update cells and bar graphs
-    const rowData = [];
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const solution = row.cells[1].textContent;
-        const impact = calculateTotalImpact(solution);
-        const cost = calculateTotalCost(solution);
+    // Sort row data
+    sortRowData(rowData);
 
-        // Skip solutions with both impact and cost as 0
-        if (impact === 0 && cost === 0) {
-            row.style.display = 'none';
-            continue;
-        } else {
-            row.style.display = '';
-        }
+    // Second pass: update cells and bar graphs, and reorder rows
+    const tbody = table.tBodies[0];
+    tbody.innerHTML = ''; // Clear existing rows
+    rowData.forEach(({ row, solution, impact, cost }) => {
+        // Recreate the checkbox and add event listener
+        const checkboxCell = row.cells[0];
+        checkboxCell.innerHTML = '';
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = state.selectedSolutions[solution] !== false;
+        checkbox.style.accentColor = state.colorScale(solution);
+        checkbox.addEventListener("change", function() {
+            updateState({ 
+                selectedSolutions: {
+                    ...state.selectedSolutions,
+                    [solution]: this.checked
+                }
+            });
+            updateMap(state.currentCategory);
+        });
+        checkboxCell.appendChild(checkbox);
 
         const impactCell = row.cells[2];
         const costCell = row.cells[3];
@@ -273,13 +278,16 @@ export function updateSolutionTable() {
         impactBar.style.backgroundColor = state.colorScale(solution);
         costBar.style.backgroundColor = state.colorScale(solution);
 
-        rowData.push({ row, solution, impact, cost });
-    }
+        // Append the row to tbody
+        tbody.appendChild(row);
+    });
 
-    // Sort and reorder rows
-    sortRowData(rowData);
-    const tbody = table.tBodies[0];
-    rowData.forEach(({ row }) => tbody.appendChild(row));
+    // Highlight the current sorting column
+    const headers = table.tHead.rows[0].cells;
+    for (let i = 2; i < headers.length; i++) {
+        headers[i].classList.toggle('sorted', headers[i].className.includes(state.currentSortColumn));
+        headers[i].classList.toggle('ascending', state.isAscending);
+    }
 
     updateSliderRanges();
     filterSolutionTable();
@@ -310,7 +318,7 @@ function toggleSort(column) {
     if (state.currentSortColumn === column) {
         updateState({ isAscending: !state.isAscending });
     } else {
-        updateState({ currentSortColumn: column, isAscending: false });
+        updateState({ currentSortColumn: column, isAscending: column === 'cost' });
     }
     updateSolutionTable();
 }
@@ -319,7 +327,11 @@ function sortRowData(rowData) {
     rowData.sort((a, b) => {
         const aValue = state.currentSortColumn === 'impact' ? a.impact : a.cost;
         const bValue = state.currentSortColumn === 'impact' ? b.impact : b.cost;
-        return state.isAscending ? aValue - bValue : bValue - aValue;
+        if (state.currentSortColumn === 'cost') {
+            return state.isAscending ? aValue - bValue : bValue - aValue;
+        } else {
+            return state.isAscending ? bValue - aValue : aValue - bValue;
+        }
     });
 }
 
@@ -360,13 +372,8 @@ export function createButtons(containerId, dataArray, buttonClass) {
         button.className = buttonClass;
         button.textContent = d;
         button.addEventListener("click", function() {
-            document.querySelectorAll(`.${buttonClass}`).forEach(btn => btn.classList.remove("active"));
-            this.classList.add("active");
-            const dropBtn = document.querySelector("#categoryDropdown .dropbtn");
-            if (dropBtn) {
-                dropBtn.innerHTML = `<span class="dropdown-title">Optimised for: </span>${d}`;
-            }
             updateState({ currentCategory: d });
+            updateCategoryDropdown(d);
             updateMap(d);
         });
         container.appendChild(button);
@@ -378,9 +385,12 @@ export function updateCategoryDropdown(category) {
     if (dropBtn) {
         dropBtn.innerHTML = `<span class="dropdown-title">Optimised for: </span>${category}`;
     }
-    document.querySelectorAll(".category-button").forEach(btn => btn.classList.remove("active"));
-    const activeBtn = document.querySelector(`.category-button:contains("${category}")`);
-    if (activeBtn) {
-        activeBtn.classList.add("active");
+    document.querySelectorAll(".category-button").forEach(btn => {
+        btn.classList.toggle('active', btn.textContent === category);
+    });
+    // Close the dropdown after selection
+    const categoryButtons = document.getElementById('categoryButtons');
+    if (categoryButtons) {
+        categoryButtons.classList.remove('show');
     }
 }

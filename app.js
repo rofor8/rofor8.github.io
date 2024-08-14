@@ -24,6 +24,7 @@ async function initializeApp() {
         const { map, gridLayer } = initMap();
         updateState({ map, gridLayer });
 
+        // Set up UI before updating the map
         setupUI();
         
         // Load rasters after state has been initialized

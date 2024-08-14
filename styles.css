@@ -60,6 +60,18 @@ body {
     background-color: #ddd;
 }
 
+.solutions-table th.sorted {
+    background-color: #e0e0e0;
+}
+
+.solutions-table th.sorted::after {
+    content: ' ▼';
+}
+
+.solutions-table th.sorted.ascending::after {
+    content: ' ▲';
+}
+
 .bar-graph {
     height: 20px;
     transition: width 0.3s ease-in-out;
@@ -106,6 +118,7 @@ body {
 
 .dropdown {
     margin-bottom: 10px;
+    position: relative;
 }
 
 .dropbtn {
@@ -121,9 +134,11 @@ body {
 
 .dropdown-content {
     display: none;
+    position: absolute;
     background-color: #f9f9f9;
     box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
     z-index: 1;
+    width: 100%;
     max-height: 200px;
     overflow-y: auto;
 }
@@ -144,6 +159,11 @@ body {
 
 .dropdown:hover .dropdown-content {
     display: block;
+}
+
+.dropdown-title {
+    font-weight: bold;
+    margin-right: 5px;
 }
 
 .toggle-button {

@@ -90,13 +90,14 @@ export function renderCells() {
                 });
 
             if (validSolutions.length > 0) {
-                // Sort solutions based on the current sorting criteria
                 validSolutions.sort((a, b) => {
                     const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
                     const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
-                    // For cost, lower is better, so we invert the comparison
-                    const comparison = state.currentSortColumn === 'cost' ? aValue - bValue : bValue - aValue;
-                    return state.isAscending ? -comparison : comparison;
+                    if (state.currentSortColumn === 'cost') {
+                        return state.isAscending ? aValue - bValue : bValue - aValue;
+                    } else {
+                        return state.isAscending ? bValue - aValue : aValue - bValue;
+                    }
                 });
 
                 // Select the top solution for coloring

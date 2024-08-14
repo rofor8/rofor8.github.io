@@ -278,6 +278,9 @@ export function updateSolutionTable() {
         impactBar.style.backgroundColor = state.colorScale(solution);
         costBar.style.backgroundColor = state.colorScale(solution);
 
+        // Highlight the row if the solution is displayed in the grid
+        row.classList.toggle('highlighted', state.displayedSolutions.includes(solution));
+
         // Append the row to tbody
         tbody.appendChild(row);
     });

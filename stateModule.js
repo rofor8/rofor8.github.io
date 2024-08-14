@@ -1,4 +1,3 @@
-// stateModule.js
 import { loadTilesForViewport, calculateSuitabilityScores } from './dataModule.js';
 import { updateUIForCategory, updateSolutionTable } from './uiModule.js';
 
@@ -29,7 +28,8 @@ export const state = {
     impactFilter: 0,
     costFilter: 0,
     currentSortColumn: 'impact',
-    isAscending: false
+    isAscending: false,
+    displayedSolutions: [] // Add this line to the state object
 };
 
 export function updateState(newState) {

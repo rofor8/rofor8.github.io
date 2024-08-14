@@ -1,3 +1,4 @@
+
 // uiModule.js
 import { state, updateState, updateMap } from './stateModule.js';
 import { renderCells } from './mapModule.js';
@@ -69,7 +70,7 @@ function setupSolutionTable() {
     // Add table rows
     Object.keys(state.solutionCriteria).forEach(solution => {
         const row = tbody.insertRow();
-        
+
         // Checkbox cell with color indicator
         const checkboxCell = row.insertCell();
         const checkbox = document.createElement("input");
@@ -77,13 +78,14 @@ function setupSolutionTable() {
         checkbox.checked = true;
         checkbox.style.accentColor = state.colorScale(solution);
         checkbox.addEventListener("change", function() {
-            updateState({ 
+            updateState({
                 selectedSolutions: {
                     ...state.selectedSolutions,
                     [solution]: this.checked
                 }
             });
             updateMap(state.currentCategory);
+            updateSliderRanges(); // Update slider ranges when cells are selected
         });
         checkboxCell.appendChild(checkbox);
 
@@ -140,7 +142,7 @@ function setupFilterSliders() {
 
     const impactSlider = document.getElementById("impactSlider");
     const costSlider = document.getElementById("costSlider");
-    
+
     if (impactSlider && costSlider) {
         noUiSlider.create(impactSlider, {
             start: [0, 100],
@@ -209,6 +211,10 @@ function updateSliderRanges() {
         }
     });
 
+    // Set sliders to their max range
+    impactSlider.noUiSlider.set([0, maxImpact > 0 ? maxImpact : 100]);
+    costSlider.noUiSlider.set([0, maxCost > 0 ? maxCost : 100]);
+
     // Update state with the new values
     updateState({
         impactFilter: impactSlider.noUiSlider.get().map(Number),
@@ -268,13 +274,14 @@ export function updateSolutionTable() {
         checkbox.checked = state.selectedSolutions[solution] !== false;
         checkbox.style.accentColor = state.colorScale(solution);
         checkbox.addEventListener("change", function() {
-            updateState({ 
+            updateState({
                 selectedSolutions: {
                     ...state.selectedSolutions,
                     [solution]: this.checked
                 }
             });
             updateMap(state.currentCategory);
+            updateSliderRanges(); // Update slider ranges when cells are selected
         });
         checkboxCell.appendChild(checkbox);
 
@@ -371,8 +378,8 @@ function filterSolutionTable() {
         const row = rows[i];
         const impact = parseFloat(row.cells[2].querySelector('.value').textContent);
         const cost = parseFloat(row.cells[3].querySelector('.value').textContent);
-        row.style.display = (impact >= impactMin && impact <= impactMax && 
-                             cost >= costMin && cost <= costMax && 
+        row.style.display = (impact >= impactMin && impact <= impactMax &&
+                             cost >= costMin && cost <= costMax &&
                              (impact > 0 || cost > 0)) ? "" : "none";
     }
 }
@@ -416,3 +423,5 @@ export function updateCategoryDropdown(category) {
         categoryButtons.classList.remove('show');
     }
 }
+
+

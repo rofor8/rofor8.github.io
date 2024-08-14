@@ -1,4 +1,3 @@
-// dataModule.js
 import { state, updateState, getRasterValueAtPoint } from './stateModule.js';
 
 export async function loadJSONData() {
@@ -22,7 +21,8 @@ export async function loadAllRasters() {
     }
 
     const criteria = new Set(Object.values(state.solutionCriteria).flat());
-    for (const criterion of criteria) {
+
+    await Promise.all(Array.from(criteria).map(async (criterion) => {
         try {
             const response = await fetch(`rasters/${criterion}.tif`);
             const arrayBuffer = await response.arrayBuffer();
@@ -42,25 +42,23 @@ export async function loadAllRasters() {
         } catch (error) {
             console.error(`Error loading raster for criterion ${criterion}:`, error);
         }
-    }
+    }));
 }
 
 export async function loadTilesForViewport(bounds) {
     console.log("Loading tiles for viewport:", bounds);
     const visibleCriteria = new Set(Object.values(state.solutionCriteria).flat());
 
-    for (const criterion of visibleCriteria) {
+    await Promise.all(Array.from(visibleCriteria).map(async (criterion) => {
         if (!state.criteriaRasters[criterion]) {
             console.warn(`Criterion ${criterion} not found in criteriaRasters`);
-            continue;
+            return;
         }
 
         const { tiff, bounds: rasterBounds } = state.criteriaRasters[criterion];
-        const [minX, minY, maxX, maxY] = rasterBounds;
-
         if (!boundsIntersect(bounds, rasterBounds)) {
             console.log(`Viewport does not intersect with raster for ${criterion}`);
-            continue;
+            return;
         }
 
         try {
@@ -85,7 +83,7 @@ export async function loadTilesForViewport(bounds) {
         } catch (error) {
             console.error(`Error loading raster data for ${criterion}:`, error);
         }
-    }
+    }));
 }
 
 export async function calculateSuitabilityScores(bounds, challengeCategory) {
@@ -97,7 +95,7 @@ export async function calculateSuitabilityScores(bounds, challengeCategory) {
     );
     console.log('Time to filter visible cells:', performance.now() - startTime, 'ms');
 
-    for (const cell of visibleCells) {
+    await Promise.all(visibleCells.map(async (cell) => {
         const [lat, lng] = cell.key.split(',').map(Number);
         const cellScores = {};
 
@@ -117,7 +115,7 @@ export async function calculateSuitabilityScores(bounds, challengeCategory) {
         console.log('Time to calculate scores for cell:', performance.now() - criteriaStartTime, 'ms');
 
         cell.scores = cellScores;
-    }
+    }));
 
     console.timeEnd('calculateSuitabilityScores');
 }
@@ -125,7 +123,8 @@ export async function calculateSuitabilityScores(bounds, challengeCategory) {
 async function calculateOverlapArea(lat, lng, criteria) {
     let totalValue = 0;
     let validCriteria = 0;
-    for (const criterion of criteria) {
+
+    await Promise.all(criteria.map(async (criterion) => {
         const raster = state.criteriaRasters[criterion];
         if (raster) {
             try {
@@ -140,7 +139,8 @@ async function calculateOverlapArea(lat, lng, criteria) {
         } else {
             console.warn(`Raster not found for criterion: ${criterion}`);
         }
-    }
+    }));
+
     return validCriteria > 0 ? totalValue / validCriteria : 0;
 }
 
@@ -148,8 +148,6 @@ function boundsIntersect(bounds1, bounds2) {
     return !(bounds1.getWest() > bounds2[2] || bounds1.getEast() < bounds2[0] ||
              bounds1.getSouth() > bounds2[3] || bounds1.getNorth() < bounds2[1]);
 }
-
-// dataModule.js (continued)
 
 function calculateWindow(bounds, rasterBounds, imageWidth, imageHeight) {
     const [minX, minY, maxX, maxY] = rasterBounds;

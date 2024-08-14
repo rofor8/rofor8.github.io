@@ -1,3 +1,5 @@
+
+
 // mapModule.js
 import { state, updateState, updateSelectedCellKeys, updateMap } from './stateModule.js';
 import { toggleCellSelection } from './interactionModule.js';
@@ -59,14 +61,13 @@ export function updateGrid(map) {
         }
     }
 
-    const newSelectedCellKeys = new Set([...state.selectedCellKeys].filter(key => 
-        newCells.has(key) || state.allCells.has(key)
-    ));
+    // Preserve all selected cells, not just those in view
+    const newSelectedCellKeys = new Set([...state.selectedCellKeys]);
     updateSelectedCellKeys(newSelectedCellKeys);
 
     updateState({ allCells: newCells, mapNeedsUpdate: true });
     console.log('Grid updated, cells rendered');
-    renderCells();
+    renderCells(); // Call renderCells directly after updating the grid
 }
 
 export function renderCells() {
@@ -74,8 +75,6 @@ export function renderCells() {
     state.gridLayer.clearLayers();
     const mapBounds = state.map.getBounds();
     
-    const displayedSolutions = new Set();
-
     state.allCells.forEach(({ key, bounds, scores }) => {
         const cellBounds = L.latLngBounds(bounds);
         if (!mapBounds.intersects(cellBounds)) return;
@@ -87,8 +86,6 @@ export function renderCells() {
             const validSolutions = Object.entries(scores)
                 .filter(([sol, scores]) => {
                     return state.selectedSolutions[sol] !== false && 
-                           scores.impact >= state.impactFilter &&
-                           scores.cost <= state.costFilter &&
                            (scores.impact > 0 || scores.cost > 0);
                 });
 
@@ -103,11 +100,10 @@ export function renderCells() {
                     }
                 });
 
+                // Select the top solution for coloring
                 const selectedSolution = validSolutions[0];
                 fillColor = state.colorScale(selectedSolution[0]);
                 fillOpacity = 0.7;
-
-                displayedSolutions.add(selectedSolution[0]);
             }
         }
 
@@ -126,8 +122,6 @@ export function renderCells() {
             }
         });
     });
-
-    updateState({ displayedSolutions: Array.from(displayedSolutions) });
 }
 
 function handleMapClick(e) {

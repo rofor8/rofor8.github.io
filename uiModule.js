@@ -128,38 +128,54 @@ function setupFilterSliders() {
     sliderContainer.innerHTML = `
         <div class="slider-container">
             <label for="impactSlider">Impact Filter:</label>
-            <input type="range" id="impactSlider" min="0" max="100" value="0">
-            <span id="impactValue">0</span>
+            <div id="impactSlider"></div>
+            <span id="impactValue"></span>
         </div>
         <div class="slider-container">
             <label for="costSlider">Cost Filter:</label>
-            <input type="range" id="costSlider" min="0" max="100" value="100">
-            <span id="costValue">100</span>
+            <div id="costSlider"></div>
+            <span id="costValue"></span>
         </div>
     `;
 
     const impactSlider = document.getElementById("impactSlider");
     const costSlider = document.getElementById("costSlider");
     
-    if (impactSlider) {
-        impactSlider.addEventListener("input", function() {
+    if (impactSlider && costSlider) {
+        noUiSlider.create(impactSlider, {
+            start: [0, 100],
+            connect: true,
+            range: {
+                'min': 0,
+                'max': 100
+            }
+        });
+
+        noUiSlider.create(costSlider, {
+            start: [0, 100],
+            connect: true,
+            range: {
+                'min': 0,
+                'max': 100
+            }
+        });
+
+        impactSlider.noUiSlider.on('update', function (values, handle) {
             const impactValue = document.getElementById("impactValue");
             if (impactValue) {
-                impactValue.textContent = this.value;
+                impactValue.textContent = `${values[0]} - ${values[1]}`;
             }
-            updateState({ impactFilter: parseFloat(this.value) });
+            updateState({ impactFilter: values.map(Number) });
             filterSolutionTable();
             renderCells();
         });
-    }
 
-    if (costSlider) {
-        costSlider.addEventListener("input", function() {
+        costSlider.noUiSlider.on('update', function (values, handle) {
             const costValue = document.getElementById("costValue");
             if (costValue) {
-                costValue.textContent = this.value;
+                costValue.textContent = `${values[0]} - ${values[1]}`;
             }
-            updateState({ costFilter: parseFloat(this.value) });
+            updateState({ costFilter: values.map(Number) });
             filterSolutionTable();
             renderCells();
         });
@@ -171,31 +187,32 @@ function setupFilterSliders() {
 function updateSliderRanges() {
     const impactSlider = document.getElementById("impactSlider");
     const costSlider = document.getElementById("costSlider");
-    const impactValue = document.getElementById("impactValue");
-    const costValue = document.getElementById("costValue");
 
-    if (!impactSlider || !costSlider || !impactValue || !costValue) {
+    if (!impactSlider || !costSlider) {
         console.error("Slider elements not found");
         return;
     }
 
     const { maxImpact, maxCost } = calculateMaxValues();
 
-    impactSlider.max = maxImpact > 0 ? maxImpact : 100;
-    costSlider.max = maxCost > 0 ? maxCost : 100;
+    impactSlider.noUiSlider.updateOptions({
+        range: {
+            'min': 0,
+            'max': maxImpact > 0 ? maxImpact : 100
+        }
+    });
 
-    // Set impact slider to its current value or 0 if it exceeds the new max
-    impactSlider.value = Math.min(state.impactFilter, impactSlider.max);
-    impactValue.textContent = impactSlider.value;
-
-    // Set cost slider to its maximum value
-    costSlider.value = costSlider.max;
-    costValue.textContent = costSlider.max;
+    costSlider.noUiSlider.updateOptions({
+        range: {
+            'min': 0,
+            'max': maxCost > 0 ? maxCost : 100
+        }
+    });
 
     // Update state with the new values
     updateState({
-        impactFilter: parseFloat(impactSlider.value),
-        costFilter: parseFloat(costSlider.max)
+        impactFilter: impactSlider.noUiSlider.get().map(Number),
+        costFilter: costSlider.noUiSlider.get().map(Number)
     });
 }
 
@@ -278,8 +295,8 @@ export function updateSolutionTable() {
         impactBar.style.backgroundColor = state.colorScale(solution);
         costBar.style.backgroundColor = state.colorScale(solution);
 
-        // Highlight the row if the solution is displayed in the grid
-        row.classList.toggle('highlighted', state.displayedSolutions.includes(solution));
+        // Gray out deselected solutions
+        row.style.opacity = state.selectedSolutions[solution] !== false ? '1' : '0.5';
 
         // Append the row to tbody
         tbody.appendChild(row);
@@ -346,15 +363,17 @@ function filterSolutionTable() {
         return;
     }
 
-    const impactThreshold = state.impactFilter;
-    const costThreshold = state.costFilter;
+    const [impactMin, impactMax] = state.impactFilter;
+    const [costMin, costMax] = state.costFilter;
 
     const rows = table.tBodies[0].rows;
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const impact = parseFloat(row.cells[2].querySelector('.value').textContent);
         const cost = parseFloat(row.cells[3].querySelector('.value').textContent);
-        row.style.display = (impact >= impactThreshold && cost <= costThreshold && (impact > 0 || cost > 0)) ? "" : "none";
+        row.style.display = (impact >= impactMin && impact <= impactMax && 
+                             cost >= costMin && cost <= costMax && 
+                             (impact > 0 || cost > 0)) ? "" : "none";
     }
 }
 

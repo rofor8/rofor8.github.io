@@ -1,4 +1,3 @@
-
 // uiModule.js
 import { state, updateState, updateMap } from './stateModule.js';
 import { renderCells } from './mapModule.js';
@@ -423,5 +422,3 @@ export function updateCategoryDropdown(category) {
         categoryButtons.classList.remove('show');
     }
 }
-
-

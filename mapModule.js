@@ -1,5 +1,3 @@
-
-
 // mapModule.js
 import { state, updateState, updateSelectedCellKeys, updateMap } from './stateModule.js';
 import { toggleCellSelection } from './interactionModule.js';
@@ -34,7 +32,7 @@ export function updateGrid(map) {
         return;
     }
     const bounds = map.getBounds();
-    
+
     const cellSizeMeters = state.CELL_SIZE;
     const cellSizeLat = cellSizeMeters / 111111;
     const cellSizeLng = cellSizeMeters / (111111 * Math.cos(bounds.getCenter().lat * Math.PI / 180));
@@ -74,7 +72,9 @@ export function renderCells() {
     if (!state.map || !state.gridLayer) return;
     state.gridLayer.clearLayers();
     const mapBounds = state.map.getBounds();
-    
+
+    const highlightedSolutions = new Set();
+
     state.allCells.forEach(({ key, bounds, scores }) => {
         const cellBounds = L.latLngBounds(bounds);
         if (!mapBounds.intersects(cellBounds)) return;
@@ -85,7 +85,7 @@ export function renderCells() {
         if (scores) {
             const validSolutions = Object.entries(scores)
                 .filter(([sol, scores]) => {
-                    return state.selectedSolutions[sol] !== false && 
+                    return state.selectedSolutions[sol] !== false &&
                            (scores.impact > 0 || scores.cost > 0);
                 });
 
@@ -104,6 +104,7 @@ export function renderCells() {
                 const selectedSolution = validSolutions[0];
                 fillColor = state.colorScale(selectedSolution[0]);
                 fillOpacity = 0.7;
+                highlightedSolutions.add(selectedSolution[0]);
             }
         }
 
@@ -122,6 +123,9 @@ export function renderCells() {
             }
         });
     });
+
+    // Update the UI to highlight the selected solutions in the table
+    updateHighlightedSolutions(highlightedSolutions);
 }
 
 function handleMapClick(e) {
@@ -155,3 +159,23 @@ const debouncedUpdateGrid = debounce((map) => {
 }, 500);
 
 export { debouncedUpdateGrid };
+
+// Function to update the UI with highlighted solutions
+function updateHighlightedSolutions(highlightedSolutions) {
+    const table = document.getElementById("solutionsTable");
+    if (!table) {
+        console.error("Solutions table not found");
+        return;
+    }
+
+    const rows = table.tBodies[0].rows;
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const solution = row.cells[1].textContent;
+        if (highlightedSolutions.has(solution)) {
+            row.style.border = '2px solid red';
+        } else {
+            row.style.border = '';
+        }
+    }
+}

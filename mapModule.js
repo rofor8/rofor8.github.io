@@ -92,11 +92,28 @@ export function renderCells() {
             let fillOpacity = 0.5;
 
             if (scores) {
-                const validSolutions = Object.entries(scores)
-                    .filter(([sol, scores]) => {
-                        return state.selectedSolutions[sol] !== false && 
-                               (scores.impact > 0 || scores.cost > 0);
-                    });
+                let validSolutions;
+                
+                if (isSelected) {
+                    // For selected cells, apply filters
+                    validSolutions = Object.entries(scores)
+                        .filter(([sol, scores]) => {
+                            const isSelected = state.selectedSolutions[sol] !== false;
+                            const isWithinImpactRange = scores.impact >= state.impactFilter[0] && 
+                                                        scores.impact <= state.impactFilter[1];
+                            const isWithinCostRange = scores.cost >= state.costFilter[0] &&
+                                                      scores.cost <= state.costFilter[1];
+                            const hasPositiveScore = scores.impact > 0 || scores.cost > 0;
+                            
+                            return isSelected && isWithinImpactRange && isWithinCostRange && hasPositiveScore;
+                        });
+                } else {
+                    // For non-selected cells, only filter by selection status
+                    validSolutions = Object.entries(scores)
+                        .filter(([sol, scores]) => {
+                            return state.selectedSolutions[sol] !== false && (scores.impact > 0 || scores.cost > 0);
+                        });
+                }
 
                 if (validSolutions.length > 0) {
                     validSolutions.sort((a, b) => {
@@ -112,13 +129,13 @@ export function renderCells() {
                     // Select the top solution for coloring
                     const selectedSolution = validSolutions[0];
                     fillColor = state.colorScale(selectedSolution[0]);
-                    fillOpacity = state.selectedSolutions[selectedSolution[0]] !== false ? 0.7 : 0.3;
+                    fillOpacity = 0.7;
                 }
             }
 
             if (isSelected) {
-                fillColor = isVisible ? fillColor : "rgba(255,0,0,0.2)";
-                fillOpacity = isVisible ? fillOpacity : 0.5;
+                // Increase opacity for selected cells
+                fillOpacity = 0.9;
             }
 
             const rectangle = L.rectangle(cellBounds, {

@@ -187,6 +187,9 @@ function setupFilterSliders() {
     updateSliderRanges();
 }
 
+// uiModule.js
+// ... (previous code remains the same)
+
 function updateSliderRanges() {
     const impactSlider = document.getElementById("impactSlider");
     const costSlider = document.getElementById("costSlider");
@@ -203,36 +206,34 @@ function updateSliderRanges() {
     const currentCostValues = costSlider.noUiSlider.get().map(Number);
 
     // Update impact slider
-    impactSlider.noUiSlider.updateOptions({
-        range: {
-            'min': 0,
-            'max': Math.max(maxImpact, currentImpactValues[1])
-        }
-    });
+    updateSliderOptions(impactSlider, maxImpact, currentImpactValues);
 
     // Update cost slider
-    costSlider.noUiSlider.updateOptions({
-        range: {
-            'min': 0,
-            'max': Math.max(maxCost, currentCostValues[1])
-        }
-    });
-
-    // Set sliders to their current values, but ensure they don't exceed the new max
-    impactSlider.noUiSlider.set([
-        Math.min(currentImpactValues[0], maxImpact),
-        Math.min(currentImpactValues[1], maxImpact)
-    ]);
-    costSlider.noUiSlider.set([
-        Math.min(currentCostValues[0], maxCost),
-        Math.min(currentCostValues[1], maxCost)
-    ]);
+    updateSliderOptions(costSlider, maxCost, currentCostValues);
 
     // Update state with the new values
     updateState({
         impactFilter: impactSlider.noUiSlider.get().map(Number),
         costFilter: costSlider.noUiSlider.get().map(Number)
     });
+}
+
+function updateSliderOptions(slider, maxValue, currentValues) {
+    const epsilon = 0.0001; // Small value to avoid equal min and max
+    const newMax = Math.max(maxValue, currentValues[1], epsilon);
+    
+    slider.noUiSlider.updateOptions({
+        range: {
+            'min': 0,
+            'max': newMax
+        }
+    });
+
+    // Set sliders to their current values, but ensure they don't exceed the new max
+    slider.noUiSlider.set([
+        Math.min(currentValues[0], newMax),
+        Math.min(currentValues[1], newMax)
+    ]);
 }
 
 function calculateMaxValues() {
@@ -248,6 +249,8 @@ function calculateMaxValues() {
 
     return { maxImpact, maxCost };
 }
+
+ 
 
 function updateSolutionTable() {
     const table = document.getElementById("solutionsTable");

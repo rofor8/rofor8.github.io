@@ -89,8 +89,7 @@ export function renderCells() {
             if (scores) {
                 const validSolutions = Object.entries(scores)
                     .filter(([sol, scores]) => {
-                        return state.selectedSolutions[sol] !== false && 
-                               (scores.impact > 0 || scores.cost > 0);
+                        return scores.impact > 0 || scores.cost > 0;
                     });
 
                 if (validSolutions.length > 0) {
@@ -107,7 +106,7 @@ export function renderCells() {
                     // Select the top solution for coloring
                     const selectedSolution = validSolutions[0];
                     fillColor = state.colorScale(selectedSolution[0]);
-                    fillOpacity = 0.7;
+                    fillOpacity = state.selectedSolutions[selectedSolution[0]] !== false ? 0.7 : 0.3;
                 }
             }
 

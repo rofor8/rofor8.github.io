@@ -2,7 +2,7 @@
 import { state, updateState, updateMap } from './stateModule.js';
 import { renderCells } from './mapModule.js';
 
-export function setupUI() {
+function setupUI() {
     if (state.challengeCategories && Object.keys(state.challengeCategories).length > 0) {
         createButtons("categoryButtons", Object.keys(state.challengeCategories), "category-button");
     } else {
@@ -84,7 +84,8 @@ function setupSolutionTable() {
                 }
             });
             updateMap(state.currentCategory);
-            updateSliderRanges(); // Update slider ranges when cells are selected
+            updateSliderRanges();
+            filterSolutionTable();
         });
         checkboxCell.appendChild(checkbox);
 
@@ -235,7 +236,7 @@ function calculateMaxValues() {
     return { maxImpact, maxCost };
 }
 
-export function updateSolutionTable() {
+function updateSolutionTable() {
     const table = document.getElementById("solutionsTable");
     if (!table) {
         console.error("Solutions table not found");
@@ -280,7 +281,8 @@ export function updateSolutionTable() {
                 }
             });
             updateMap(state.currentCategory);
-            updateSliderRanges(); // Update slider ranges when cells are selected
+            updateSliderRanges();
+            filterSolutionTable();
         });
         checkboxCell.appendChild(checkbox);
 
@@ -300,9 +302,6 @@ export function updateSolutionTable() {
         // Update bar colors
         impactBar.style.backgroundColor = state.colorScale(solution);
         costBar.style.backgroundColor = state.colorScale(solution);
-
-        // Gray out deselected solutions
-        row.style.opacity = state.selectedSolutions[solution] !== false ? '1' : '0.5';
 
         // Append the row to tbody
         tbody.appendChild(row);
@@ -377,17 +376,30 @@ function filterSolutionTable() {
         const row = rows[i];
         const impact = parseFloat(row.cells[2].querySelector('.value').textContent);
         const cost = parseFloat(row.cells[3].querySelector('.value').textContent);
-        row.style.display = (impact >= impactMin && impact <= impactMax &&
-                             cost >= costMin && cost <= costMax &&
-                             (impact > 0 || cost > 0)) ? "" : "none";
+        const solution = row.cells[1].textContent;
+        const isSelected = state.selectedSolutions[solution] !== false;
+
+        const isWithinFilter = impact >= impactMin && impact <= impactMax &&
+                               cost >= costMin && cost <= costMax &&
+                               (impact > 0 || cost > 0);
+
+        // Always show the row, but adjust opacity based on selection and filter status
+        row.style.display = "";
+        row.style.opacity = isSelected ? (isWithinFilter ? "1" : "0.5") : "0.3";
+
+        // Adjust the checkbox state
+        const checkbox = row.cells[0].querySelector('input[type="checkbox"]');
+        if (checkbox) {
+            checkbox.checked = isSelected;
+        }
     }
 }
 
-export function updateUIForCategory(challengeCategory) {
+function updateUIForCategory(challengeCategory) {
     updateSolutionTable();
 }
 
-export function createButtons(containerId, dataArray, buttonClass) {
+function createButtons(containerId, dataArray, buttonClass) {
     const container = document.getElementById(containerId);
     if (!container) {
         console.error(`Container with id ${containerId} not found`);
@@ -408,7 +420,7 @@ export function createButtons(containerId, dataArray, buttonClass) {
     });
 }
 
-export function updateCategoryDropdown(category) {
+function updateCategoryDropdown(category) {
     const dropBtn = document.querySelector("#categoryDropdown .dropbtn");
     if (dropBtn) {
         dropBtn.innerHTML = `<span class="dropdown-title">Optimised for: </span>${category}`;
@@ -422,3 +434,13 @@ export function updateCategoryDropdown(category) {
         categoryButtons.classList.remove('show');
     }
 }
+
+// Export all functions that need to be accessed from other modules
+export {
+    setupUI,
+    updateSolutionTable,
+    filterSolutionTable,
+    updateUIForCategory,
+    createButtons,
+    updateCategoryDropdown
+};

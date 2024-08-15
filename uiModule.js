@@ -198,23 +198,35 @@ function updateSliderRanges() {
 
     const { maxImpact, maxCost } = calculateMaxValues();
 
+    // Get current slider values
+    const currentImpactValues = impactSlider.noUiSlider.get().map(Number);
+    const currentCostValues = costSlider.noUiSlider.get().map(Number);
+
+    // Update impact slider
     impactSlider.noUiSlider.updateOptions({
         range: {
             'min': 0,
-            'max': maxImpact > 0 ? maxImpact : 100
+            'max': Math.max(maxImpact, currentImpactValues[1])
         }
     });
 
+    // Update cost slider
     costSlider.noUiSlider.updateOptions({
         range: {
             'min': 0,
-            'max': maxCost > 0 ? maxCost : 100
+            'max': Math.max(maxCost, currentCostValues[1])
         }
     });
 
-    // Set sliders to their max range
-    impactSlider.noUiSlider.set([0, maxImpact > 0 ? maxImpact : 100]);
-    costSlider.noUiSlider.set([0, maxCost > 0 ? maxCost : 100]);
+    // Set sliders to their current values, but ensure they don't exceed the new max
+    impactSlider.noUiSlider.set([
+        Math.min(currentImpactValues[0], maxImpact),
+        Math.min(currentImpactValues[1], maxImpact)
+    ]);
+    costSlider.noUiSlider.set([
+        Math.min(currentCostValues[0], maxCost),
+        Math.min(currentCostValues[1], maxCost)
+    ]);
 
     // Update state with the new values
     updateState({

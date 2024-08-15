@@ -423,7 +423,7 @@ function createButtons(containerId, dataArray, buttonClass) {
 
     container.innerHTML = '';
     dataArray.forEach(d => {
-        const button = document.createElement("button");
+const button = document.createElement("button");
         button.className = buttonClass;
         button.textContent = d;
         button.addEventListener("click", function() {

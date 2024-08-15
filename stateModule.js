@@ -29,7 +29,7 @@ export const state = {
     impactFilter: [0, 100],
     costFilter: [0, 100],
     currentSortColumn: 'impact',
-    isAscending: false
+    isAscending: true
 };
 
 export function updateState(newState) {

@@ -5,17 +5,17 @@ import { toggleCellSelection } from './interactionModule.js';
 export function initMap() {
     const map = L.map('map', {
         maxZoom: 20,
-        minZoom: 17,
+        minZoom: 16,
         renderer: L.canvas(),
         tap: true,
         touchZoom: true,
         dragging: true,
         zoomControl: false
-    }).setView([51.454514, -2.587910], 17);
+    }).setView([51.454514, -2.587910], 16);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 20,
-        minZoom: 17,
+        minZoom: 16,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         className: 'map-tiles'
     }).addTo(map);
@@ -88,8 +88,8 @@ export function renderCells() {
         const isSelected = state.selectedCellKeys.has(key);
 
         if (isVisible || isSelected) {
-            let fillColor = "rgba(200,200,200,0.5)";
-            let fillOpacity = 0.5;
+            let fillColor = "rgba(200,200,200)";
+           let fillOpacity = 0.5;
 
             if (scores) {
                 let validSolutions;
@@ -129,13 +129,13 @@ export function renderCells() {
                     // Select the top solution for coloring
                     const selectedSolution = validSolutions[0];
                     fillColor = state.colorScale(selectedSolution[0]);
-                    fillOpacity = 0.7;
+                  //  fillOpacity = 0.7;
                 }
             }
 
             if (isSelected) {
                 // Increase opacity for selected cells
-                fillOpacity = 0.9;
+              //  fillOpacity = 0.9;
             }
 
             const rectangle = L.rectangle(cellBounds, {

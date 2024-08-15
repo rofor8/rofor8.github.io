@@ -32,7 +32,7 @@ export function updateGrid(map) {
         return;
     }
     const bounds = map.getBounds();
-
+    
     const cellSizeMeters = state.CELL_SIZE;
     const cellSizeLat = cellSizeMeters / 111111;
     const cellSizeLng = cellSizeMeters / (111111 * Math.cos(bounds.getCenter().lat * Math.PI / 180));
@@ -44,6 +44,7 @@ export function updateGrid(map) {
 
     const newCells = new Map();
 
+    // Add cells for the current viewport
     for (let lat = minLat; lat < maxLat; lat += cellSizeLat) {
         for (let lng = minLng; lng < maxLng; lng += cellSizeLng) {
             const cellKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
@@ -59,73 +60,76 @@ export function updateGrid(map) {
         }
     }
 
-    // Preserve all selected cells, not just those in view
-    const newSelectedCellKeys = new Set([...state.selectedCellKeys]);
-    updateSelectedCellKeys(newSelectedCellKeys);
+    // Preserve selected cells that are outside the current viewport
+    state.selectedCellKeys.forEach(key => {
+        if (!newCells.has(key) && state.allCells.has(key)) {
+            newCells.set(key, state.allCells.get(key));
+        }
+    });
 
     updateState({ allCells: newCells, mapNeedsUpdate: true });
     console.log('Grid updated, cells rendered');
-    renderCells(); // Call renderCells directly after updating the grid
+    renderCells();
 }
 
 export function renderCells() {
     if (!state.map || !state.gridLayer) return;
     state.gridLayer.clearLayers();
     const mapBounds = state.map.getBounds();
-
-    const highlightedSolutions = new Set();
-
+    
     state.allCells.forEach(({ key, bounds, scores }) => {
         const cellBounds = L.latLngBounds(bounds);
-        if (!mapBounds.intersects(cellBounds)) return;
-
-        let fillColor = "rgba(200,200,200,0.5)";
-        let fillOpacity = 0.5;
-
-        if (scores) {
-            const validSolutions = Object.entries(scores)
-                .filter(([sol, scores]) => {
-                    return state.selectedSolutions[sol] !== false &&
-                           (scores.impact > 0 || scores.cost > 0);
-                });
-
-            if (validSolutions.length > 0) {
-                validSolutions.sort((a, b) => {
-                    const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
-                    const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
-                    if (state.currentSortColumn === 'cost') {
-                        return state.isAscending ? aValue - bValue : bValue - aValue;
-                    } else {
-                        return state.isAscending ? bValue - aValue : aValue - bValue;
-                    }
-                });
-
-                // Select the top solution for coloring
-                const selectedSolution = validSolutions[0];
-                fillColor = state.colorScale(selectedSolution[0]);
-                fillOpacity = 0.7;
-                highlightedSolutions.add(selectedSolution[0]);
-            }
-        }
-
+        const isVisible = mapBounds.intersects(cellBounds);
         const isSelected = state.selectedCellKeys.has(key);
 
-        const rectangle = L.rectangle(cellBounds, {
-            color: isSelected ? 'red' : 'transparent',
-            weight: isSelected ? 2 : 1,
-            fillColor: fillColor,
-            fillOpacity: fillOpacity
-        }).addTo(state.gridLayer);
+        if (isVisible || isSelected) {
+            let fillColor = "rgba(200,200,200,0.5)";
+            let fillOpacity = 0.5;
 
-        rectangle.on('click', function() {
-            if (!state.isDrawMode) {
-                toggleCellSelection(key);
+            if (scores) {
+                const validSolutions = Object.entries(scores)
+                    .filter(([sol, scores]) => {
+                        return state.selectedSolutions[sol] !== false && 
+                               (scores.impact > 0 || scores.cost > 0);
+                    });
+
+                if (validSolutions.length > 0) {
+                    validSolutions.sort((a, b) => {
+                        const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
+                        const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
+                        if (state.currentSortColumn === 'cost') {
+                            return state.isAscending ? aValue - bValue : bValue - aValue;
+                        } else {
+                            return state.isAscending ? bValue - aValue : aValue - bValue;
+                        }
+                    });
+
+                    // Select the top solution for coloring
+                    const selectedSolution = validSolutions[0];
+                    fillColor = state.colorScale(selectedSolution[0]);
+                    fillOpacity = 0.7;
+                }
             }
-        });
-    });
 
-    // Update the UI to highlight the selected solutions in the table
-    updateHighlightedSolutions(highlightedSolutions);
+            if (isSelected) {
+                fillColor = isVisible ? fillColor : "rgba(255,0,0,0.2)";
+                fillOpacity = isVisible ? fillOpacity : 0.5;
+            }
+
+            const rectangle = L.rectangle(cellBounds, {
+                color: isSelected ? 'red' : 'transparent',
+                weight: isSelected ? 2 : 1,
+                fillColor: fillColor,
+                fillOpacity: fillOpacity
+            }).addTo(state.gridLayer);
+
+            rectangle.on('click', function() {
+                if (!state.isDrawMode) {
+                    toggleCellSelection(key);
+                }
+            });
+        }
+    });
 }
 
 function handleMapClick(e) {
@@ -159,23 +163,3 @@ const debouncedUpdateGrid = debounce((map) => {
 }, 500);
 
 export { debouncedUpdateGrid };
-
-// Function to update the UI with highlighted solutions
-function updateHighlightedSolutions(highlightedSolutions) {
-    const table = document.getElementById("solutionsTable");
-    if (!table) {
-        console.error("Solutions table not found");
-        return;
-    }
-
-    const rows = table.tBodies[0].rows;
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const solution = row.cells[1].textContent;
-        if (highlightedSolutions.has(solution)) {
-            row.style.border = '2px solid red';
-        } else {
-            row.style.border = '';
-        }
-    }
-}

@@ -38,6 +38,7 @@ export function updateState(newState) {
 
 export function updateSelectedCellKeys(newSelectedCellKeys) {
     state.selectedCellKeys = new Set(newSelectedCellKeys);
+    state.mapNeedsUpdate = true;
     if (state.callUpdateScores) {
         state.callUpdateScores();
     }

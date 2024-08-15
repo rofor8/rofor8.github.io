@@ -4,14 +4,18 @@ import { toggleCellSelection } from './interactionModule.js';
 
 export function initMap() {
     const map = L.map('map', {
+        maxZoom: 20,
+        minZoom: 17,
         renderer: L.canvas(),
         tap: true,
         touchZoom: true,
         dragging: true,
         zoomControl: false
-    }).setView([51.454514, -2.587910], 15);
+    }).setView([51.454514, -2.587910], 17);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        minZoom: 17,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         className: 'map-tiles'
     }).addTo(map);

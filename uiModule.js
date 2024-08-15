@@ -1,6 +1,6 @@
 // uiModule.js
 import { state, updateState, updateMap } from './stateModule.js';
-import { renderCells } from './mapModule.js';
+import { renderCells, updateSelectionRectangle } from './mapModule.js';
 
 function setupUI() {
     if (state.challengeCategories && Object.keys(state.challengeCategories).length > 0) {
@@ -74,7 +74,7 @@ function setupSolutionTable() {
         const checkboxCell = row.insertCell();
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
-        checkbox.checked = true;
+        checkbox.checked = state.selectedSolutions[solution] !== false;
         checkbox.style.accentColor = state.colorScale(solution);
         checkbox.addEventListener("change", function() {
             updateState({
@@ -86,6 +86,7 @@ function setupSolutionTable() {
             updateMap(state.currentCategory);
             updateSliderRanges();
             filterSolutionTable();
+            renderCells();
         });
         checkboxCell.appendChild(checkbox);
 
@@ -283,6 +284,7 @@ function updateSolutionTable() {
             updateMap(state.currentCategory);
             updateSliderRanges();
             filterSolutionTable();
+            renderCells();
         });
         checkboxCell.appendChild(checkbox);
 
@@ -317,6 +319,7 @@ function updateSolutionTable() {
     updateSliderRanges();
     filterSolutionTable();
     renderCells(); // Re-render cells to update colors based on new sorting
+    updateSelectionRectangle(); // Update the selection rectangle
 }
 
 function calculateTotalImpact(solution) {

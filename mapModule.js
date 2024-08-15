@@ -70,6 +70,7 @@ export function updateGrid(map) {
     updateState({ allCells: newCells, mapNeedsUpdate: true });
     console.log('Grid updated, cells rendered');
     renderCells();
+    updateSelectionRectangle();
 }
 
 export function renderCells() {
@@ -89,7 +90,8 @@ export function renderCells() {
             if (scores) {
                 const validSolutions = Object.entries(scores)
                     .filter(([sol, scores]) => {
-                        return scores.impact > 0 || scores.cost > 0;
+                        return state.selectedSolutions[sol] !== false && 
+                               (scores.impact > 0 || scores.cost > 0);
                     });
 
                 if (validSolutions.length > 0) {
@@ -129,6 +131,26 @@ export function renderCells() {
             });
         }
     });
+}
+
+export function updateSelectionRectangle() {
+    if (!state.map) return;
+    
+    const bounds = state.map.getBounds();
+    const rectangle = L.rectangle(bounds, {
+        color: "red",
+        weight: 2,
+        fill: false,
+        dashArray: '5, 5',
+        interactive: false
+    });
+    
+    if (state.selectionRectangle) {
+        state.map.removeLayer(state.selectionRectangle);
+    }
+    
+    state.selectionRectangle = rectangle;
+    rectangle.addTo(state.map);
 }
 
 function handleMapClick(e) {

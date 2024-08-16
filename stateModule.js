@@ -1,4 +1,7 @@
 // stateModule.js
+import { loadTilesForViewport, calculateSuitabilityScores } from './dataModule.js';
+import { updateUIForCategory, updateSolutionTable } from './uiModule.js';
+
 export const state = {
     allCells: new Map(),
     solutionCriteria: {},
@@ -42,8 +45,8 @@ export function updateSelectedCellKeys(newSelectedCellKeys) {
     if (state.callUpdateScores) {
         state.callUpdateScores();
     }
-    if (typeof window.updateSolutionTable === 'function') {
-        window.updateSolutionTable();
+    if (typeof updateSolutionTable === 'function') {
+        updateSolutionTable();
     }
 }
 

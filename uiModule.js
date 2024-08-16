@@ -2,7 +2,7 @@
 import { state, updateState, updateMap, updateTotals } from './stateModule.js';
 import { renderCells, updateSelectionRectangle } from './mapModule.js';
 
-export function setupUI() {
+function setupUI() {
     if (state.challengeCategories && Object.keys(state.challengeCategories).length > 0) {
         createButtons("categoryButtons", Object.keys(state.challengeCategories), "category-button");
     } else {
@@ -83,10 +83,7 @@ function setupSolutionTable() {
                     [solution]: this.checked
                 }
             });
-            updateMap(state.currentCategory);
-            updateSliderRanges();
-            filterSolutionTable();
-            renderCells();
+            renderCells(); // Only re-render cells, don't update the table
         });
         checkboxCell.appendChild(checkbox);
 
@@ -118,7 +115,8 @@ function setupSolutionTable() {
     solutionsContainer.innerHTML = '';
     solutionsContainer.appendChild(table);
 
-    updateSolutionTable();
+    // Call updateSolutionTable after a short delay to ensure the table is in the DOM
+    setTimeout(updateSolutionTable, 0);
 }
 
 function setupFilterSliders() {
@@ -169,7 +167,6 @@ function setupFilterSliders() {
                 impactValue.textContent = `${values[0]} - ${values[1]}`;
             }
             updateState({ impactFilter: values.map(Number) });
-            filterSolutionTable();
             renderCells();
         });
 
@@ -179,12 +176,12 @@ function setupFilterSliders() {
                 costValue.textContent = `${values[0]} - ${values[1]}`;
             }
             updateState({ costFilter: values.map(Number) });
-            filterSolutionTable();
             renderCells();
         });
     }
 
-    updateSliderRanges();
+    // Call updateSliderRanges after a short delay to ensure the sliders are in the DOM
+    setTimeout(updateSliderRanges, 0);
 }
 
 function updateSliderRanges() {
@@ -192,7 +189,8 @@ function updateSliderRanges() {
     const costSlider = document.getElementById("costSlider");
 
     if (!impactSlider || !costSlider) {
-        console.error("Slider elements not found");
+        console.warn("Slider elements not found, retrying...");
+        setTimeout(updateSliderRanges, 100); // Retry after a short delay
         return;
     }
 
@@ -245,10 +243,11 @@ function calculateMaxValues() {
     return { maxImpact, maxCost };
 }
 
-export function updateSolutionTable() {
+function updateSolutionTable() {
     const table = document.getElementById("solutionsTable");
     if (!table) {
-        console.error("Solutions table not found");
+        console.warn("Solutions table not found, retrying...");
+        setTimeout(updateSolutionTable, 100); // Retry after a short delay
         return;
     }
 
@@ -291,10 +290,7 @@ export function updateSolutionTable() {
                     [solution]: this.checked
                 }
             });
-            updateMap(state.currentCategory);
-            updateSliderRanges();
-            filterSolutionTable();
-            renderCells();
+            renderCells(); // Only re-render cells, don't update the table
         });
         checkboxCell.appendChild(checkbox);
 
@@ -315,6 +311,10 @@ export function updateSolutionTable() {
         impactBar.style.backgroundColor = state.colorScale(solution);
         costBar.style.backgroundColor = state.colorScale(solution);
 
+        // Set opacity based on selection status
+        const rowOpacity = state.selectedSolutions[solution] !== false ? 1 : 0.5;
+        row.style.opacity = rowOpacity;
+
         // Append the row to tbody
         tbody.appendChild(row);
     });
@@ -327,7 +327,6 @@ export function updateSolutionTable() {
     }
 
     updateSliderRanges();
-    filterSolutionTable();
     renderCells();
     updateSelectionRectangle();
 }
@@ -344,42 +343,7 @@ function sortRowData(rowData) {
     });
 }
 
-function filterSolutionTable() {
-    const table = document.getElementById("solutionsTable");
-
-    if (!table) {
-        console.error("Required elements for filtering not found");
-        return;
-    }
-
-    const [impactMin, impactMax] = state.impactFilter;
-    const [costMin, costMax] = state.costFilter;
-
-    const rows = table.tBodies[0].rows;
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const solution = row.cells[1].textContent;
-        const impact = state.totalImpacts[solution] || 0;
-        const cost = state.totalCosts[solution] || 0;
-        const isSelected = state.selectedSolutions[solution] !== false;
-
-        const isWithinFilter = impact >= impactMin && impact <= impactMax &&
-                               cost >= costMin && cost <= costMax &&
-                               (impact > 0 || cost > 0);
-
-        // Always show the row, but adjust opacity based on selection and filter status
-        row.style.display = "";
-        row.style.opacity = isSelected ? (isWithinFilter ? "1" : "0.5") : "0.3";
-
-        // Adjust the checkbox state
-        const checkbox = row.cells[0].querySelector('input[type="checkbox"]');
-        if (checkbox) {
-            checkbox.checked = isSelected;
-        }
-    }
-}
-
-export function updateUIForCategory(challengeCategory) {
+function updateUIForCategory(challengeCategory) {
     updateSolutionTable();
 }
 
@@ -428,10 +392,10 @@ function toggleSort(column) {
     updateSolutionTable();
 }
 
+// Consolidated exports
 export {
     setupUI,
     updateSolutionTable,
-    filterSolutionTable,
     updateUIForCategory,
     createButtons,
     updateCategoryDropdown

@@ -95,15 +95,20 @@ export function renderCells() {
                 let validSolutions = Object.entries(scores)
                     .filter(([sol, scores]) => {
                         const isSelected = state.selectedSolutions[sol] !== false;
-                        const totalImpact = state.totalImpacts[sol] || 0;
-                        const totalCost = state.totalCosts[sol] || 0;
-                        const isWithinImpactRange = totalImpact >= state.impactFilter[0] && 
-                                                    totalImpact <= state.impactFilter[1];
-                        const isWithinCostRange = totalCost >= state.costFilter[0] &&
-                                                  totalCost <= state.costFilter[1];
                         const hasPositiveScore = scores.impact > 0 || scores.cost > 0;
                         
-                        return isSelected && isWithinImpactRange && isWithinCostRange && hasPositiveScore;
+                        if (!isSelected) return false;
+                        
+                        // Only apply filters to selected cells
+                        if (isSelected && state.selectedCellKeys.has(key)) {
+                            const isWithinImpactRange = scores.impact >= state.impactFilter[0] && 
+                                                        scores.impact <= state.impactFilter[1];
+                            const isWithinCostRange = scores.cost >= state.costFilter[0] &&
+                                                      scores.cost <= state.costFilter[1];
+                            return isWithinImpactRange && isWithinCostRange && hasPositiveScore;
+                        }
+                        
+                        return hasPositiveScore;
                     });
 
                 if (validSolutions.length > 0) {

@@ -2,6 +2,8 @@
 import { state, updateState, updateMap, updateTotals } from './stateModule.js';
 import { renderCells, updateSelectionRectangle } from './mapModule.js';
 
+let isUpdating = false;
+
 function setupUI() {
     if (state.challengeCategories && Object.keys(state.challengeCategories).length > 0) {
         createButtons("categoryButtons", Object.keys(state.challengeCategories), "category-button");
@@ -83,7 +85,8 @@ function setupSolutionTable() {
                     [solution]: this.checked
                 }
             });
-            renderCells(); // Only re-render cells, don't update the table
+            updateSolutionTable();
+            renderCells();
         });
         checkboxCell.appendChild(checkbox);
 
@@ -162,21 +165,29 @@ function setupFilterSliders() {
         });
 
         impactSlider.noUiSlider.on('update', function (values, handle) {
+            if (isUpdating) return;
+            isUpdating = true;
             const impactValue = document.getElementById("impactValue");
             if (impactValue) {
                 impactValue.textContent = `${values[0]} - ${values[1]}`;
             }
             updateState({ impactFilter: values.map(Number) });
+            updateSolutionTable();
             renderCells();
+            isUpdating = false;
         });
 
         costSlider.noUiSlider.on('update', function (values, handle) {
+            if (isUpdating) return;
+            isUpdating = true;
             const costValue = document.getElementById("costValue");
             if (costValue) {
                 costValue.textContent = `${values[0]} - ${values[1]}`;
             }
             updateState({ costFilter: values.map(Number) });
+            updateSolutionTable();
             renderCells();
+            isUpdating = false;
         });
     }
 
@@ -185,12 +196,16 @@ function setupFilterSliders() {
 }
 
 function updateSliderRanges() {
+    if (isUpdating) return;
+    isUpdating = true;
+
     const impactSlider = document.getElementById("impactSlider");
     const costSlider = document.getElementById("costSlider");
 
     if (!impactSlider || !costSlider) {
         console.warn("Slider elements not found, retrying...");
         setTimeout(updateSliderRanges, 100); // Retry after a short delay
+        isUpdating = false;
         return;
     }
 
@@ -211,6 +226,8 @@ function updateSliderRanges() {
         impactFilter: impactSlider.noUiSlider.get().map(Number),
         costFilter: costSlider.noUiSlider.get().map(Number)
     });
+
+    isUpdating = false;
 }
 
 function updateSliderOptions(slider, maxValue, currentValues) {
@@ -222,7 +239,7 @@ function updateSliderOptions(slider, maxValue, currentValues) {
             'min': 0,
             'max': newMax
         }
-    });
+    }, true); // The 'true' here prevents the 'update' event from firing
 
     // Set sliders to their current values, but ensure they don't exceed the new max
     slider.noUiSlider.set([
@@ -244,10 +261,14 @@ function calculateMaxValues() {
 }
 
 function updateSolutionTable() {
+    if (isUpdating) return;
+    isUpdating = true;
+
     const table = document.getElementById("solutionsTable");
     if (!table) {
         console.warn("Solutions table not found, retrying...");
         setTimeout(updateSolutionTable, 100); // Retry after a short delay
+        isUpdating = false;
         return;
     }
 
@@ -290,7 +311,8 @@ function updateSolutionTable() {
                     [solution]: this.checked
                 }
             });
-            renderCells(); // Only re-render cells, don't update the table
+            updateSolutionTable();
+            renderCells();
         });
         checkboxCell.appendChild(checkbox);
 
@@ -311,8 +333,10 @@ function updateSolutionTable() {
         impactBar.style.backgroundColor = state.colorScale(solution);
         costBar.style.backgroundColor = state.colorScale(solution);
 
-        // Set opacity based on selection status
-        const rowOpacity = state.selectedSolutions[solution] !== false ? 1 : 0.5;
+        // Set opacity based on selection status and filter
+        const isWithinFilter = impact >= state.impactFilter[0] && impact <= state.impactFilter[1] &&
+                               cost >= state.costFilter[0] && cost <= state.costFilter[1];
+        const rowOpacity = state.selectedSolutions[solution] !== false && isWithinFilter ? 1 : 0.5;
         row.style.opacity = rowOpacity;
 
         // Append the row to tbody
@@ -327,8 +351,7 @@ function updateSolutionTable() {
     }
 
     updateSliderRanges();
-    renderCells();
-    updateSelectionRectangle();
+    isUpdating = false;
 }
 
 function sortRowData(rowData) {

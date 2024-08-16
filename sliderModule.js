@@ -64,12 +64,12 @@ function calculateRangesForSelection() {
         if (cell && cell.scores) {
             Object.values(cell.scores).forEach(score => {
                 if (score.impact !== undefined) {
-                    const totalImpact = score.impact * cellCount;
+                    const totalImpact = (score.impact * cellCount) / 2;
                     minImpact = Math.min(minImpact, totalImpact);
                     maxImpact = Math.max(maxImpact, totalImpact);
                 }
                 if (score.cost !== undefined) {
-                    const totalCost = score.cost * cellCount;
+                    const totalCost = (score.cost * cellCount) / 2;
                     minCost = Math.min(minCost, totalCost);
                     maxCost = Math.max(maxCost, totalCost);
                 }

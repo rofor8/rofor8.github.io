@@ -1,8 +1,8 @@
 // uiModule.js
-import { state, updateState, updateMap } from './stateModule.js';
+import { state, updateState, updateMap, updateTotals } from './stateModule.js';
 import { renderCells, updateSelectionRectangle } from './mapModule.js';
 
-function setupUI() {
+export function setupUI() {
     if (state.challengeCategories && Object.keys(state.challengeCategories).length > 0) {
         createButtons("categoryButtons", Object.keys(state.challengeCategories), "category-button");
     } else {
@@ -187,9 +187,6 @@ function setupFilterSliders() {
     updateSliderRanges();
 }
 
-// uiModule.js
-// ... (previous code remains the same)
-
 function updateSliderRanges() {
     const impactSlider = document.getElementById("impactSlider");
     const costSlider = document.getElementById("costSlider");
@@ -241,23 +238,21 @@ function calculateMaxValues() {
     let maxCost = 0;
 
     Object.keys(state.solutionCriteria).forEach(solution => {
-        const impact = calculateTotalImpact(solution);
-        const cost = calculateTotalCost(solution);
-        maxImpact = Math.max(maxImpact, impact);
-        maxCost = Math.max(maxCost, cost);
+        maxImpact = Math.max(maxImpact, state.totalImpacts[solution] || 0);
+        maxCost = Math.max(maxCost, state.totalCosts[solution] || 0);
     });
 
     return { maxImpact, maxCost };
 }
 
- 
-
-function updateSolutionTable() {
+export function updateSolutionTable() {
     const table = document.getElementById("solutionsTable");
     if (!table) {
         console.error("Solutions table not found");
         return;
     }
+
+    updateTotals();
 
     const rows = table.tBodies[0].rows;
     let maxImpact = 0;
@@ -268,8 +263,8 @@ function updateSolutionTable() {
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const solution = row.cells[1].textContent;
-        const impact = calculateTotalImpact(solution);
-        const cost = calculateTotalCost(solution);
+        const impact = state.totalImpacts[solution] || 0;
+        const cost = state.totalCosts[solution] || 0;
         maxImpact = Math.max(maxImpact, impact);
         maxCost = Math.max(maxCost, cost);
         rowData.push({ row, solution, impact, cost });
@@ -333,37 +328,8 @@ function updateSolutionTable() {
 
     updateSliderRanges();
     filterSolutionTable();
-    renderCells(); // Re-render cells to update colors based on new sorting
-    updateSelectionRectangle(); // Update the selection rectangle
-}
-
-function calculateTotalImpact(solution) {
-    return Array.from(state.selectedCellKeys).reduce((total, key) => {
-        const cell = state.allCells.get(key);
-        if (cell && cell.scores && cell.scores[solution]) {
-            return total + (cell.scores[solution].impact || 0);
-        }
-        return total;
-    }, 0);
-}
-
-function calculateTotalCost(solution) {
-    return Array.from(state.selectedCellKeys).reduce((total, key) => {
-        const cell = state.allCells.get(key);
-        if (cell && cell.scores && cell.scores[solution]) {
-            return total + (cell.scores[solution].cost || 0);
-        }
-        return total;
-    }, 0);
-}
-
-function toggleSort(column) {
-    if (state.currentSortColumn === column) {
-        updateState({ isAscending: !state.isAscending });
-    } else {
-        updateState({ currentSortColumn: column, isAscending: column === 'cost' });
-    }
-    updateSolutionTable();
+    renderCells();
+    updateSelectionRectangle();
 }
 
 function sortRowData(rowData) {
@@ -392,9 +358,9 @@ function filterSolutionTable() {
     const rows = table.tBodies[0].rows;
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const impact = parseFloat(row.cells[2].querySelector('.value').textContent);
-        const cost = parseFloat(row.cells[3].querySelector('.value').textContent);
         const solution = row.cells[1].textContent;
+        const impact = state.totalImpacts[solution] || 0;
+        const cost = state.totalCosts[solution] || 0;
         const isSelected = state.selectedSolutions[solution] !== false;
 
         const isWithinFilter = impact >= impactMin && impact <= impactMax &&
@@ -413,7 +379,7 @@ function filterSolutionTable() {
     }
 }
 
-function updateUIForCategory(challengeCategory) {
+export function updateUIForCategory(challengeCategory) {
     updateSolutionTable();
 }
 
@@ -426,7 +392,7 @@ function createButtons(containerId, dataArray, buttonClass) {
 
     container.innerHTML = '';
     dataArray.forEach(d => {
-const button = document.createElement("button");
+        const button = document.createElement("button");
         button.className = buttonClass;
         button.textContent = d;
         button.addEventListener("click", function() {
@@ -453,7 +419,15 @@ function updateCategoryDropdown(category) {
     }
 }
 
-// Export all functions that need to be accessed from other modules
+function toggleSort(column) {
+    if (state.currentSortColumn === column) {
+        updateState({ isAscending: !state.isAscending });
+    } else {
+        updateState({ currentSortColumn: column, isAscending: column === 'cost' });
+    }
+    updateSolutionTable();
+}
+
 export {
     setupUI,
     updateSolutionTable,

@@ -1,7 +1,4 @@
 // stateModule.js
-import { loadTilesForViewport, calculateSuitabilityScores } from './dataModule.js';
-import { updateUIForCategory, updateSolutionTable } from './uiModule.js';
-
 export const state = {
     allCells: new Map(),
     solutionCriteria: {},
@@ -29,7 +26,9 @@ export const state = {
     impactFilter: [0, 100],
     costFilter: [0, 100],
     currentSortColumn: 'impact',
-    isAscending: true
+    isAscending: true,
+    totalImpacts: {},
+    totalCosts: {}
 };
 
 export function updateState(newState) {
@@ -39,6 +38,7 @@ export function updateState(newState) {
 export function updateSelectedCellKeys(newSelectedCellKeys) {
     state.selectedCellKeys = new Set(newSelectedCellKeys);
     state.mapNeedsUpdate = true;
+    updateTotals();
     if (state.callUpdateScores) {
         state.callUpdateScores();
     }
@@ -65,6 +65,7 @@ export async function updateMap(challengeCategory) {
         await calculateSuitabilityScores(bounds, challengeCategory);
 
         updateUIForCategory(challengeCategory);
+        updateTotals();
 
         state.mapNeedsUpdate = true;
         if (state.callUpdateScores) {
@@ -102,4 +103,27 @@ export function getRasterValueAtPoint(raster, lat, lng) {
 
     console.log('Invalid raster coordinates', { x, y, width, height });
     return 0;
+}
+
+export function updateTotals() {
+    const totalImpacts = {};
+    const totalCosts = {};
+
+    Object.keys(state.solutionCriteria).forEach(solution => {
+        let impactSum = 0;
+        let costSum = 0;
+
+        state.selectedCellKeys.forEach(key => {
+            const cell = state.allCells.get(key);
+            if (cell && cell.scores && cell.scores[solution]) {
+                impactSum += cell.scores[solution].impact || 0;
+                costSum += cell.scores[solution].cost || 0;
+            }
+        });
+
+        totalImpacts[solution] = impactSum;
+        totalCosts[solution] = costSum;
+    });
+
+    updateState({ totalImpacts, totalCosts });
 }

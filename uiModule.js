@@ -1,7 +1,7 @@
 // uiModule.js
-
 import { state, updateState, updateMap, updateTotals } from './stateModule.js';
 import { renderCells, updateSelectionRectangle } from './mapModule.js';
+import { updateSliderRanges } from './sliderModule.js';
 
 let isUpdating = false;
 
@@ -170,7 +170,7 @@ function setupFilterSliders() {
             isUpdating = true;
             const impactValue = document.getElementById("impactValue");
             if (impactValue) {
-                impactValue.textContent = `${values[0]} - ${values[1]}`;
+                impactValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
             }
             updateState({ impactFilter: values.map(Number) });
             updateSolutionTable();
@@ -183,7 +183,7 @@ function setupFilterSliders() {
             isUpdating = true;
             const costValue = document.getElementById("costValue");
             if (costValue) {
-                costValue.textContent = `${values[0]} - ${values[1]}`;
+                costValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
             }
             updateState({ costFilter: values.map(Number) });
             updateSolutionTable();
@@ -203,7 +203,7 @@ function updateSolutionTable() {
     const table = document.getElementById("solutionsTable");
     if (!table) {
         console.warn("Solutions table not found, retrying...");
-        setTimeout(updateSolutionTable, 100);
+        setTimeout(updateSolutionTable, 100); // Retry after a short delay
         isUpdating = false;
         return;
     }
@@ -211,18 +211,15 @@ function updateSolutionTable() {
     updateTotals();
 
     const rows = table.tBodies[0].rows;
-    let maxImpact = 0;
-    let maxCost = 0;
+    const { maxImpact, maxCost } = calculateMaxValues();
 
-    // First pass: calculate max values and collect row data
+    // First pass: collect row data
     const rowData = [];
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const solution = row.cells[1].textContent;
         const impact = state.totalImpacts[solution] || 0;
         const cost = state.totalCosts[solution] || 0;
-        maxImpact = Math.max(maxImpact, impact);
-        maxCost = Math.max(maxCost, cost);
         rowData.push({ row, solution, impact, cost });
     }
 
@@ -290,98 +287,32 @@ function updateSolutionTable() {
     isUpdating = false;
 }
 
-function sortRowData(rowData) {
-    rowData.sort((a, b) => {
-        const aValue = state.currentSortColumn === 'impact' ? a.impact : a.cost;
-        const bValue = state.currentSortColumn === 'impact' ? b.impact : b.cost;
-        return state.isAscending ? aValue - bValue : bValue - aValue;
-    });
-}
-
-function updateSliderRanges() {
-    if (isUpdating) return;
-    isUpdating = true;
-
-    const impactSlider = document.getElementById("impactSlider");
-    const costSlider = document.getElementById("costSlider");
-
-    if (!impactSlider || !costSlider) {
-        console.warn("Slider elements not found, retrying...");
-        setTimeout(updateSliderRanges, 100);
-        isUpdating = false;
-        return;
-    }
-
-    const { maxImpact, maxCost } = calculateMaxValues();
-
-    // Get current slider values
-    const currentImpactValues = impactSlider.noUiSlider.get().map(Number);
-    const currentCostValues = costSlider.noUiSlider.get().map(Number);
-
-    // Update impact slider
-    updateSliderOptions(impactSlider, maxImpact, currentImpactValues);
-
-    // Update cost slider
-    updateSliderOptions(costSlider, maxCost, currentCostValues);
-
-    // Update state with the new values
-    updateState({
-        impactFilter: impactSlider.noUiSlider.get().map(Number),
-        costFilter: costSlider.noUiSlider.get().map(Number)
-    });
-
-    isUpdating = false;
-}
-
 function calculateMaxValues() {
     let maxImpact = 0;
     let maxCost = 0;
 
-    // Only consider selected cells
-    state.selectedCellKeys.forEach(key => {
-        const cell = state.allCells.get(key);
-        if (cell && cell.scores) {
-            Object.keys(state.solutionCriteria).forEach(solution => {
-                if (cell.scores[solution]) {
-                    maxImpact = Math.max(maxImpact, cell.scores[solution].impact || 0);
-                    maxCost = Math.max(maxCost, cell.scores[solution].cost || 0);
-                }
-            });
-        }
+    Object.keys(state.solutionCriteria).forEach(solution => {
+        maxImpact = Math.max(maxImpact, state.totalImpacts[solution] || 0);
+        maxCost = Math.max(maxCost, state.totalCosts[solution] || 0);
     });
-
-    // If no cells are selected, use the total impacts and costs
-    if (state.selectedCellKeys.size === 0) {
-        Object.keys(state.solutionCriteria).forEach(solution => {
-            maxImpact = Math.max(maxImpact, state.totalImpacts[solution] || 0);
-            maxCost = Math.max(maxCost, state.totalCosts[solution] || 0);
-        });
-    }
 
     return { maxImpact, maxCost };
 }
 
-function updateSliderOptions(slider, maxValue, currentValues) {
-    const epsilon = 0.0001; // Small value to avoid equal min and max
-    const newMax = Math.max(maxValue, currentValues[1], epsilon);
-    
-    slider.noUiSlider.updateOptions({
-        range: {
-            'min': 0,
-            'max': newMax
+function sortRowData(rowData) {
+    rowData.sort((a, b) => {
+        const aValue = state.currentSortColumn === 'impact' ? a.impact : a.cost;
+        const bValue = state.currentSortColumn === 'impact' ? b.impact : b.cost;
+        if (state.currentSortColumn === 'cost') {
+            return state.isAscending ? aValue - bValue : bValue - aValue;
+        } else {
+            return state.isAscending ? bValue - aValue : aValue - bValue;
         }
-    }, true); // The 'true' here prevents the 'update' event from firing
-
-    // Set sliders to their current values, but ensure they don't exceed the new max
-    slider.noUiSlider.set([
-        Math.min(currentValues[0], newMax),
-        Math.min(currentValues[1], newMax)
-    ]);
+    });
 }
 
 function updateUIForCategory(challengeCategory) {
     updateSolutionTable();
-    updateSliderRanges();
 }
 
 function createButtons(containerId, dataArray, buttonClass) {
@@ -424,19 +355,16 @@ function toggleSort(column) {
     if (state.currentSortColumn === column) {
         updateState({ isAscending: !state.isAscending });
     } else {
-        updateState({ currentSortColumn: column, isAscending: true });
+        updateState({ currentSortColumn: column, isAscending: column === 'cost' });
     }
     updateSolutionTable();
     renderCells();
 }
 
-// Export all necessary functions
 export {
     setupUI,
     updateSolutionTable,
     updateUIForCategory,
     createButtons,
-    updateCategoryDropdown,
-    toggleSort,
-    updateSliderRanges
+    updateCategoryDropdown
 };

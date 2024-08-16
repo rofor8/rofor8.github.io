@@ -1,5 +1,7 @@
 // interactionModule.js
 import { state, updateState } from './stateModule.js';
+import { updateSliderRanges } from './sliderModule.js';
+import { updateSolutionTable } from './uiModule.js';
 
 export function toggleCellSelection(key) {
     const newSelectedCellKeys = new Set(state.selectedCellKeys);
@@ -14,6 +16,8 @@ export function toggleCellSelection(key) {
     } else {
         console.warn('callUpdateScores is not set');
     }
+    updateSliderRanges();
+    updateSolutionTable();
 }
 
 export function clearSelection() {

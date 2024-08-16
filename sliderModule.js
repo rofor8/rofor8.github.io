@@ -18,10 +18,10 @@ export function updateSliderRanges() {
     const { minImpact, maxImpact, minCost, maxCost } = calculateRangesForSelection();
 
     // Update impact slider
-    updateSliderOptions(impactSlider, minImpact, maxImpact, state.impactFilter);
+    updateSliderOptions(impactSlider, minImpact, maxImpact, [maxImpact, maxImpact]);
 
     // Update cost slider
-    updateSliderOptions(costSlider, minCost, maxCost, state.costFilter);
+    updateSliderOptions(costSlider, minCost, maxCost, [maxCost, maxCost]);
 
     // Update state with the new values
     updateState({
@@ -31,6 +31,7 @@ export function updateSliderRanges() {
 
     state.isUpdating = false;
 }
+
 
 function updateSliderOptions(slider, minValue, maxValue, currentValues) {
     const epsilon = 0.01; // Small value to avoid equal min and max
@@ -44,12 +45,11 @@ function updateSliderOptions(slider, minValue, maxValue, currentValues) {
         }
     }, true); // The 'true' here prevents the 'update' event from firing
 
-    // Set sliders to their current values, but ensure they don't exceed the new range
-    slider.noUiSlider.set([
-        Math.max(currentValues[0], newMin),
-        Math.min(currentValues[1], newMax)
-    ]);
+    // Set sliders to their calculated min and max values
+    slider.noUiSlider.set([newMin, newMax]);
 }
+
+
 
 function calculateRangesForSelection() {
     let minImpact = Infinity;

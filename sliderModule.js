@@ -57,24 +57,28 @@ function calculateRangesForSelection() {
     let minCost = Infinity;
     let maxCost = -Infinity;
 
+    const cellCount = state.selectedCellKeys.size;
+
     state.selectedCellKeys.forEach(key => {
         const cell = state.allCells.get(key);
         if (cell && cell.scores) {
             Object.values(cell.scores).forEach(score => {
                 if (score.impact !== undefined) {
-                    minImpact = Math.min(minImpact, score.impact);
-                    maxImpact = Math.max(maxImpact, score.impact);
+                    const totalImpact = score.impact * cellCount;
+                    minImpact = Math.min(minImpact, totalImpact);
+                    maxImpact = Math.max(maxImpact, totalImpact);
                 }
                 if (score.cost !== undefined) {
-                    minCost = Math.min(minCost, score.cost);
-                    maxCost = Math.max(maxCost, score.cost);
+                    const totalCost = score.cost * cellCount;
+                    minCost = Math.min(minCost, totalCost);
+                    maxCost = Math.max(maxCost, totalCost);
                 }
             });
         }
     });
 
     // If no cells are selected, use the overall ranges
-    if (state.selectedCellKeys.size === 0) {
+    if (cellCount === 0) {
         Object.values(state.totalImpacts).forEach(impact => {
             minImpact = Math.min(minImpact, impact);
             maxImpact = Math.max(maxImpact, impact);

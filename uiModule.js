@@ -203,30 +203,33 @@ function updateSolutionTable() {
     const table = document.getElementById("solutionsTable");
     if (!table) {
         console.warn("Solutions table not found, retrying...");
-        setTimeout(updateSolutionTable, 100); // Retry after a short delay
+        setTimeout(updateSolutionTable, 100);
         isUpdating = false;
         return;
     }
 
-    updateTotals();
+    // Calculate totals for selected cells
+    const selectedTotals = calculateSelectedTotals();
 
     const rows = table.tBodies[0].rows;
-    const { maxImpact, maxCost } = calculateMaxValues();
+    const { maxImpact, maxCost } = calculateMaxValues(selectedTotals);
 
-    // First pass: collect row data
+    // Collect row data
     const rowData = [];
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const solution = row.cells[1].textContent;
-        const impact = state.totalImpacts[solution] || 0;
-        const cost = state.totalCosts[solution] || 0;
+        const impact = selectedTotals[solution]?.impact || 0;
+        const cost = selectedTotals[solution]?.cost || 0;
+
+        // Always include the solution, we'll filter visually later
         rowData.push({ row, solution, impact, cost });
     }
 
     // Sort row data
     sortRowData(rowData);
 
-    // Second pass: update cells and bar graphs, and reorder rows
+    // Update cells and bar graphs, and reorder rows
     const tbody = table.tBodies[0];
     tbody.innerHTML = ''; // Clear existing rows
     rowData.forEach(({ row, solution, impact, cost }) => {
@@ -287,15 +290,30 @@ function updateSolutionTable() {
     isUpdating = false;
 }
 
-function calculateMaxValues() {
+function calculateSelectedTotals() {
+    const totals = {};
+    state.selectedCellKeys.forEach(key => {
+        const cell = state.allCells.get(key);
+        if (cell && cell.scores) {
+            Object.entries(cell.scores).forEach(([solution, scores]) => {
+                if (!totals[solution]) {
+                    totals[solution] = { impact: 0, cost: 0 };
+                }
+                totals[solution].impact += scores.impact || 0;
+                totals[solution].cost += scores.cost || 0;
+            });
+        }
+    });
+    return totals;
+}
+
+function calculateMaxValues(totals) {
     let maxImpact = 0;
     let maxCost = 0;
-
-    Object.keys(state.solutionCriteria).forEach(solution => {
-        maxImpact = Math.max(maxImpact, state.totalImpacts[solution] || 0);
-        maxCost = Math.max(maxCost, state.totalCosts[solution] || 0);
+    Object.values(totals).forEach(({ impact, cost }) => {
+        maxImpact = Math.max(maxImpact, impact);
+        maxCost = Math.max(maxCost, cost);
     });
-
     return { maxImpact, maxCost };
 }
 

@@ -223,6 +223,3 @@ export function updateScores(
         .text("Total Cost");
 }
 
-// Assuming 'state' is globally accessible or passed to this function
-state.maxImpact = d3.max([totalImpact, d3.max(Object.values(rankTotals).map(d => d.impact))]);
-state.maxCost = d3.max([totalCost, d3.max(Object.values(rankTotals).map(d => d.cost))]);

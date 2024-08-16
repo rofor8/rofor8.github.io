@@ -1,5 +1,5 @@
 // mapModule.js
-import { state, updateState, updateSelectedCellKeys, updateMap, updateTotals } from './stateModule.js';
+import { state, updateState, updateSelectedCellKeys, updateMap, updateTotals, isWithinFilters } from './stateModule.js';
 import { toggleCellSelection } from './interactionModule.js';
 
 export function initMap() {
@@ -108,21 +108,7 @@ export function renderCells() {
                     .filter(([sol, scores]) => {
                         const isSelected = state.selectedSolutions[sol] !== false;
                         const hasPositiveScore = scores.impact > 0 || scores.cost > 0;
-                        
-                        if (!isSelected || !hasPositiveScore) return false;
-                        
-                        // Only apply filters to selected cells
-                        if (state.selectedCellKeys.has(key)) {
-                            const totalImpact = state.totalImpacts[sol] || 0;
-                            const totalCost = state.totalCosts[sol] || 0;
-                            const isWithinImpactRange = totalImpact >= state.impactFilter[0] && 
-                                                        totalImpact <= state.impactFilter[1];
-                            const isWithinCostRange = totalCost >= state.costFilter[0] &&
-                                                      totalCost <= state.costFilter[1];
-                            return isWithinImpactRange && isWithinCostRange;
-                        }
-                        
-                        return true; // For non-selected cells, don't apply filters
+                        return isSelected && hasPositiveScore;
                     });
 
                 if (validSolutions.length > 0) {
@@ -163,14 +149,72 @@ export function renderCells() {
     });
 }
 
+export function renderSelectedCells() {
+    if (!state.map || !state.gridLayer) return;
+    
+    state.selectedCellKeys.forEach(key => {
+        const cell = state.allCells.get(key);
+        if (cell) {
+            const cellBounds = L.latLngBounds(cell.bounds);
+            let fillColor = "rgba(200,200,200,0.5)";
+            let fillOpacity = 0.9;
+
+            if (cell.scores) {
+                let validSolutions = Object.entries(cell.scores)
+                    .filter(([sol, scores]) => {
+                        const isSelected = state.selectedSolutions[sol] !== false;
+                        const hasPositiveScore = scores.impact > 0 || scores.cost > 0;
+                        return isSelected && hasPositiveScore && isWithinFilters(sol);
+                    });
+
+                if (validSolutions.length > 0) {
+                    validSolutions.sort((a, b) => {
+                        const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
+                        const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
+                        if (state.currentSortColumn === 'cost') {
+                            return state.isAscending ? aValue - bValue : bValue - aValue;
+                        } else {
+                            return state.isAscending ? bValue - aValue : aValue - bValue;
+                        }
+                    });
+
+                    // Select the top solution for coloring
+                    const selectedSolution = validSolutions[0];
+                    fillColor = state.colorScale(selectedSolution[0]);
+                }
+            }
+
+            const existingLayer = state.gridLayer.getLayers().find(layer => 
+                layer.getBounds().equals(cellBounds)
+            );
+
+            if (existingLayer) {
+                existingLayer.setStyle({
+                    fillColor: fillColor,
+                    fillOpacity: fillOpacity
+                });
+            } else {
+                const rectangle = L.rectangle(cellBounds, {
+                    color: 'red',
+                    weight: 2,
+                    fillColor: fillColor,
+                    fillOpacity: fillOpacity
+                }).addTo(state.gridLayer);
+
+                rectangle.on('click', function() {
+                    if (!state.isDrawMode) {
+                        toggleCellSelection(key);
+                    }
+                });
+            }
+        }
+    });
+}
+
 function getTopSolutionValue(scores) {
     const validSolutions = Object.entries(scores)
         .filter(([sol, scores]) => {
-            return state.selectedSolutions[sol] !== false &&
-                   scores.impact >= state.impactFilter[0] && 
-                   scores.impact <= state.impactFilter[1] &&
-                   scores.cost >= state.costFilter[0] &&
-                   scores.cost <= state.costFilter[1];
+            return state.selectedSolutions[sol] !== false && isWithinFilters(sol);
         });
 
     if (validSolutions.length === 0) return 0;

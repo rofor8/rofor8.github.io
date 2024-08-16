@@ -1,7 +1,7 @@
 // stateModule.js
 import { loadTilesForViewport, calculateSuitabilityScores } from './dataModule.js';
 import { updateUIForCategory, updateSolutionTable } from './uiModule.js';
-import { renderCells } from './mapModule.js';
+import { renderCells, renderSelectedCells } from './mapModule.js';
 
 export const state = {
     allCells: new Map(),
@@ -32,7 +32,9 @@ export const state = {
     currentSortColumn: 'impact',
     isAscending: true,
     totalImpacts: {},
-    totalCosts: {}
+    totalCosts: {},
+    impactRange: [0, 100],
+    costRange: [0, 100]
 };
 
 export function updateState(newState) {
@@ -47,7 +49,7 @@ export function updateSelectedCellKeys(newSelectedCellKeys) {
         state.callUpdateScores();
     }
     updateSolutionTable();
-    renderCells();
+    renderSelectedCells();
 }
 
 export async function updateMap(challengeCategory) {
@@ -112,22 +114,55 @@ export function getRasterValueAtPoint(raster, lat, lng) {
 export function updateTotals() {
     const totalImpacts = {};
     const totalCosts = {};
+    let minImpact = Infinity;
+    let maxImpact = -Infinity;
+    let minCost = Infinity;
+    let maxCost = -Infinity;
 
-    Object.keys(state.solutionCriteria).forEach(solution => {
-        let impactSum = 0;
-        let costSum = 0;
+    state.selectedCellKeys.forEach(key => {
+        const cell = state.allCells.get(key);
+        if (cell && cell.scores) {
+            Object.entries(cell.scores).forEach(([solution, scores]) => {
+                if (!totalImpacts[solution]) totalImpacts[solution] = 0;
+                if (!totalCosts[solution]) totalCosts[solution] = 0;
+                
+                totalImpacts[solution] += scores.impact || 0;
+                totalCosts[solution] += scores.cost || 0;
 
-        state.selectedCellKeys.forEach(key => {
-            const cell = state.allCells.get(key);
-            if (cell && cell.scores && cell.scores[solution]) {
-                impactSum += cell.scores[solution].impact || 0;
-                costSum += cell.scores[solution].cost || 0;
-            }
-        });
-
-        totalImpacts[solution] = impactSum;
-        totalCosts[solution] = costSum;
+                minImpact = Math.min(minImpact, totalImpacts[solution]);
+                maxImpact = Math.max(maxImpact, totalImpacts[solution]);
+                minCost = Math.min(minCost, totalCosts[solution]);
+                maxCost = Math.max(maxCost, totalCosts[solution]);
+            });
+        }
     });
 
-    updateState({ totalImpacts, totalCosts });
+    // Ensure we always have valid ranges
+    if (minImpact === Infinity) minImpact = 0;
+    if (maxImpact === -Infinity) maxImpact = 100;
+    if (minCost === Infinity) minCost = 0;
+    if (maxCost === -Infinity) maxCost = 100;
+
+    updateState({ 
+        totalImpacts, 
+        totalCosts, 
+        impactRange: [minImpact, maxImpact],
+        costRange: [minCost, maxCost],
+        impactFilter: [minImpact, maxImpact],
+        costFilter: [minCost, maxCost]
+    });
+}
+
+export function isWithinFilters(solution) {
+    const impact = state.totalImpacts[solution] || 0;
+    const cost = state.totalCosts[solution] || 0;
+    return impact >= state.impactFilter[0] && impact <= state.impactFilter[1] &&
+           cost >= state.costFilter[0] && cost <= state.costFilter[1];
+}
+
+export function getFilterRanges() {
+    return {
+        impact: state.impactRange,
+        cost: state.costRange
+    };
 }

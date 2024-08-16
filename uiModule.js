@@ -1,7 +1,6 @@
 // uiModule.js
-import { state, updateState, updateMap, updateTotals } from './stateModule.js';
-import { renderCells, updateSelectionRectangle } from './mapModule.js';
-import { updateSliderRanges } from './sliderModule.js';
+import { state, updateState, updateMap, updateTotals, isWithinFilters, getFilterRanges } from './stateModule.js';
+import { renderCells, updateSelectionRectangle, renderSelectedCells } from './mapModule.js';
 
 let isUpdating = false;
 
@@ -87,7 +86,7 @@ function setupSolutionTable() {
                 }
             });
             updateSolutionTable();
-            renderCells();
+            renderSelectedCells();
         });
         checkboxCell.appendChild(checkbox);
 
@@ -123,79 +122,6 @@ function setupSolutionTable() {
     setTimeout(updateSolutionTable, 0);
 }
 
-function setupFilterSliders() {
-    const sliderContainer = document.getElementById("filterSliders");
-    if (!sliderContainer) {
-        console.error("Filter sliders container not found");
-        return;
-    }
-
-    sliderContainer.innerHTML = `
-        <div class="slider-container">
-            <label for="impactSlider">Impact Filter:</label>
-            <div id="impactSlider"></div>
-            <span id="impactValue"></span>
-        </div>
-        <div class="slider-container">
-            <label for="costSlider">Cost Filter:</label>
-            <div id="costSlider"></div>
-            <span id="costValue"></span>
-        </div>
-    `;
-
-    const impactSlider = document.getElementById("impactSlider");
-    const costSlider = document.getElementById("costSlider");
-
-    if (impactSlider && costSlider) {
-        noUiSlider.create(impactSlider, {
-            start: [0, 100],
-            connect: true,
-            range: {
-                'min': 0,
-                'max': 100
-            }
-        });
-
-        noUiSlider.create(costSlider, {
-            start: [0, 100],
-            connect: true,
-            range: {
-                'min': 0,
-                'max': 100
-            }
-        });
-
-        impactSlider.noUiSlider.on('update', function (values, handle) {
-            if (isUpdating) return;
-            isUpdating = true;
-            const impactValue = document.getElementById("impactValue");
-            if (impactValue) {
-                impactValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
-            }
-            updateState({ impactFilter: values.map(Number) });
-            updateSolutionTable();
-            renderCells();
-            isUpdating = false;
-        });
-
-        costSlider.noUiSlider.on('update', function (values, handle) {
-            if (isUpdating) return;
-            isUpdating = true;
-            const costValue = document.getElementById("costValue");
-            if (costValue) {
-                costValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
-            }
-            updateState({ costFilter: values.map(Number) });
-            updateSolutionTable();
-            renderCells();
-            isUpdating = false;
-        });
-    }
-
-    // Call updateSliderRanges after a short delay to ensure the sliders are in the DOM
-    setTimeout(updateSliderRanges, 0);
-}
-
 function updateSolutionTable() {
     if (isUpdating) return;
     isUpdating = true;
@@ -222,8 +148,10 @@ function updateSolutionTable() {
         const impact = selectedTotals[solution]?.impact || 0;
         const cost = selectedTotals[solution]?.cost || 0;
 
-        // Always include the solution, we'll filter visually later
-        rowData.push({ row, solution, impact, cost });
+        // Only include solutions that are within the filter ranges
+        if (isWithinFilters(solution)) {
+            rowData.push({ row, solution, impact, cost });
+        }
     }
 
     // Sort row data
@@ -248,7 +176,7 @@ function updateSolutionTable() {
                 }
             });
             updateSolutionTable();
-            renderCells();
+            renderSelectedCells();
         });
         checkboxCell.appendChild(checkbox);
 
@@ -269,12 +197,6 @@ function updateSolutionTable() {
         impactBar.style.backgroundColor = state.colorScale(solution);
         costBar.style.backgroundColor = state.colorScale(solution);
 
-        // Set opacity based on selection status and filter
-        const isWithinFilter = impact >= state.impactFilter[0] && impact <= state.impactFilter[1] &&
-                               cost >= state.costFilter[0] && cost <= state.costFilter[1];
-        const rowOpacity = state.selectedSolutions[solution] !== false && isWithinFilter ? 1 : 0.5;
-        row.style.opacity = rowOpacity;
-
         // Append the row to tbody
         tbody.appendChild(row);
     });
@@ -288,6 +210,106 @@ function updateSolutionTable() {
 
     updateSliderRanges();
     isUpdating = false;
+}
+
+function setupFilterSliders() {
+    const sliderContainer = document.getElementById("filterSliders");
+    if (!sliderContainer) {
+        console.error("Filter sliders container not found");
+        return;
+    }
+
+    sliderContainer.innerHTML = `
+        <div class="slider-container">
+            <label for="impactSlider">Impact Filter:</label>
+            <div id="impactSlider"></div>
+            <span id="impactValue"></span>
+        </div>
+        <div class="slider-container">
+            <label for="costSlider">Cost Filter:</label>
+            <div id="costSlider"></div>
+            <span id="costValue"></span>
+        </div>
+    `;
+
+    const impactSlider = document.getElementById("impactSlider");
+    const costSlider = document.getElementById("costSlider");
+
+    if (impactSlider && costSlider) {
+        const ranges = getFilterRanges();
+
+        noUiSlider.create(impactSlider, {
+            start: [ranges.impact[0], ranges.impact[1]],
+            connect: true,
+            range: {
+                'min': ranges.impact[0],
+                'max': Math.max(ranges.impact[1], ranges.impact[0] + 0.01)
+            },
+            step: 0.01
+        });
+
+        noUiSlider.create(costSlider, {
+            start: [ranges.cost[0], ranges.cost[1]],
+            connect: true,
+            range: {
+                'min': ranges.cost[0],
+                'max': Math.max(ranges.cost[1], ranges.cost[0] + 0.01)
+            },
+            step: 0.01
+        });
+
+        impactSlider.noUiSlider.on('update', function (values, handle) {
+            if (isUpdating) return;
+            isUpdating = true;
+            const impactValue = document.getElementById("impactValue");
+            if (impactValue) {
+                impactValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
+            }
+            updateState({ impactFilter: values.map(Number) });
+            updateSolutionTable();
+            renderSelectedCells();
+            isUpdating = false;
+        });
+
+        costSlider.noUiSlider.on('update', function (values, handle) {
+            if (isUpdating) return;
+            isUpdating = true;
+            const costValue = document.getElementById("costValue");
+            if (costValue) {
+                costValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
+            }
+            updateState({ costFilter: values.map(Number) });
+            updateSolutionTable();
+            renderSelectedCells();
+            isUpdating = false;
+        });
+    }
+}
+
+function updateSliderRanges() {
+    const ranges = getFilterRanges();
+    const impactSlider = document.getElementById("impactSlider");
+    const costSlider = document.getElementById("costSlider");
+
+    if (impactSlider && impactSlider.noUiSlider) {
+        impactSlider.noUiSlider.updateOptions({
+            range: {
+                'min': ranges.impact[0],
+                'max': Math.max(ranges.impact[1], ranges.impact[0] + 0.01)
+            }
+        });
+        impactSlider.noUiSlider.set([ranges.impact[0], ranges.impact[1]]);
+    }
+
+    if (costSlider && costSlider.noUiSlider) {
+        costSlider.noUiSlider.updateOptions({
+            range: {
+                'min': ranges.cost[0],
+                'max': Math.max(ranges.cost[1], ranges.cost[0] + 0.01)
+            }
+        });
+        costSlider.noUiSlider.set([ranges.cost[0], ranges.cost[1]]);
+    }
 }
 
 function calculateSelectedTotals() {
@@ -376,13 +398,15 @@ function toggleSort(column) {
         updateState({ currentSortColumn: column, isAscending: column === 'cost' });
     }
     updateSolutionTable();
-    renderCells();
+    renderSelectedCells();
 }
 
+// Export all necessary functions at the end of the file
 export {
     setupUI,
     updateSolutionTable,
     updateUIForCategory,
     createButtons,
-    updateCategoryDropdown
+    updateCategoryDropdown,
+    updateSliderRanges
 };

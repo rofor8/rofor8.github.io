@@ -1,6 +1,7 @@
 // stateModule.js
 import { loadTilesForViewport, calculateSuitabilityScores } from './dataModule.js';
 import { updateUIForCategory, updateSolutionTable } from './uiModule.js';
+import { renderCells } from './mapModule.js';
 
 export const state = {
     allCells: new Map(),
@@ -29,7 +30,7 @@ export const state = {
     impactFilter: [0, 100],
     costFilter: [0, 100],
     currentSortColumn: 'impact',
-    isAscending: true,
+    isAscending: false,
     totalImpacts: {},
     totalCosts: {}
 };
@@ -45,9 +46,8 @@ export function updateSelectedCellKeys(newSelectedCellKeys) {
     if (state.callUpdateScores) {
         state.callUpdateScores();
     }
-    if (typeof updateSolutionTable === 'function') {
-        updateSolutionTable();
-    }
+    updateSolutionTable();
+    renderCells();
 }
 
 export async function updateMap(challengeCategory) {
@@ -78,6 +78,7 @@ export async function updateMap(challengeCategory) {
         }
 
         updateSolutionTable();
+        renderCells();
     } catch (error) {
         console.error('Error updating map:', error);
     }

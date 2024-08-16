@@ -82,6 +82,13 @@ export function renderCells() {
     state.gridLayer.clearLayers();
     const mapBounds = state.map.getBounds();
     
+    // Sort solutions based on current sorting criteria
+    const sortedSolutions = Object.keys(state.solutionCriteria).sort((a, b) => {
+        const aValue = state.currentSortColumn === 'impact' ? state.totalImpacts[a] : state.totalCosts[a];
+        const bValue = state.currentSortColumn === 'impact' ? state.totalImpacts[b] : state.totalCosts[b];
+        return state.isAscending ? aValue - bValue : bValue - aValue;
+    });
+
     state.allCells.forEach(({ key, bounds, scores }) => {
         const cellBounds = L.latLngBounds(bounds);
         const isVisible = mapBounds.intersects(cellBounds);
@@ -92,39 +99,31 @@ export function renderCells() {
             let fillOpacity = 0.5;
 
             if (scores) {
-                let validSolutions = Object.entries(scores)
-                    .filter(([sol, scores]) => {
-                        const isSelected = state.selectedSolutions[sol] !== false;
-                        const hasPositiveScore = scores.impact > 0 || scores.cost > 0;
-                        
-                        if (!isSelected) return false;
-                        
-                        // Only apply filters to selected cells
-                        if (isSelected && state.selectedCellKeys.has(key)) {
-                            const isWithinImpactRange = scores.impact >= state.impactFilter[0] && 
-                                                        scores.impact <= state.impactFilter[1];
-                            const isWithinCostRange = scores.cost >= state.costFilter[0] &&
-                                                      scores.cost <= state.costFilter[1];
-                            return isWithinImpactRange && isWithinCostRange && hasPositiveScore;
-                        }
-                        
-                        return hasPositiveScore;
-                    });
+                const validSolutions = sortedSolutions.filter(solution => {
+                    const cellScore = scores[solution];
+                    if (!cellScore) return false;
+
+                    const isSelected = state.selectedSolutions[solution] !== false;
+                    const hasPositiveScore = cellScore.impact > 0 || cellScore.cost > 0;
+                    
+                    if (!isSelected || !hasPositiveScore) return false;
+                    
+                    if (isSelected && state.selectedCellKeys.has(key)) {
+                        const totalImpact = state.totalImpacts[solution] || 0;
+                        const totalCost = state.totalCosts[solution] || 0;
+                        const isWithinImpactRange = totalImpact >= state.impactFilter[0] && 
+                                                    totalImpact <= state.impactFilter[1];
+                        const isWithinCostRange = totalCost >= state.costFilter[0] &&
+                                                  totalCost <= state.costFilter[1];
+                        return isWithinImpactRange && isWithinCostRange;
+                    }
+                    
+                    return true;
+                });
 
                 if (validSolutions.length > 0) {
-                    validSolutions.sort((a, b) => {
-                        const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
-                        const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
-                        if (state.currentSortColumn === 'cost') {
-                            return state.isAscending ? aValue - bValue : bValue - aValue;
-                        } else {
-                            return state.isAscending ? bValue - aValue : aValue - bValue;
-                        }
-                    });
-
-                    // Select the top solution for coloring
-                    const selectedSolution = validSolutions[0];
-                    fillColor = state.colorScale(selectedSolution[0]);
+                    const topSolution = validSolutions[0];
+                    fillColor = state.colorScale(topSolution);
                     fillOpacity = 0.7;
                 }
             }

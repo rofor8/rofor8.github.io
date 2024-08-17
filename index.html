@@ -11,6 +11,8 @@
     <script src="https://unpkg.com/geotiff"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.6.3/nouislider.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.6.3/nouislider.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 
 </head>
 <body>
@@ -24,6 +26,7 @@
         </div>
         <div id="infoPanel">
             <h3>Nature-based Solutions</h3>
+
             <div id="categoryDropdown" class="dropdown">
                 <button class="dropbtn">Select Category</button>
                 <div id="categoryButtons" class="dropdown-content"></div>
@@ -31,7 +34,7 @@
             <div id="filterSliders"></div>
             <div id="solutionsContainer"></div>
             <div id="selectionTotals"></div>
-            
+            <button id="generateReport" style="float: right;">Generate Report</button>
         </div>
     </div>
     <script type="module" src="app.js"></script>

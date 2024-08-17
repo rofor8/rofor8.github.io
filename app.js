@@ -5,10 +5,12 @@ import { loadJSONData, loadAllRasters } from './dataModule.js';
 import { state, updateState, updateMap, getRasterValueAtPoint, updateSelectedCellKeys } from './stateModule.js';
 import { toggleRanking, clearSelection, toggleDrawMode, searchLocation } from './interactionModule.js';
 import { updateScores } from './updateScores.js';
+import { generateReport } from './reportModule.js';
 
 // Main initialization function
 async function initializeApp() {
     try {
+        console.log('Initializing app...');
         const data = await loadJSONData();
         updateState({
             solutionCriteria: data.solutionCriteria,
@@ -57,7 +59,9 @@ async function initializeApp() {
             console.error('Map failed to initialize');
         }
         
+        setupReportButton();
         render(); // Start the render loop
+        console.log('App initialization complete');
     } catch (error) {
         console.error('Error initializing app:', error);
     }
@@ -71,8 +75,33 @@ function render() {
     }
 }
 
+function setupReportButton() {
+    console.log('Setting up report button...');
+    const reportButton = document.getElementById('generateReport');
+    if (!reportButton) {
+        console.error('Generate Report button not found');
+        return;
+    }
+
+    reportButton.addEventListener('click', handleReportGeneration);
+    console.log('Report button event listener attached');
+}
+
+function handleReportGeneration() {
+    console.log('Generate Report button clicked');
+    try {
+        console.log('Calling generateReport function...');
+        generateReport();
+        console.log('Report generation complete');
+    } catch (error) {
+        console.error('Error in report generation:', error);
+        alert(`Error generating report: ${error.message}`);
+    }
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', initializeApp);
+console.log('DOMContentLoaded event listener attached');
 
 // Export functions to global scope for use in HTML
 window.toggleRanking = toggleRanking;

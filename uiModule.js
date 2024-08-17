@@ -135,20 +135,29 @@ function updateSolutionTable() {
     }
 
     const rows = table.tBodies[0].rows;
-    const { maxImpact, maxCost } = calculateMaxValues();
+    const selectedCellCount = state.selectedCellKeys.size;
+
+    // Calculate totals
+    const solutionTotals = {};
+    Object.keys(state.solutionCriteria).forEach(solution => {
+        const impactWeight = state.challengeCategories[state.currentCategory][solution] || 0;
+        const cost = state.solutionCosts[solution] || 0;
+        solutionTotals[solution] = {
+            impact: impactWeight * selectedCellCount,
+            cost: cost * selectedCellCount
+        };
+    });
+
+    // Calculate max values for scaling
+    const maxImpact = Math.max(...Object.values(solutionTotals).map(s => s.impact));
+    const maxCost = Math.max(...Object.values(solutionTotals).map(s => s.cost));
 
     // Collect row data
-    const rowData = [];
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const solution = row.cells[1].textContent;
-        const impact = state.challengeCategories[state.currentCategory][solution] || 0;
-        const cost = state.solutionCosts[solution] || 0;
-
-        if (isWithinFilters(solution, { impact, cost })) {
-            rowData.push({ row, solution, impact, cost });
-        }
-    }
+    const rowData = Object.entries(solutionTotals).map(([solution, totals]) => ({
+        solution,
+        impact: totals.impact,
+        cost: totals.cost
+    })).filter(({ solution }) => isWithinFilters(solution, solutionTotals[solution]));
 
     // Sort row data
     sortRowData(rowData);
@@ -156,10 +165,11 @@ function updateSolutionTable() {
     // Update cells and bar graphs, and reorder rows
     const tbody = table.tBodies[0];
     tbody.innerHTML = ''; // Clear existing rows
-    rowData.forEach(({ row, solution, impact, cost }) => {
-        // Recreate the checkbox and add event listener
-        const checkboxCell = row.cells[0];
-        checkboxCell.innerHTML = '';
+    rowData.forEach(({ solution, impact, cost }) => {
+        const row = document.createElement('tr');
+
+        // Checkbox cell
+        const checkboxCell = row.insertCell();
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.checked = state.selectedSolutions[solution] !== false;
@@ -176,24 +186,36 @@ function updateSolutionTable() {
         });
         checkboxCell.appendChild(checkbox);
 
-        const impactCell = row.cells[2];
-        const costCell = row.cells[3];
+        // Solution name cell
+        const nameCell = row.insertCell();
+        nameCell.textContent = solution;
 
-        const impactBar = impactCell.querySelector('.impact-bar');
-        const costBar = costCell.querySelector('.cost-bar');
-        const impactValue = impactCell.querySelector('.value');
-        const costValue = costCell.querySelector('.value');
-
-        // Update bar graphs
+        // Impact cell with bar graph
+        const impactCell = row.insertCell();
+        impactCell.className = "impact";
+        const impactBar = document.createElement("div");
+        impactBar.className = "bar-graph impact-bar";
         impactBar.style.width = `${(impact / maxImpact) * 100}%`;
         impactBar.style.backgroundColor = state.colorScale(solution);
+        impactCell.appendChild(impactBar);
+        const impactValue = document.createElement("span");
+        impactValue.className = "value";
+        impactValue.textContent = impact.toFixed(2);
+        impactCell.appendChild(impactValue);
+
+        // Cost cell with bar graph
+        const costCell = row.insertCell();
+        costCell.className = "cost";
+        const costBar = document.createElement("div");
+        costBar.className = "bar-graph cost-bar";
         costBar.style.width = `${(cost / maxCost) * 100}%`;
         costBar.style.backgroundColor = state.colorScale(solution);
-
-        impactValue.textContent = impact.toFixed(2);
+        costCell.appendChild(costBar);
+        const costValue = document.createElement("span");
+        costValue.className = "value";
         costValue.textContent = cost.toFixed(2);
+        costCell.appendChild(costValue);
 
-        // Append the row to tbody
         tbody.appendChild(row);
     });
 
@@ -307,27 +329,11 @@ function updateSliderRanges() {
     }
 }
 
-function calculateMaxValues() {
-    let maxImpact = 0;
-    let maxCost = 0;
-    Object.keys(state.solutionCriteria).forEach(solution => {
-        const impact = state.challengeCategories[state.currentCategory][solution] || 0;
-        const cost = state.solutionCosts[solution] || 0;
-        maxImpact = Math.max(maxImpact, impact);
-        maxCost = Math.max(maxCost, cost);
-    });
-    return { maxImpact, maxCost };
-}
-
 function sortRowData(rowData) {
     rowData.sort((a, b) => {
         const aValue = state.currentSortColumn === 'impact' ? a.impact : a.cost;
         const bValue = state.currentSortColumn === 'impact' ? b.impact : b.cost;
-        if (state.currentSortColumn === 'cost') {
-            return state.isAscending ? aValue - bValue : bValue - aValue;
-        } else {
-            return state.isAscending ? bValue - aValue : aValue - bValue;
-        }
+        return state.isAscending ? aValue - bValue : bValue - aValue;
     });
 }
 
@@ -376,7 +382,7 @@ function toggleSort(column) {
     if (state.currentSortColumn === column) {
         updateState({ isAscending: !state.isAscending });
     } else {
-        updateState({ currentSortColumn: column, isAscending: column === 'cost' });
+        updateState({ currentSortColumn: column, isAscending: false });
     }
     updateSolutionTable();
     renderCells();

@@ -2,6 +2,7 @@
 import { state, updateState, updateSelectedCellKeys, updateMap, updateTotals, isWithinFilters } from './stateModule.js';
 import { toggleCellSelection } from './interactionModule.js';
 
+// mapModule.js (continued)
 export function initMap() {
     const map = L.map('map', {
         maxZoom: 20,
@@ -87,11 +88,7 @@ export function renderCells() {
         if (!a.scores || !b.scores) return 0;
         const aValue = getTopSolutionValue(a.scores);
         const bValue = getTopSolutionValue(b.scores);
-        if (state.currentSortColumn === 'cost') {
-            return state.isAscending ? aValue - bValue : bValue - aValue;
-        } else {
-            return state.isAscending ? aValue - bValue : bValue - aValue;
-        }
+        return state.isAscending ? aValue - bValue : bValue - aValue;
     });
 
     sortedCells.forEach(({ key, bounds, scores }) => {
@@ -111,11 +108,7 @@ export function renderCells() {
                     validSolutions.sort((a, b) => {
                         const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
                         const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
-                        if (state.currentSortColumn === 'cost') {
-                            return state.isAscending ? aValue - bValue : bValue - aValue;
-                        } else {
-                            return state.isAscending ? aValue - bValue : bValue - aValue;
-                        }
+                        return state.isAscending ? aValue - bValue : bValue - aValue;
                     });
 
                     // Select the top solution for coloring
@@ -163,11 +156,7 @@ export function renderSelectedCells() {
                     validSolutions.sort((a, b) => {
                         const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
                         const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
-                        if (state.currentSortColumn === 'cost') {
-                            return state.isAscending ? aValue - bValue : bValue - aValue;
-                        } else {
-                            return state.isAscending ? aValue - bValue : bValue - aValue;
-                        }
+                        return state.isAscending ? aValue - bValue : bValue - aValue;
                     });
 
                     // Select the top solution for coloring
@@ -212,11 +201,7 @@ function getTopSolutionValue(scores) {
     validSolutions.sort((a, b) => {
         const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
         const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
-        if (state.currentSortColumn === 'cost') {
-            return state.isAscending ? aValue - bValue : bValue - aValue;
-        } else {
-            return state.isAscending ? aValue - bValue : bValue - aValue;
-        }
+        return state.isAscending ? aValue - bValue : bValue - aValue;
     });
 
     return state.currentSortColumn === 'impact' ? validSolutions[0][1].impact : validSolutions[0][1].cost;

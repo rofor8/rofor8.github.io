@@ -13,7 +13,7 @@ export const state = {
     rasterLayers: {},
     selectedCellKeys: new Set(),
     currentRanking: 'impact',
-    CELL_SIZE: 100, // meters
+    CELL_SIZE: 1, // meters
     currentCategory: "Biodiversity and soils",
     drawLayer: null,
     isDrawMode: false,

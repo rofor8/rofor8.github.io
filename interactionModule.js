@@ -1,7 +1,7 @@
 // interactionModule.js
 import { state, updateState } from './stateModule.js';
-import { updateSliderRanges } from './sliderModule.js';
 import { updateSolutionTable } from './uiModule.js';
+import { renderCells } from './mapModule.js';
 
 export function toggleCellSelection(key) {
     const newSelectedCellKeys = new Set(state.selectedCellKeys);
@@ -16,8 +16,8 @@ export function toggleCellSelection(key) {
     } else {
         console.warn('callUpdateScores is not set');
     }
-    updateSliderRanges();
     updateSolutionTable();
+    renderCells();
 }
 
 export function clearSelection() {
@@ -31,6 +31,8 @@ export function clearSelection() {
     } else {
         console.warn('callUpdateScores is not set');
     }
+    updateSolutionTable();
+    renderCells();
 }
 
 export function toggleDrawMode() {
@@ -137,6 +139,8 @@ export function selectCellsInShape(shape) {
     } else {
         console.warn('callUpdateScores is not set');
     }
+    updateSolutionTable();
+    renderCells();
 }
 
 export function pointInPolygon(point, polygon) {
@@ -187,4 +191,5 @@ export function toggleRanking() {
     } else {
         console.warn('callUpdateScores is not set');
     }
+    renderCells();
 }

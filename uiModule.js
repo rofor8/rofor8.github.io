@@ -86,7 +86,7 @@ function setupSolutionTable() {
                 }
             });
             updateSolutionTable();
-            renderSelectedCells();
+            renderCells();
         });
         checkboxCell.appendChild(checkbox);
 
@@ -148,10 +148,7 @@ function updateSolutionTable() {
         const impact = selectedTotals[solution]?.impact || 0;
         const cost = selectedTotals[solution]?.cost || 0;
 
-        // Only include solutions that are within the filter ranges
-        if (isWithinFilters(solution)) {
-            rowData.push({ row, solution, impact, cost });
-        }
+        rowData.push({ row, solution, impact, cost });
     }
 
     // Sort row data
@@ -176,7 +173,7 @@ function updateSolutionTable() {
                 }
             });
             updateSolutionTable();
-            renderSelectedCells();
+            renderCells();
         });
         checkboxCell.appendChild(checkbox);
 
@@ -188,14 +185,25 @@ function updateSolutionTable() {
         const impactValue = impactCell.querySelector('.value');
         const costValue = costCell.querySelector('.value');
 
-        impactBar.style.width = `${(impact / maxImpact) * 100}%`;
-        costBar.style.width = `${(cost / maxCost) * 100}%`;
+        // Clear bar graphs when values are zero
+        if (impact === 0) {
+            impactBar.style.width = '0%';
+            impactBar.style.backgroundColor = 'transparent';
+        } else {
+            impactBar.style.width = `${(impact / maxImpact) * 100}%`;
+            impactBar.style.backgroundColor = state.colorScale(solution);
+        }
+
+        if (cost === 0) {
+            costBar.style.width = '0%';
+            costBar.style.backgroundColor = 'transparent';
+        } else {
+            costBar.style.width = `${(cost / maxCost) * 100}%`;
+            costBar.style.backgroundColor = state.colorScale(solution);
+        }
+
         impactValue.textContent = impact.toFixed(2);
         costValue.textContent = cost.toFixed(2);
-
-        // Update bar colors
-        impactBar.style.backgroundColor = state.colorScale(solution);
-        costBar.style.backgroundColor = state.colorScale(solution);
 
         // Append the row to tbody
         tbody.appendChild(row);
@@ -208,7 +216,6 @@ function updateSolutionTable() {
         headers[i].classList.toggle('ascending', state.isAscending);
     }
 
-    updateSliderRanges();
     isUpdating = false;
 }
 
@@ -243,7 +250,7 @@ function setupFilterSliders() {
             connect: true,
             range: {
                 'min': ranges.impact[0],
-                'max': Math.max(ranges.impact[1], ranges.impact[0] + 0.01)
+                'max': ranges.impact[1]
             },
             step: 0.01
         });
@@ -253,7 +260,7 @@ function setupFilterSliders() {
             connect: true,
             range: {
                 'min': ranges.cost[0],
-                'max': Math.max(ranges.cost[1], ranges.cost[0] + 0.01)
+                'max': ranges.cost[1]
             },
             step: 0.01
         });
@@ -266,8 +273,8 @@ function setupFilterSliders() {
                 impactValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
             }
             updateState({ impactFilter: values.map(Number) });
+            renderCells();
             updateSolutionTable();
-            renderSelectedCells();
             isUpdating = false;
         });
 
@@ -279,8 +286,8 @@ function setupFilterSliders() {
                 costValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
             }
             updateState({ costFilter: values.map(Number) });
+            renderCells();
             updateSolutionTable();
-            renderSelectedCells();
             isUpdating = false;
         });
     }
@@ -295,7 +302,7 @@ function updateSliderRanges() {
         impactSlider.noUiSlider.updateOptions({
             range: {
                 'min': ranges.impact[0],
-                'max': Math.max(ranges.impact[1], ranges.impact[0] + 0.01)
+                'max': ranges.impact[1]
             }
         });
         impactSlider.noUiSlider.set([ranges.impact[0], ranges.impact[1]]);
@@ -305,7 +312,7 @@ function updateSliderRanges() {
         costSlider.noUiSlider.updateOptions({
             range: {
                 'min': ranges.cost[0],
-                'max': Math.max(ranges.cost[1], ranges.cost[0] + 0.01)
+                'max': ranges.cost[1]
             }
         });
         costSlider.noUiSlider.set([ranges.cost[0], ranges.cost[1]]);
@@ -321,8 +328,10 @@ function calculateSelectedTotals() {
                 if (!totals[solution]) {
                     totals[solution] = { impact: 0, cost: 0 };
                 }
-                totals[solution].impact += scores.impact || 0;
-                totals[solution].cost += scores.cost || 0;
+                if (isWithinFilters(solution, cell.scores)) {
+                    totals[solution].impact += scores.impact || 0;
+                    totals[solution].cost += scores.cost || 0;
+                }
             });
         }
     });
@@ -353,6 +362,7 @@ function sortRowData(rowData) {
 
 function updateUIForCategory(challengeCategory) {
     updateSolutionTable();
+    updateSliderRanges();
 }
 
 function createButtons(containerId, dataArray, buttonClass) {
@@ -398,7 +408,7 @@ function toggleSort(column) {
         updateState({ currentSortColumn: column, isAscending: column === 'cost' });
     }
     updateSolutionTable();
-    renderSelectedCells();
+    renderCells();
 }
 
 // Export all necessary functions at the end of the file

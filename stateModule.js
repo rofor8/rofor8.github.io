@@ -30,11 +30,13 @@ export const state = {
     impactFilter: [0, 100],
     costFilter: [0, 100],
     currentSortColumn: 'impact',
-    isAscending: true,
+    isAscending: false,
     totalImpacts: {},
     totalCosts: {},
     impactRange: [0, 100],
-    costRange: [0, 100]
+    costRange: [0, 100],
+    maxImpactWeight: 0,
+    maxCostPerCell: 0
 };
 
 export function updateState(newState) {
@@ -71,6 +73,7 @@ export async function updateMap(challengeCategory) {
 
         updateUIForCategory(challengeCategory);
         updateTotals();
+        updateMaxValues();
 
         state.mapNeedsUpdate = true;
         if (state.callUpdateScores) {
@@ -114,10 +117,6 @@ export function getRasterValueAtPoint(raster, lat, lng) {
 export function updateTotals() {
     const totalImpacts = {};
     const totalCosts = {};
-    let minImpact = Infinity;
-    let maxImpact = -Infinity;
-    let minCost = Infinity;
-    let maxCost = -Infinity;
 
     state.selectedCellKeys.forEach(key => {
         const cell = state.allCells.get(key);
@@ -128,36 +127,39 @@ export function updateTotals() {
                 
                 totalImpacts[solution] += scores.impact || 0;
                 totalCosts[solution] += scores.cost || 0;
-
-                minImpact = Math.min(minImpact, totalImpacts[solution]);
-                maxImpact = Math.max(maxImpact, totalImpacts[solution]);
-                minCost = Math.min(minCost, totalCosts[solution]);
-                maxCost = Math.max(maxCost, totalCosts[solution]);
             });
         }
     });
 
-    // Ensure we always have valid ranges
-    if (minImpact === Infinity) minImpact = 0;
-    if (maxImpact === -Infinity) maxImpact = 100;
-    if (minCost === Infinity) minCost = 0;
-    if (maxCost === -Infinity) maxCost = 100;
+    updateState({ totalImpacts, totalCosts });
+}
+
+export function updateMaxValues() {
+    let maxImpactWeight = 0;
+    let maxCostPerCell = 0;
+
+    Object.keys(state.solutionCriteria).forEach(solution => {
+        const impactWeight = state.challengeCategories[state.currentCategory][solution] || 0;
+        const costPerCell = state.solutionCosts[solution] || 0;
+
+        maxImpactWeight = Math.max(maxImpactWeight, impactWeight);
+        maxCostPerCell = Math.max(maxCostPerCell, costPerCell);
+    });
 
     updateState({ 
-        totalImpacts, 
-        totalCosts, 
-        impactRange: [minImpact, maxImpact],
-        costRange: [minCost, maxCost],
-        impactFilter: [minImpact, maxImpact],
-        costFilter: [minCost, maxCost]
+        maxImpactWeight, 
+        maxCostPerCell,
+        impactRange: [0, maxImpactWeight * 100], // Multiply by 100 to match the existing scale
+        costRange: [0, maxCostPerCell]
     });
 }
 
-export function isWithinFilters(solution) {
-    const impact = state.totalImpacts[solution] || 0;
-    const cost = state.totalCosts[solution] || 0;
+export function isWithinFilters(solution, cellScores) {
+    const impact = cellScores[solution]?.impact || 0;
+    const cost = cellScores[solution]?.cost || 0;
     return impact >= state.impactFilter[0] && impact <= state.impactFilter[1] &&
-           cost >= state.costFilter[0] && cost <= state.costFilter[1];
+           cost >= state.costFilter[0] && cost <= state.costFilter[1] &&
+           state.selectedSolutions[solution] !== false;
 }
 
 export function getFilterRanges() {

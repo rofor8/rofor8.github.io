@@ -48,7 +48,7 @@ export function updateGrid(map) {
 
     const newCells = new Map();
 
-    // Add cells for the current viewport  c
+    // Add cells for the current viewport
     for (let lat = minLat; lat < maxLat; lat += cellSizeLat) {
         for (let lng = minLng; lng < maxLng; lng += cellSizeLng) {
             const cellKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
@@ -90,7 +90,7 @@ export function renderCells() {
         if (state.currentSortColumn === 'cost') {
             return state.isAscending ? aValue - bValue : bValue - aValue;
         } else {
-            return state.isAscending ? bValue - aValue : aValue - bValue;
+            return state.isAscending ? aValue - bValue : bValue - aValue;
         }
     });
 
@@ -105,11 +105,7 @@ export function renderCells() {
 
             if (scores) {
                 let validSolutions = Object.entries(scores)
-                    .filter(([sol, scores]) => {
-                        const isSelected = state.selectedSolutions[sol] !== false;
-                        const hasPositiveScore = scores.impact > 0 || scores.cost > 0;
-                        return isSelected && hasPositiveScore;
-                    });
+                    .filter(([sol, scores]) => isWithinFilters(sol, scores));
 
                 if (validSolutions.length > 0) {
                     validSolutions.sort((a, b) => {
@@ -118,7 +114,7 @@ export function renderCells() {
                         if (state.currentSortColumn === 'cost') {
                             return state.isAscending ? aValue - bValue : bValue - aValue;
                         } else {
-                            return state.isAscending ? bValue - aValue : aValue - bValue;
+                            return state.isAscending ? aValue - bValue : bValue - aValue;
                         }
                     });
 
@@ -161,11 +157,7 @@ export function renderSelectedCells() {
 
             if (cell.scores) {
                 let validSolutions = Object.entries(cell.scores)
-                    .filter(([sol, scores]) => {
-                        const isSelected = state.selectedSolutions[sol] !== false;
-                        const hasPositiveScore = scores.impact > 0 || scores.cost > 0;
-                        return isSelected && hasPositiveScore && isWithinFilters(sol);
-                    });
+                    .filter(([sol, scores]) => isWithinFilters(sol, scores));
 
                 if (validSolutions.length > 0) {
                     validSolutions.sort((a, b) => {
@@ -174,7 +166,7 @@ export function renderSelectedCells() {
                         if (state.currentSortColumn === 'cost') {
                             return state.isAscending ? aValue - bValue : bValue - aValue;
                         } else {
-                            return state.isAscending ? bValue - aValue : aValue - bValue;
+                            return state.isAscending ? aValue - bValue : bValue - aValue;
                         }
                     });
 
@@ -213,9 +205,7 @@ export function renderSelectedCells() {
 
 function getTopSolutionValue(scores) {
     const validSolutions = Object.entries(scores)
-        .filter(([sol, scores]) => {
-            return state.selectedSolutions[sol] !== false && isWithinFilters(sol);
-        });
+        .filter(([sol, scores]) => isWithinFilters(sol, scores));
 
     if (validSolutions.length === 0) return 0;
 
@@ -225,7 +215,7 @@ function getTopSolutionValue(scores) {
         if (state.currentSortColumn === 'cost') {
             return state.isAscending ? aValue - bValue : bValue - aValue;
         } else {
-            return state.isAscending ? bValue - aValue : aValue - bValue;
+            return state.isAscending ? aValue - bValue : bValue - aValue;
         }
     });
 

@@ -1,6 +1,6 @@
 // uiModule.js
 import { state, updateState, updateMap, updateTotals, isWithinFilters, getFilterRanges } from './stateModule.js';
-import { renderCells, updateSelectionRectangle, renderSelectedCells } from './mapModule.js';
+import { renderCells, updateSelectionRectangle, renderSelectedCells, highlightSolutionCells } from './mapModule.js';
 
 let isUpdating = false;
 
@@ -71,6 +71,7 @@ function setupSolutionTable() {
     // Add table rows
     Object.keys(state.solutionCriteria).forEach(solution => {
         const row = tbody.insertRow();
+        row.setAttribute('data-solution', solution);
 
         // Checkbox cell with color indicator
         const checkboxCell = row.insertCell();
@@ -113,6 +114,10 @@ function setupSolutionTable() {
         const costValue = document.createElement("span");
         costValue.className = "value";
         costCell.appendChild(costValue);
+
+        // Add hover effect
+        row.addEventListener('mouseenter', () => highlightSolutionCells(solution));
+        row.addEventListener('mouseleave', () => renderCells());
     });
 
     solutionsContainer.innerHTML = '';
@@ -157,16 +162,20 @@ function updateSolutionTable() {
         solution,
         impact: totals.impact,
         cost: totals.cost
-    })).filter(({ solution }) => isWithinFilters(solution, solutionTotals[solution]));
+    }));
 
     // Sort row data
     sortRowData(rowData);
 
-    // Update cells and bar graphs, and reorder rows
-    const tbody = table.tBodies[0];
-    tbody.innerHTML = ''; // Clear existing rows
+    // Clear existing rows
+    while (table.tBodies[0].firstChild) {
+        table.tBodies[0].removeChild(table.tBodies[0].firstChild);
+    }
+
+    // Add sorted rows
     rowData.forEach(({ solution, impact, cost }) => {
-        const row = document.createElement('tr');
+        const row = table.tBodies[0].insertRow();
+        row.setAttribute('data-solution', solution);
 
         // Checkbox cell
         const checkboxCell = row.insertCell();
@@ -216,7 +225,11 @@ function updateSolutionTable() {
         costValue.textContent = cost.toFixed(2);
         costCell.appendChild(costValue);
 
-        tbody.appendChild(row);
+        row.style.opacity = state.selectedSolutions[solution] !== false ? '1' : '0.5';
+
+        // Add hover effect
+        row.addEventListener('mouseenter', () => highlightSolutionCells(solution));
+        row.addEventListener('mouseleave', () => renderCells());
     });
 
     // Highlight the current sorting column

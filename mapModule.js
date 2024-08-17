@@ -2,7 +2,6 @@
 import { state, updateState, updateSelectedCellKeys, updateMap, updateTotals, isWithinFilters } from './stateModule.js';
 import { toggleCellSelection } from './interactionModule.js';
 
-// mapModule.js (continued)
 export function initMap() {
     const map = L.map('map', {
         maxZoom: 20,
@@ -102,7 +101,7 @@ export function renderCells() {
 
             if (scores) {
                 let validSolutions = Object.entries(scores)
-                    .filter(([sol, scores]) => isWithinFilters(sol, scores));
+                    .filter(([sol, scores]) => isWithinFilters(sol, scores) && state.selectedSolutions[sol] !== false);
 
                 if (validSolutions.length > 0) {
                     validSolutions.sort((a, b) => {
@@ -150,7 +149,7 @@ export function renderSelectedCells() {
 
             if (cell.scores) {
                 let validSolutions = Object.entries(cell.scores)
-                    .filter(([sol, scores]) => isWithinFilters(sol, scores));
+                    .filter(([sol, scores]) => isWithinFilters(sol, scores) && state.selectedSolutions[sol] !== false);
 
                 if (validSolutions.length > 0) {
                     validSolutions.sort((a, b) => {
@@ -192,9 +191,87 @@ export function renderSelectedCells() {
     });
 }
 
+export function highlightSolutionCells(solution) {
+    if (!state.map || !state.gridLayer) return;
+    state.gridLayer.clearLayers();
+    const mapBounds = state.map.getBounds();
+
+    const criteria = state.solutionCriteria[solution];
+    if (!criteria || criteria.length !== 2) {
+        console.error(`Invalid criteria for solution: ${solution}`);
+        return;
+    }
+
+    state.allCells.forEach(({ key, bounds, scores }) => {
+        const cellBounds = L.latLngBounds(bounds);
+        const isVisible = mapBounds.intersects(cellBounds);
+        const isSelected = state.selectedCellKeys.has(key);
+
+        if (isVisible || isSelected) {
+            let fillColor = "rgba(200,200,200,0.5)";
+            let fillOpacity = 0.5;
+
+            const [lat, lng] = key.split(',').map(Number);
+
+            // Check if both criteria rasters have a value > 0 for this cell
+            const criteriaOverlap = criteria.every(criterion => {
+                const rasterValue = getRasterValueAtPoint(state.criteriaRasters[criterion], lat, lng);
+                return rasterValue > 0;
+            });
+
+            if (criteriaOverlap) {
+                fillColor = state.colorScale(solution);
+                fillOpacity = 0.7;
+            }
+
+            if (isSelected) {
+                fillOpacity = 0.9;
+            }
+
+            const rectangle = L.rectangle(cellBounds, {
+                color: isSelected ? 'red' : 'transparent',
+                weight: isSelected ? 2 : 1,
+                fillColor: fillColor,
+                fillOpacity: fillOpacity
+            }).addTo(state.gridLayer);
+
+            rectangle.on('click', function() {
+                if (!state.isDrawMode) {
+                    toggleCellSelection(key);
+                }
+            });
+        }
+    });
+}
+
+function getRasterValueAtPoint(raster, lat, lng) {
+    if (!raster || !raster.bounds || !raster.data || !raster.windowBounds) {
+        console.warn('Invalid raster data', raster);
+        return 0;
+    }
+
+    const { data, width, height, windowBounds } = raster;
+    const [minX, minY, maxX, maxY] = windowBounds;
+
+    if (lng < minX || lng > maxX || lat < minY || lat > maxY) {
+        console.log('Point outside raster window bounds', { lat, lng, windowBounds });
+        return 0;
+    }
+
+    const x = Math.floor((lng - minX) / (maxX - minX) * width);
+    const y = Math.floor((maxY - lat) / (maxY - minY) * height);
+
+    if (x >= 0 && x < width && y >= 0 && y < height) {
+        return data[y * width + x];
+    }
+
+    console.log('Invalid raster coordinates', { x, y, width, height });
+    return 0;
+}
+
 function getTopSolutionValue(scores) {
     const validSolutions = Object.entries(scores)
-        .filter(([sol, scores]) => isWithinFilters(sol, scores));
+        .filter(([sol, scores]) => isWithinFilters(sol, scores) && state.selectedSolutions[sol] !== false);
 
     if (validSolutions.length === 0) return 0;
 

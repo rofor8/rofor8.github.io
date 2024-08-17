@@ -142,15 +142,22 @@ function updateSolutionTable() {
     const rows = table.tBodies[0].rows;
     const selectedCellCount = state.selectedCellKeys.size;
 
-    // Calculate totals
+    // Calculate totals or use base values
     const solutionTotals = {};
     Object.keys(state.solutionCriteria).forEach(solution => {
         const impactWeight = state.challengeCategories[state.currentCategory][solution] || 0;
         const cost = state.solutionCosts[solution] || 0;
-        solutionTotals[solution] = {
-            impact: impactWeight * selectedCellCount,
-            cost: cost * selectedCellCount
-        };
+        if (selectedCellCount > 0) {
+            solutionTotals[solution] = {
+                impact: impactWeight * selectedCellCount,
+                cost: cost * selectedCellCount
+            };
+        } else {
+            solutionTotals[solution] = {
+                impact: impactWeight,
+                cost: cost
+            };
+        }
     });
 
     // Calculate max values for scaling

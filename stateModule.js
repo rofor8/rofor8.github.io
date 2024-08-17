@@ -27,16 +27,16 @@ export const state = {
     criteriaRasters: {},
     callUpdateScores: null,
     selectedSolutions: {},
-    impactFilter: [0, 100],
-    costFilter: [0, 100],
+    impactFilter: [0, 1], // Impact weight range
+    costFilter: [0, 100], // Cost range
     currentSortColumn: 'impact',
     isAscending: false,
     totalImpacts: {},
     totalCosts: {},
-    impactRange: [0, 100],
+    impactRange: [0, 1],
     costRange: [0, 100],
-    maxImpactWeight: 0,
-    maxCostPerCell: 0
+    maxImpactWeight: 1,
+    maxCostPerCell: 100
 };
 
 export function updateState(newState) {
@@ -149,14 +149,14 @@ export function updateMaxValues() {
     updateState({ 
         maxImpactWeight, 
         maxCostPerCell,
-        impactRange: [0, maxImpactWeight * 100], // Multiply by 100 to match the existing scale
+        impactRange: [0, maxImpactWeight],
         costRange: [0, maxCostPerCell]
     });
 }
 
 export function isWithinFilters(solution, cellScores) {
-    const impact = cellScores[solution]?.impact || 0;
-    const cost = cellScores[solution]?.cost || 0;
+    const impact = state.challengeCategories[state.currentCategory][solution] || 0;
+    const cost = state.solutionCosts[solution] || 0;
     return impact >= state.impactFilter[0] && impact <= state.impactFilter[1] &&
            cost >= state.costFilter[0] && cost <= state.costFilter[1] &&
            state.selectedSolutions[solution] !== false;

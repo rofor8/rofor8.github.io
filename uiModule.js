@@ -134,21 +134,20 @@ function updateSolutionTable() {
         return;
     }
 
-    // Calculate totals for selected cells
-    const selectedTotals = calculateSelectedTotals();
-
     const rows = table.tBodies[0].rows;
-    const { maxImpact, maxCost } = calculateMaxValues(selectedTotals);
+    const { maxImpact, maxCost } = calculateMaxValues();
 
     // Collect row data
     const rowData = [];
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const solution = row.cells[1].textContent;
-        const impact = selectedTotals[solution]?.impact || 0;
-        const cost = selectedTotals[solution]?.cost || 0;
+        const impact = state.challengeCategories[state.currentCategory][solution] || 0;
+        const cost = state.solutionCosts[solution] || 0;
 
-        rowData.push({ row, solution, impact, cost });
+        if (isWithinFilters(solution, { impact, cost })) {
+            rowData.push({ row, solution, impact, cost });
+        }
     }
 
     // Sort row data
@@ -185,22 +184,11 @@ function updateSolutionTable() {
         const impactValue = impactCell.querySelector('.value');
         const costValue = costCell.querySelector('.value');
 
-        // Clear bar graphs when values are zero
-        if (impact === 0) {
-            impactBar.style.width = '0%';
-            impactBar.style.backgroundColor = 'transparent';
-        } else {
-            impactBar.style.width = `${(impact / maxImpact) * 100}%`;
-            impactBar.style.backgroundColor = state.colorScale(solution);
-        }
-
-        if (cost === 0) {
-            costBar.style.width = '0%';
-            costBar.style.backgroundColor = 'transparent';
-        } else {
-            costBar.style.width = `${(cost / maxCost) * 100}%`;
-            costBar.style.backgroundColor = state.colorScale(solution);
-        }
+        // Update bar graphs
+        impactBar.style.width = `${(impact / maxImpact) * 100}%`;
+        impactBar.style.backgroundColor = state.colorScale(solution);
+        costBar.style.width = `${(cost / maxCost) * 100}%`;
+        costBar.style.backgroundColor = state.colorScale(solution);
 
         impactValue.textContent = impact.toFixed(2);
         costValue.textContent = cost.toFixed(2);
@@ -319,29 +307,12 @@ function updateSliderRanges() {
     }
 }
 
-function calculateSelectedTotals() {
-    const totals = {};
-    state.selectedCellKeys.forEach(key => {
-        const cell = state.allCells.get(key);
-        if (cell && cell.scores) {
-            Object.entries(cell.scores).forEach(([solution, scores]) => {
-                if (!totals[solution]) {
-                    totals[solution] = { impact: 0, cost: 0 };
-                }
-                if (isWithinFilters(solution, cell.scores)) {
-                    totals[solution].impact += scores.impact || 0;
-                    totals[solution].cost += scores.cost || 0;
-                }
-            });
-        }
-    });
-    return totals;
-}
-
-function calculateMaxValues(totals) {
+function calculateMaxValues() {
     let maxImpact = 0;
     let maxCost = 0;
-    Object.values(totals).forEach(({ impact, cost }) => {
+    Object.keys(state.solutionCriteria).forEach(solution => {
+        const impact = state.challengeCategories[state.currentCategory][solution] || 0;
+        const cost = state.solutionCosts[solution] || 0;
         maxImpact = Math.max(maxImpact, impact);
         maxCost = Math.max(maxCost, cost);
     });
@@ -411,7 +382,7 @@ function toggleSort(column) {
     renderCells();
 }
 
-// Export all necessary functions at the end of the file
+// Export all necessary functions
 export {
     setupUI,
     updateSolutionTable,

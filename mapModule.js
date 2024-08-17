@@ -48,7 +48,7 @@ export function updateGrid(map) {
 
     const newCells = new Map();
 
-    // Add cells for the current viewport
+    // Add cells for the current viewport  c
     for (let lat = minLat; lat < maxLat; lat += cellSizeLat) {
         for (let lng = minLng; lng < maxLng; lng += cellSizeLng) {
             const cellKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;

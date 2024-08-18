@@ -36,11 +36,18 @@ export const state = {
     impactRange: [0, 1],
     costRange: [0, 100],
     maxImpactWeight: 1,
-    maxCostPerCell: 100
+    maxCostPerCell: 100,
+    categorySliderValues: {} // New property to store slider values for each category
 };
 
 export function updateState(newState) {
     Object.assign(state, newState);
+    
+    // If the category has changed, update the sliders with stored values
+    if (newState.currentCategory && state.categorySliderValues[newState.currentCategory]) {
+        state.impactFilter = state.categorySliderValues[newState.currentCategory].impact;
+        state.costFilter = state.categorySliderValues[newState.currentCategory].cost;
+    }
 }
 
 export function updateSelectedCellKeys(newSelectedCellKeys) {
@@ -166,5 +173,13 @@ export function getFilterRanges() {
     return {
         impact: state.impactRange,
         cost: state.costRange
+    };
+}
+
+// New function to store slider values for the current category
+export function storeSliderValues() {
+    state.categorySliderValues[state.currentCategory] = {
+        impact: [...state.impactFilter],
+        cost: [...state.costFilter]
     };
 }

@@ -1,5 +1,5 @@
 // uiModule.js
-import { state, updateState, updateMap, updateTotals, isWithinFilters, getFilterRanges } from './stateModule.js';
+import { state, updateState, updateMap, updateTotals, isWithinFilters, getFilterRanges, storeSliderValues } from './stateModule.js';
 import { renderCells, updateSelectionRectangle, renderSelectedCells, highlightSolutionCells } from './mapModule.js';
 
 let isUpdating = false;
@@ -68,58 +68,6 @@ function setupSolutionTable() {
         headerRow.appendChild(th);
     });
 
-    // Add table rows
-    Object.keys(state.solutionCriteria).forEach(solution => {
-        const row = tbody.insertRow();
-        row.setAttribute('data-solution', solution);
-
-        // Checkbox cell with color indicator
-        const checkboxCell = row.insertCell();
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.checked = state.selectedSolutions[solution] !== false;
-        checkbox.style.accentColor = state.colorScale(solution);
-        checkbox.addEventListener("change", function() {
-            updateState({
-                selectedSolutions: {
-                    ...state.selectedSolutions,
-                    [solution]: this.checked
-                }
-            });
-            updateSolutionTable();
-            renderCells();
-        });
-        checkboxCell.appendChild(checkbox);
-
-        // Solution name cell
-        const nameCell = row.insertCell();
-        nameCell.textContent = solution;
-
-        // Impact cell with bar graph
-        const impactCell = row.insertCell();
-        impactCell.className = "impact";
-        const impactBar = document.createElement("div");
-        impactBar.className = "bar-graph impact-bar";
-        impactCell.appendChild(impactBar);
-        const impactValue = document.createElement("span");
-        impactValue.className = "value";
-        impactCell.appendChild(impactValue);
-
-        // Cost cell with bar graph
-        const costCell = row.insertCell();
-        costCell.className = "cost";
-        const costBar = document.createElement("div");
-        costBar.className = "bar-graph cost-bar";
-        costCell.appendChild(costBar);
-        const costValue = document.createElement("span");
-        costValue.className = "value";
-        costCell.appendChild(costValue);
-
-        // Add hover effect
-        row.addEventListener('mouseenter', () => highlightSolutionCells(solution));
-        row.addEventListener('mouseleave', () => renderCells());
-    });
-
     solutionsContainer.innerHTML = '';
     solutionsContainer.appendChild(table);
 
@@ -139,7 +87,7 @@ function updateSolutionTable() {
         return;
     }
 
-    const rows = table.tBodies[0].rows;
+    const tbody = table.tBodies[0];
     const selectedCellCount = state.selectedCellKeys.size;
 
     // Calculate totals or use base values
@@ -175,13 +123,11 @@ function updateSolutionTable() {
     sortRowData(rowData);
 
     // Clear existing rows
-    while (table.tBodies[0].firstChild) {
-        table.tBodies[0].removeChild(table.tBodies[0].firstChild);
-    }
+    tbody.innerHTML = '';
 
     // Add sorted rows
     rowData.forEach(({ solution, impact, cost }) => {
-        const row = table.tBodies[0].insertRow();
+        const row = tbody.insertRow();
         row.setAttribute('data-solution', solution);
 
         // Checkbox cell
@@ -232,7 +178,10 @@ function updateSolutionTable() {
         costValue.textContent = cost.toFixed(2);
         costCell.appendChild(costValue);
 
-        row.style.opacity = state.selectedSolutions[solution] !== false ? '1' : '0.5';
+        // Check if the solution is filtered
+        const isFiltered = !isWithinFilters(solution, { impact, cost });
+        row.style.opacity = isFiltered ? '0.3' : '1';
+        row.style.pointerEvents = isFiltered ? 'none' : 'auto';
 
         // Add hover effect
         row.addEventListener('mouseenter', () => highlightSolutionCells(solution));
@@ -246,7 +195,33 @@ function updateSolutionTable() {
         headers[i].classList.toggle('ascending', state.isAscending);
     }
 
+    highlightVisibleSolutions();
+
     isUpdating = false;
+}
+
+function highlightVisibleSolutions() {
+    const table = document.getElementById("solutionsTable");
+    if (!table) return;
+
+    const tbody = table.tBodies[0];
+    const rows = tbody.rows;
+
+    for (let row of rows) {
+        const solution = row.getAttribute('data-solution');
+        const isVisible = state.selectedCellKeys.size > 0 && 
+                          Array.from(state.selectedCellKeys).some(key => {
+                              const cell = state.allCells.get(key);
+                              return cell && cell.scores && cell.scores[solution] && 
+                                     isWithinFilters(solution, cell.scores[solution]);
+                          });
+
+        if (isVisible) {
+            row.style.border = '2px solid red';
+        } else {
+            row.style.border = '';
+        }
+    }
 }
 
 function setupFilterSliders() {
@@ -274,9 +249,10 @@ function setupFilterSliders() {
 
     if (impactSlider && costSlider) {
         const ranges = getFilterRanges();
+        const storedValues = state.categorySliderValues[state.currentCategory] || {};
 
         noUiSlider.create(impactSlider, {
-            start: [ranges.impact[0], ranges.impact[1]],
+            start: storedValues.impact || [ranges.impact[0], ranges.impact[1]],
             connect: true,
             range: {
                 'min': ranges.impact[0],
@@ -286,7 +262,7 @@ function setupFilterSliders() {
         });
 
         noUiSlider.create(costSlider, {
-            start: [ranges.cost[0], ranges.cost[1]],
+            start: storedValues.cost || [ranges.cost[0], ranges.cost[1]],
             connect: true,
             range: {
                 'min': ranges.cost[0],
@@ -294,6 +270,26 @@ function setupFilterSliders() {
             },
             step: 0.01
         });
+
+        const updateTableStyles = () => {
+            const table = document.getElementById("solutionsTable");
+            if (!table) return;
+
+            const tbody = table.tBodies[0];
+            const rows = tbody.rows;
+
+            for (let row of rows) {
+                const solution = row.getAttribute('data-solution');
+                const impact = parseFloat(row.cells[2].textContent);
+                const cost = parseFloat(row.cells[3].textContent);
+
+                const isFiltered = !isWithinFilters(solution, { impact, cost });
+                row.style.opacity = isFiltered ? '0.3' : '1';
+                row.style.pointerEvents = isFiltered ? 'none' : 'auto';
+            }
+
+            highlightVisibleSolutions();
+        };
 
         impactSlider.noUiSlider.on('update', function (values, handle) {
             if (isUpdating) return;
@@ -303,8 +299,9 @@ function setupFilterSliders() {
                 impactValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
             }
             updateState({ impactFilter: values.map(Number) });
+            storeSliderValues();
+            updateTableStyles();
             renderCells();
-            updateSolutionTable();
             isUpdating = false;
         });
 
@@ -316,8 +313,9 @@ function setupFilterSliders() {
                 costValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
             }
             updateState({ costFilter: values.map(Number) });
+            storeSliderValues();
+            updateTableStyles();
             renderCells();
-            updateSolutionTable();
             isUpdating = false;
         });
     }
@@ -335,7 +333,8 @@ function updateSliderRanges() {
                 'max': ranges.impact[1]
             }
         });
-        impactSlider.noUiSlider.set([ranges.impact[0], ranges.impact[1]]);
+        const storedImpact = state.categorySliderValues[state.currentCategory]?.impact || [ranges.impact[0], ranges.impact[1]];
+        impactSlider.noUiSlider.set(storedImpact);
     }
 
     if (costSlider && costSlider.noUiSlider) {
@@ -345,7 +344,8 @@ function updateSliderRanges() {
                 'max': ranges.cost[1]
             }
         });
-        costSlider.noUiSlider.set([ranges.cost[0], ranges.cost[1]]);
+        const storedCost = state.categorySliderValues[state.currentCategory]?.cost || [ranges.cost[0], ranges.cost[1]];
+        costSlider.noUiSlider.set(storedCost);
     }
 }
 
@@ -408,6 +408,100 @@ function toggleSort(column) {
     renderCells();
 }
 
+function updateSelectionTotals() {
+    const selectionTotals = document.getElementById('selectionTotals');
+    if (!selectionTotals) return;
+
+    const selectedCells = state.selectedCellKeys.size;
+    let totalImpact = 0;
+    let totalCost = 0;
+
+    state.selectedCellKeys.forEach(key => {
+        const cell = state.allCells.get(key);
+        if (cell && cell.scores) {
+            Object.entries(cell.scores).forEach(([solution, score]) => {
+                if (isWithinFilters(solution, score)) {
+                    totalImpact += score.impact;
+                    totalCost += score.cost;
+                }
+            });
+        }
+    });
+
+    selectionTotals.innerHTML = `
+        <p>Selected Cells: ${selectedCells}</p>
+        <p>Total Impact: ${totalImpact.toFixed(2)}</p>
+        <p>Total Cost: £${totalCost.toFixed(2)}</p>
+    `;
+}
+
+function updateFilterDisplay() {
+    const impactValue = document.getElementById("impactValue");
+    const costValue = document.getElementById("costValue");
+    
+    if (impactValue) {
+        impactValue.textContent = `${state.impactFilter[0].toFixed(2)} - ${state.impactFilter[1].toFixed(2)}`;
+    }
+    
+    if (costValue) {
+        costValue.textContent = `${state.costFilter[0].toFixed(2)} - ${state.costFilter[1].toFixed(2)}`;
+    }
+}
+
+function setupReportButton() {
+    const reportButton = document.getElementById('generateReport');
+    if (reportButton) {
+        reportButton.addEventListener('click', generateReport);
+    }
+}
+
+function generateReport() {
+    // Implement report generation logic here
+    console.log('Generating report...');
+    // You can call a function from reportModule.js here
+    // For example: reportModule.generatePDFReport(state);
+}
+
+function setupSearchBar() {
+    const searchInput = document.getElementById('searchInput');
+    const searchButton = document.getElementById('searchButton');
+    
+    if (searchInput && searchButton) {
+        searchButton.addEventListener('click', () => {
+            const query = searchInput.value;
+            searchLocation(query);
+        });
+        
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const query = searchInput.value;
+                searchLocation(query);
+            }
+        });
+    }
+}
+
+function searchLocation(query) {
+    // Implement location search logic here
+    console.log('Searching for location:', query);
+    // You can call a function from a geocoding service or API here
+    // For example: mapModule.geocodeAndZoom(query);
+}
+
+function initializeUI() {
+    setupUI();
+    setupReportButton();
+    setupSearchBar();
+    updateSelectionTotals();
+    updateFilterDisplay();
+}
+
+// Event listeners for window resize
+window.addEventListener('resize', () => {
+    updateSelectionRectangle();
+    renderCells();
+});
+
 // Export all necessary functions
 export {
     setupUI,
@@ -415,5 +509,11 @@ export {
     updateUIForCategory,
     createButtons,
     updateCategoryDropdown,
-    updateSliderRanges
+    updateSliderRanges,
+    updateSelectionTotals,
+    updateFilterDisplay,
+    generateReport,
+    searchLocation,
+    initializeUI,
+    highlightVisibleSolutions
 };

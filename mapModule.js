@@ -1,5 +1,5 @@
 // mapModule.js
-import { state, updateState, updateSelectedCellKeys, updateMap, updateTotals, isWithinFilters } from './stateModule.js';
+import { state, updateState, isWithinFilters } from './stateModule.js';
 import { toggleCellSelection } from './interactionModule.js';
 
 export function initMap() {
@@ -101,7 +101,7 @@ export function renderCells() {
 
             if (scores) {
                 let validSolutions = Object.entries(scores)
-                    .filter(([sol, scores]) => isWithinFilters(sol, scores) && state.selectedSolutions[sol] !== false);
+                    .filter(([sol, score]) => score.isSuitable && isWithinFilters(sol, score) && state.selectedSolutions[sol] !== false);
 
                 if (validSolutions.length > 0) {
                     validSolutions.sort((a, b) => {
@@ -149,7 +149,7 @@ export function renderSelectedCells() {
 
             if (cell.scores) {
                 let validSolutions = Object.entries(cell.scores)
-                    .filter(([sol, scores]) => isWithinFilters(sol, scores) && state.selectedSolutions[sol] !== false);
+                    .filter(([sol, score]) => score.isSuitable && isWithinFilters(sol, score) && state.selectedSolutions[sol] !== false);
 
                 if (validSolutions.length > 0) {
                     validSolutions.sort((a, b) => {
@@ -211,15 +211,7 @@ export function highlightSolutionCells(solution) {
             let fillColor = "rgba(200,200,200,0.5)";
             let fillOpacity = 0.5;
 
-            const [lat, lng] = key.split(',').map(Number);
-
-            // Check if both criteria rasters have a value > 0 for this cell
-            const criteriaOverlap = criteria.every(criterion => {
-                const rasterValue = getRasterValueAtPoint(state.criteriaRasters[criterion], lat, lng);
-                return rasterValue > 0;
-            });
-
-            if (criteriaOverlap) {
+            if (scores && scores[solution] && scores[solution].isSuitable) {
                 fillColor = state.colorScale(solution);
                 fillOpacity = 0.7;
             }
@@ -242,46 +234,6 @@ export function highlightSolutionCells(solution) {
             });
         }
     });
-}
-
-function getRasterValueAtPoint(raster, lat, lng) {
-    if (!raster || !raster.bounds || !raster.data || !raster.windowBounds) {
-        console.warn('Invalid raster data', raster);
-        return 0;
-    }
-
-    const { data, width, height, windowBounds } = raster;
-    const [minX, minY, maxX, maxY] = windowBounds;
-
-    if (lng < minX || lng > maxX || lat < minY || lat > maxY) {
-        console.log('Point outside raster window bounds', { lat, lng, windowBounds });
-        return 0;
-    }
-
-    const x = Math.floor((lng - minX) / (maxX - minX) * width);
-    const y = Math.floor((maxY - lat) / (maxY - minY) * height);
-
-    if (x >= 0 && x < width && y >= 0 && y < height) {
-        return data[y * width + x];
-    }
-
-    console.log('Invalid raster coordinates', { x, y, width, height });
-    return 0;
-}
-
-function getTopSolutionValue(scores) {
-    const validSolutions = Object.entries(scores)
-        .filter(([sol, scores]) => isWithinFilters(sol, scores) && state.selectedSolutions[sol] !== false);
-
-    if (validSolutions.length === 0) return 0;
-
-    validSolutions.sort((a, b) => {
-        const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
-        const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
-        return state.isAscending ? aValue - bValue : bValue - aValue;
-    });
-
-    return state.currentSortColumn === 'impact' ? validSolutions[0][1].impact : validSolutions[0][1].cost;
 }
 
 export function updateSelectionRectangle() {
@@ -318,6 +270,21 @@ function getCellKeyFromLatLng(lat, lng) {
     const cellLat = Math.floor(lat / (state.CELL_SIZE / 111111)) * (state.CELL_SIZE / 111111);
     const cellLng = Math.floor(lng / (state.CELL_SIZE / (111111 * Math.cos(lat * Math.PI / 180)))) * (state.CELL_SIZE / (111111 * Math.cos(lat * Math.PI / 180)));
     return `${cellLat.toFixed(6)},${cellLng.toFixed(6)}`;
+}
+
+function getTopSolutionValue(scores) {
+    const validSolutions = Object.entries(scores)
+        .filter(([sol, score]) => score.isSuitable && isWithinFilters(sol, score) && state.selectedSolutions[sol] !== false);
+
+    if (validSolutions.length === 0) return 0;
+
+    validSolutions.sort((a, b) => {
+        const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
+        const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
+        return state.isAscending ? aValue - bValue : bValue - aValue;
+    });
+
+    return state.currentSortColumn === 'impact' ? validSolutions[0][1].impact : validSolutions[0][1].cost;
 }
 
 function debounce(func, wait) {

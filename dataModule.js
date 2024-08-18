@@ -104,7 +104,14 @@ export async function calculateSuitabilityScores(bounds, challengeCategory) {
         const promises = Object.entries(state.solutionCriteria)
             .filter(([solution]) => state.selectedSolutions[solution] !== false)
             .map(async ([solution, criteria]) => {
-                const isSuitable = await checkCriteriaOverlap(lat, lng, criteria);
+                const [criterion1, criterion2] = criteria;
+                const value1 = getRasterValueAtPoint(state.criteriaRasters[criterion1], lat, lng);
+                const value2 = getRasterValueAtPoint(state.criteriaRasters[criterion2], lat, lng);
+                
+                const isSuitable = value1 > 0 && value2 > 0;
+                
+                console.log(`Cell ${cell.key}, Solution ${solution}: Criterion1 (${criterion1}) = ${value1}, Criterion2 (${criterion2}) = ${value2}, Suitable: ${isSuitable}`);
+
                 const weight = state.challengeCategories[challengeCategory]?.[solution] || 0;
                 cellScores[solution] = {
                     impact: isSuitable ? weight * 100 : 0,
@@ -119,19 +126,6 @@ export async function calculateSuitabilityScores(bounds, challengeCategory) {
     }));
 
     console.timeEnd('calculateSuitabilityScores');
-}
-
-async function checkCriteriaOverlap(lat, lng, criteria) {
-    if (criteria.length !== 2) {
-        console.error(`Invalid criteria length for solution:`, criteria);
-        return false;
-    }
-
-    const [criterion1, criterion2] = criteria;
-    const value1 = getRasterValueAtPoint(state.criteriaRasters[criterion1], lat, lng);
-    const value2 = getRasterValueAtPoint(state.criteriaRasters[criterion2], lat, lng);
-
-    return value1 > 0 && value2 > 0;
 }
 
 function boundsIntersect(bounds1, bounds2) {

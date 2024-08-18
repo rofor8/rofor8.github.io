@@ -157,19 +157,28 @@ function createTableRow(solution, impact, cost, maxImpact, maxCost) {
 
     const checkbox = row.querySelector('input[type="checkbox"]');
     checkbox.addEventListener("change", function() {
+        // Update the state with the current checkbox state (checked/unchecked)
+        const updatedSolutions = {
+            ...state.selectedSolutions,
+            [solution]: this.checked
+        };
+        
+        // Call your state update function
         updateState({
-            selectedSolutions: {
-                ...state.selectedSolutions,
-                [solution]: this.checked
-            }
+            selectedSolutions: updatedSolutions
         });
+        
+        // Update the UI
         updateSolutionTable();
         updateGrid(state.map);
     });
+    
 
     const isFiltered = !isWithinFilters(solution, { impact, cost });
     row.style.opacity = isFiltered ? '0.3' : '1';
-    row.style.pointerEvents = isFiltered ? 'none' : 'auto';
+    
+    // Keep the row interactive even if it's filtered
+    row.style.pointerEvents = 'auto';
 
     row.addEventListener('mouseenter', () => highlightSolutionCells(solution));
     row.addEventListener('mouseleave', () => updateGrid(state.map));

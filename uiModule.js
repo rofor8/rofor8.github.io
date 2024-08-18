@@ -1,8 +1,9 @@
 // uiModule.js
 import { state, updateState, updateMap, updateTotals, isWithinFilters, getFilterRanges, storeSliderValues } from './stateModule.js';
-import { renderCells, updateSelectionRectangle, renderSelectedCells, highlightSolutionCells } from './mapModule.js';
+import { updateGrid, updateSelectionRectangle, highlightSolutionCells } from './mapModule.js';
 
 let isUpdating = false;
+let updateSolutionTableTimeout = null;
 
 function setupUI() {
     if (state.challengeCategories && Object.keys(state.challengeCategories).length > 0) {
@@ -22,22 +23,13 @@ function setupDropdown() {
     if (dropdownBtn) {
         dropdownBtn.addEventListener('click', function (e) {
             e.stopPropagation();
-            const categoryButtons = document.getElementById('categoryButtons');
-            if (categoryButtons) {
-                categoryButtons.classList.toggle('show');
-            }
+            document.getElementById('categoryButtons').classList.toggle('show');
         });
     }
 
     window.addEventListener('click', function (e) {
         if (!e.target.matches('.dropbtn')) {
-            var dropdowns = document.getElementsByClassName("dropdown-content");
-            for (var d = 0; d < dropdowns.length; d++) {
-                var openDropdown = dropdowns[d];
-                if (openDropdown.classList.contains('show')) {
-                    openDropdown.classList.remove('show');
-                }
-            }
+            document.getElementById('categoryButtons').classList.remove('show');
         }
     });
 }
@@ -56,7 +48,6 @@ function setupSolutionTable() {
     const thead = table.createTHead();
     const tbody = table.createTBody();
 
-    // Add table header
     const headerRow = thead.insertRow();
     ["", "Solution", "Impact", "Cost"].forEach((text, index) => {
         const th = document.createElement("th");
@@ -71,7 +62,6 @@ function setupSolutionTable() {
     solutionsContainer.innerHTML = '';
     solutionsContainer.appendChild(table);
 
-    // Call updateSolutionTable after a short delay to ensure the table is in the DOM
     setTimeout(updateSolutionTable, 0);
 }
 
@@ -79,125 +69,120 @@ function updateSolutionTable() {
     if (isUpdating) return;
     isUpdating = true;
 
-    const table = document.getElementById("solutionsTable");
-    if (!table) {
-        console.warn("Solutions table not found, retrying...");
-        setTimeout(updateSolutionTable, 100);
-        isUpdating = false;
-        return;
+    if (updateSolutionTableTimeout) {
+        clearTimeout(updateSolutionTableTimeout);
     }
 
-    const tbody = table.tBodies[0];
-    const selectedCellCount = state.selectedCellKeys.size;
+    updateSolutionTableTimeout = setTimeout(() => {
+        const table = document.getElementById("solutionsTable");
+        if (!table) {
+            console.warn("Solutions table not found, retrying...");
+            updateSolutionTableTimeout = setTimeout(updateSolutionTable, 100);
+            isUpdating = false;
+            return;
+        }
 
-    // Calculate totals or use base values
+        const tbody = table.tBodies[0];
+        const selectedCellCount = state.selectedCellKeys.size;
+
+        const solutionTotals = calculateSolutionTotals(selectedCellCount);
+        const { maxImpact, maxCost } = getMaxValues(solutionTotals);
+
+        const rowData = prepareRowData(solutionTotals);
+        sortRowData(rowData);
+
+        const fragment = document.createDocumentFragment();
+        rowData.forEach(({ solution, impact, cost }) => {
+            const row = createTableRow(solution, impact, cost, maxImpact, maxCost);
+            fragment.appendChild(row);
+        });
+
+        tbody.innerHTML = '';
+        tbody.appendChild(fragment);
+
+        updateTableHeader(table);
+        highlightVisibleSolutions();
+
+        isUpdating = false;
+    }, 0);
+}
+
+function calculateSolutionTotals(selectedCellCount) {
     const solutionTotals = {};
     Object.keys(state.solutionCriteria).forEach(solution => {
         const impactWeight = state.challengeCategories[state.currentCategory][solution] || 0;
         const cost = state.solutionCosts[solution] || 0;
-        if (selectedCellCount > 0) {
-            solutionTotals[solution] = {
-                impact: impactWeight * selectedCellCount,
-                cost: cost * selectedCellCount
-            };
-        } else {
-            solutionTotals[solution] = {
-                impact: impactWeight,
-                cost: cost
-            };
-        }
+        solutionTotals[solution] = {
+            impact: selectedCellCount > 0 ? impactWeight * selectedCellCount : impactWeight,
+            cost: selectedCellCount > 0 ? cost * selectedCellCount : cost
+        };
     });
+    return solutionTotals;
+}
 
-    // Calculate max values for scaling
-    const maxImpact = Math.max(...Object.values(solutionTotals).map(s => s.impact));
-    const maxCost = Math.max(...Object.values(solutionTotals).map(s => s.cost));
+function getMaxValues(solutionTotals) {
+    return {
+        maxImpact: Math.max(...Object.values(solutionTotals).map(s => s.impact)),
+        maxCost: Math.max(...Object.values(solutionTotals).map(s => s.cost))
+    };
+}
 
-    // Collect row data
-    const rowData = Object.entries(solutionTotals).map(([solution, totals]) => ({
+function prepareRowData(solutionTotals) {
+    return Object.entries(solutionTotals).map(([solution, totals]) => ({
         solution,
         impact: totals.impact,
         cost: totals.cost
     }));
+}
 
-    // Sort row data
-    sortRowData(rowData);
+function createTableRow(solution, impact, cost, maxImpact, maxCost) {
+    const row = document.createElement('tr');
+    row.setAttribute('data-solution', solution);
 
-    // Clear existing rows
-    tbody.innerHTML = '';
+    row.innerHTML = `
+        <td>
+            <input type="checkbox" ${state.selectedSolutions[solution] !== false ? 'checked' : ''}
+                   style="accent-color: ${state.colorScale(solution)}">
+        </td>
+        <td>${solution}</td>
+        <td class="impact">
+            <div class="bar-graph impact-bar" style="width: ${(impact / maxImpact) * 100}%; background-color: ${state.colorScale(solution)}"></div>
+            <span class="value">${impact.toFixed(2)}</span>
+        </td>
+        <td class="cost">
+            <div class="bar-graph cost-bar" style="width: ${(cost / maxCost) * 100}%; background-color: ${state.colorScale(solution)}"></div>
+            <span class="value">${cost.toFixed(2)}</span>
+        </td>
+    `;
 
-    // Add sorted rows
-    rowData.forEach(({ solution, impact, cost }) => {
-        const row = tbody.insertRow();
-        row.setAttribute('data-solution', solution);
-
-        // Checkbox cell
-        const checkboxCell = row.insertCell();
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.checked = state.selectedSolutions[solution] !== false;
-        checkbox.style.accentColor = state.colorScale(solution);
-        checkbox.addEventListener("change", function() {
-            updateState({
-                selectedSolutions: {
-                    ...state.selectedSolutions,
-                    [solution]: this.checked
-                }
-            });
-            updateSolutionTable();
-            renderCells();
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    checkbox.addEventListener("change", function() {
+        updateState({
+            selectedSolutions: {
+                ...state.selectedSolutions,
+                [solution]: this.checked
+            }
         });
-        checkboxCell.appendChild(checkbox);
-
-        // Solution name cell
-        const nameCell = row.insertCell();
-        nameCell.textContent = solution;
-
-        // Impact cell with bar graph
-        const impactCell = row.insertCell();
-        impactCell.className = "impact";
-        const impactBar = document.createElement("div");
-        impactBar.className = "bar-graph impact-bar";
-        impactBar.style.width = `${(impact / maxImpact) * 100}%`;
-        impactBar.style.backgroundColor = state.colorScale(solution);
-        impactCell.appendChild(impactBar);
-        const impactValue = document.createElement("span");
-        impactValue.className = "value";
-        impactValue.textContent = impact.toFixed(2);
-        impactCell.appendChild(impactValue);
-
-        // Cost cell with bar graph
-        const costCell = row.insertCell();
-        costCell.className = "cost";
-        const costBar = document.createElement("div");
-        costBar.className = "bar-graph cost-bar";
-        costBar.style.width = `${(cost / maxCost) * 100}%`;
-        costBar.style.backgroundColor = state.colorScale(solution);
-        costCell.appendChild(costBar);
-        const costValue = document.createElement("span");
-        costValue.className = "value";
-        costValue.textContent = cost.toFixed(2);
-        costCell.appendChild(costValue);
-
-        // Check if the solution is filtered
-        const isFiltered = !isWithinFilters(solution, { impact, cost });
-        row.style.opacity = isFiltered ? '0.3' : '1';
-        row.style.pointerEvents = isFiltered ? 'none' : 'auto';
-
-        // Add hover effect
-        row.addEventListener('mouseenter', () => highlightSolutionCells(solution));
-        row.addEventListener('mouseleave', () => renderCells());
+        updateSolutionTable();
+        updateGrid(state.map);
     });
 
-    // Highlight the current sorting column
+    const isFiltered = !isWithinFilters(solution, { impact, cost });
+    row.style.opacity = isFiltered ? '0.3' : '1';
+    row.style.pointerEvents = isFiltered ? 'none' : 'auto';
+
+    row.addEventListener('mouseenter', () => highlightSolutionCells(solution));
+    row.addEventListener('mouseleave', () => updateGrid(state.map));
+
+    return row;
+}
+
+function updateTableHeader(table) {
     const headers = table.tHead.rows[0].cells;
     for (let i = 2; i < headers.length; i++) {
         headers[i].classList.toggle('sorted', headers[i].className.includes(state.currentSortColumn));
         headers[i].classList.toggle('ascending', state.isAscending);
     }
-
-    highlightVisibleSolutions();
-
-    isUpdating = false;
 }
 
 function highlightVisibleSolutions() {
@@ -207,7 +192,6 @@ function highlightVisibleSolutions() {
     const tbody = table.tBodies[0];
     const rows = tbody.rows;
 
-    // Get all solutions present in the selected cells with non-zero scores and are suitable
     const solutionsInSelection = new Set();
     state.selectedCellKeys.forEach(key => {
         const cell = state.allCells.get(key);
@@ -222,11 +206,7 @@ function highlightVisibleSolutions() {
 
     for (let row of rows) {
         const solution = row.getAttribute('data-solution');
-        if (solutionsInSelection.has(solution)) {
-            row.style.border = '2px solid red';
-        } else {
-            row.style.border = '';
-        }
+        row.style.border = solutionsInSelection.has(solution) ? '2px solid red' : '';
     }
 }
 
@@ -257,74 +237,54 @@ function setupFilterSliders() {
         const ranges = getFilterRanges();
         const storedValues = state.categorySliderValues[state.currentCategory] || {};
 
-        noUiSlider.create(impactSlider, {
-            start: storedValues.impact || [ranges.impact[0], ranges.impact[1]],
-            connect: true,
-            range: {
-                'min': ranges.impact[0],
-                'max': ranges.impact[1]
-            },
-            step: 0.01
-        });
-
-        noUiSlider.create(costSlider, {
-            start: storedValues.cost || [ranges.cost[0], ranges.cost[1]],
-            connect: true,
-            range: {
-                'min': ranges.cost[0],
-                'max': ranges.cost[1]
-            },
-            step: 0.01
-        });
-
-        const updateTableStyles = () => {
-            const table = document.getElementById("solutionsTable");
-            if (!table) return;
-
-            const tbody = table.tBodies[0];
-            const rows = tbody.rows;
-
-            for (let row of rows) {
-                const solution = row.getAttribute('data-solution');
-                const impact = parseFloat(row.cells[2].textContent);
-                const cost = parseFloat(row.cells[3].textContent);
-
-                const isFiltered = !isWithinFilters(solution, { impact, cost });
-                row.style.opacity = isFiltered ? '0.3' : '1';
-                row.style.pointerEvents = isFiltered ? 'none' : 'auto';
-            }
-
-            highlightVisibleSolutions();
-        };
-
-        impactSlider.noUiSlider.on('update', function (values, handle) {
-            if (isUpdating) return;
-            isUpdating = true;
-            const impactValue = document.getElementById("impactValue");
-            if (impactValue) {
-                impactValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
-            }
-            updateState({ impactFilter: values.map(Number) });
-            storeSliderValues();
-            updateTableStyles();
-            renderCells();
-            isUpdating = false;
-        });
-
-        costSlider.noUiSlider.on('update', function (values, handle) {
-            if (isUpdating) return;
-            isUpdating = true;
-            const costValue = document.getElementById("costValue");
-            if (costValue) {
-                costValue.textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
-            }
-            updateState({ costFilter: values.map(Number) });
-            storeSliderValues();
-            updateTableStyles();
-            renderCells();
-            isUpdating = false;
-        });
+        setupSlider(impactSlider, "impact", ranges.impact, storedValues.impact);
+        setupSlider(costSlider, "cost", ranges.cost, storedValues.cost);
     }
+}
+
+function setupSlider(slider, type, range, storedValues) {
+    noUiSlider.create(slider, {
+        start: storedValues || [range[0], range[1]],
+        connect: true,
+        range: {
+            'min': range[0],
+            'max': range[1]
+        },
+        step: 0.01
+    });
+
+    slider.noUiSlider.on('update', debounce(function (values) {
+        if (isUpdating) return;
+        isUpdating = true;
+        
+        document.getElementById(`${type}Value`).textContent = `${parseFloat(values[0]).toFixed(2)} - ${parseFloat(values[1]).toFixed(2)}`;
+        updateState({ [`${type}Filter`]: values.map(Number) });
+        storeSliderValues();
+        updateTableStyles();
+        updateGrid(state.map);
+        
+        isUpdating = false;
+    }, 100));
+}
+
+function updateTableStyles() {
+    const table = document.getElementById("solutionsTable");
+    if (!table) return;
+
+    const tbody = table.tBodies[0];
+    const rows = tbody.rows;
+
+    for (let row of rows) {
+        const solution = row.getAttribute('data-solution');
+        const impact = parseFloat(row.cells[2].textContent);
+        const cost = parseFloat(row.cells[3].textContent);
+
+        const isFiltered = !isWithinFilters(solution, { impact, cost });
+        row.style.opacity = isFiltered ? '0.3' : '1';
+        row.style.pointerEvents = isFiltered ? 'none' : 'auto';
+    }
+
+    highlightVisibleSolutions();
 }
 
 function updateSliderRanges() {
@@ -332,26 +292,20 @@ function updateSliderRanges() {
     const impactSlider = document.getElementById("impactSlider");
     const costSlider = document.getElementById("costSlider");
 
-    if (impactSlider && impactSlider.noUiSlider) {
-        impactSlider.noUiSlider.updateOptions({
-            range: {
-                'min': ranges.impact[0],
-                'max': ranges.impact[1]
-            }
-        });
-        const storedImpact = state.categorySliderValues[state.currentCategory]?.impact || [ranges.impact[0], ranges.impact[1]];
-        impactSlider.noUiSlider.set(storedImpact);
-    }
+    updateSliderRange(impactSlider, "impact", ranges.impact);
+    updateSliderRange(costSlider, "cost", ranges.cost);
+}
 
-    if (costSlider && costSlider.noUiSlider) {
-        costSlider.noUiSlider.updateOptions({
+function updateSliderRange(slider, type, range) {
+    if (slider && slider.noUiSlider) {
+        slider.noUiSlider.updateOptions({
             range: {
-                'min': ranges.cost[0],
-                'max': ranges.cost[1]
+                'min': range[0],
+                'max': range[1]
             }
         });
-        const storedCost = state.categorySliderValues[state.currentCategory]?.cost || [ranges.cost[0], ranges.cost[1]];
-        costSlider.noUiSlider.set(storedCost);
+        const storedValues = state.categorySliderValues[state.currentCategory]?.[type] || [range[0], range[1]];
+        slider.noUiSlider.set(storedValues);
     }
 }
 
@@ -375,7 +329,7 @@ function createButtons(containerId, dataArray, buttonClass) {
         return;
     }
 
-    container.innerHTML = '';
+    const fragment = document.createDocumentFragment();
     dataArray.forEach(d => {
         const button = document.createElement("button");
         button.className = buttonClass;
@@ -385,8 +339,11 @@ function createButtons(containerId, dataArray, buttonClass) {
             updateCategoryDropdown(d);
             updateMap(d);
         });
-        container.appendChild(button);
+        fragment.appendChild(button);
     });
+
+    container.innerHTML = '';
+    container.appendChild(fragment);
 }
 
 function updateCategoryDropdown(category) {
@@ -397,11 +354,7 @@ function updateCategoryDropdown(category) {
     document.querySelectorAll(".category-button").forEach(btn => {
         btn.classList.toggle('active', btn.textContent === category);
     });
-    // Close the dropdown after selection
-    const categoryButtons = document.getElementById('categoryButtons');
-    if (categoryButtons) {
-        categoryButtons.classList.remove('show');
-    }
+    document.getElementById('categoryButtons').classList.remove('show');
 }
 
 function toggleSort(column) {
@@ -411,7 +364,7 @@ function toggleSort(column) {
         updateState({ currentSortColumn: column, isAscending: false });
     }
     updateSolutionTable();
-    renderCells();
+    updateGrid(state.map);
 }
 
 function updateSelectionTotals() {
@@ -462,7 +415,6 @@ function setupReportButton() {
 }
 
 function generateReport() {
-    // Implement report generation logic here
     console.log('Generating report...');
     // You can call a function from reportModule.js here
     // For example: reportModule.generatePDFReport(state);
@@ -473,22 +425,16 @@ function setupSearchBar() {
     const searchButton = document.getElementById('searchButton');
     
     if (searchInput && searchButton) {
-        searchButton.addEventListener('click', () => {
-            const query = searchInput.value;
-            searchLocation(query);
-        });
-        
+        searchButton.addEventListener('click', () => searchLocation(searchInput.value));
         searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                const query = searchInput.value;
-                searchLocation(query);
+                searchLocation(searchInput.value);
             }
         });
     }
 }
 
 function searchLocation(query) {
-    // Implement location search logic here
     console.log('Searching for location:', query);
     // You can call a function from a geocoding service or API here
     // For example: mapModule.geocodeAndZoom(query);
@@ -502,12 +448,21 @@ function initializeUI() {
     updateFilterDisplay();
 }
 
-// Event listeners for window resize
-window.addEventListener('resize', () => {
-    updateSelectionRectangle();
-    renderCells();
-});
+function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
 
+// Event listeners for window resize
+window.addEventListener('resize', debounce(() => {
+    updateSelectionRectangle();
+    updateGrid(state.map);
+}, 250));
+
+// Export all necessary functions
 export {
     setupUI,
     updateSolutionTable,

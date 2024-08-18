@@ -2,11 +2,28 @@
 import { state, updateState, isWithinFilters } from './stateModule.js';
 import { toggleCellSelection } from './interactionModule.js';
 
+const CELL_RENDER_BATCH_SIZE = 500;
+
+export function renderCells() {
+    if (!state.map || !state.gridLayer) return;
+    state.gridLayer.clearLayers();
+    const mapBounds = state.map.getBounds();
+    
+    const sortedCells = Array.from(state.allCells.values()).sort((a, b) => {
+        if (!a.scores || !b.scores) return 0;
+        const aValue = getTopSolutionValue(a.scores);
+        const bValue = getTopSolutionValue(b.scores);
+        return state.isAscending ? aValue - bValue : bValue - aValue;
+    });
+
+    sortedCells.forEach(cell => renderCell(cell, mapBounds));
+}
+
 export function initMap() {
     const map = L.map('map', {
         maxZoom: 20,
         minZoom: 19,
-        renderer: L.canvas(),
+        renderer: L.canvas({ pane: 'overlayPane' }),
         tap: true,
         touchZoom: true,
         dragging: true,
@@ -48,7 +65,6 @@ export function updateGrid(map) {
 
     const newCells = new Map();
 
-    // Add cells for the current viewport
     for (let lat = minLat; lat < maxLat; lat += cellSizeLat) {
         for (let lng = minLng; lng < maxLng; lng += cellSizeLng) {
             const cellKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
@@ -64,7 +80,6 @@ export function updateGrid(map) {
         }
     }
 
-    // Preserve selected cells that are outside the current viewport
     state.selectedCellKeys.forEach(key => {
         if (!newCells.has(key) && state.allCells.has(key)) {
             newCells.set(key, state.allCells.get(key));
@@ -73,16 +88,15 @@ export function updateGrid(map) {
 
     updateState({ allCells: newCells, mapNeedsUpdate: true });
     console.log('Grid updated, cells rendered');
-    renderCells();
+    renderCellsBatched();
     updateSelectionRectangle();
 }
 
-export function renderCells() {
+function renderCellsBatched() {
     if (!state.map || !state.gridLayer) return;
     state.gridLayer.clearLayers();
     const mapBounds = state.map.getBounds();
     
-    // Sort cells based on current sorting criteria
     const sortedCells = Array.from(state.allCells.values()).sort((a, b) => {
         if (!a.scores || !b.scores) return 0;
         const aValue = getTopSolutionValue(a.scores);
@@ -90,51 +104,71 @@ export function renderCells() {
         return state.isAscending ? aValue - bValue : bValue - aValue;
     });
 
-    sortedCells.forEach(({ key, bounds, scores }) => {
-        const cellBounds = L.latLngBounds(bounds);
-        const isVisible = mapBounds.intersects(cellBounds);
-        const isSelected = state.selectedCellKeys.has(key);
+    let batchCount = 0;
+    const totalCells = sortedCells.length;
 
-        if (isVisible || isSelected) {
-            let fillColor = "rgba(200,200,200,0.5)";
-            let fillOpacity = 0.5;
+    function renderBatch() {
+        const start = batchCount * CELL_RENDER_BATCH_SIZE;
+        const end = Math.min(start + CELL_RENDER_BATCH_SIZE, totalCells);
 
-            if (scores) {
-                let validSolutions = Object.entries(scores)
-                    .filter(([sol, score]) => score.isSuitable && isWithinFilters(sol, score) && state.selectedSolutions[sol] !== false);
-
-                if (validSolutions.length > 0) {
-                    validSolutions.sort((a, b) => {
-                        const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
-                        const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
-                        return state.isAscending ? aValue - bValue : bValue - aValue;
-                    });
-
-                    // Select the top solution for coloring
-                    const selectedSolution = validSolutions[0];
-                    fillColor = state.colorScale(selectedSolution[0]);
-                    fillOpacity = 0.7;
-                }
-            }
-
-            if (isSelected) {
-                fillOpacity = 0.9;
-            }
-
-            const rectangle = L.rectangle(cellBounds, {
-                color: isSelected ? 'red' : 'transparent',
-                weight: isSelected ? 2 : 1,
-                fillColor: fillColor,
-                fillOpacity: fillOpacity
-            }).addTo(state.gridLayer);
-
-            rectangle.on('click', function() {
-                if (!state.isDrawMode) {
-                    toggleCellSelection(key);
-                }
-            });
+        for (let i = start; i < end; i++) {
+            renderCell(sortedCells[i], mapBounds);
         }
-    });
+
+        batchCount++;
+
+        if (batchCount * CELL_RENDER_BATCH_SIZE < totalCells) {
+            requestAnimationFrame(renderBatch);
+        }
+    }
+
+    renderBatch();
+}
+
+function renderCell(cell, mapBounds) {
+    const { key, bounds, scores } = cell;
+    const cellBounds = L.latLngBounds(bounds);
+    const isVisible = mapBounds.intersects(cellBounds);
+    const isSelected = state.selectedCellKeys.has(key);
+
+    if (isVisible || isSelected) {
+        let fillColor = "rgba(200,200,200,0.5)";
+        let fillOpacity = 0.5;
+
+        if (scores) {
+            let validSolutions = Object.entries(scores)
+                .filter(([sol, score]) => score.isSuitable && isWithinFilters(sol, score) && state.selectedSolutions[sol] !== false);
+
+            if (validSolutions.length > 0) {
+                validSolutions.sort((a, b) => {
+                    const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
+                    const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
+                    return state.isAscending ? aValue - bValue : bValue - aValue;
+                });
+
+                const selectedSolution = validSolutions[0];
+                fillColor = state.colorScale(selectedSolution[0]);
+                fillOpacity = 0.7;
+            }
+        }
+
+        if (isSelected) {
+            fillOpacity = 0.9;
+        }
+
+        const rectangle = L.rectangle(cellBounds, {
+            color: isSelected ? 'red' : 'transparent',
+            weight: isSelected ? 2 : 1,
+            fillColor: fillColor,
+            fillOpacity: fillOpacity
+        }).addTo(state.gridLayer);
+
+        rectangle.on('click', function() {
+            if (!state.isDrawMode) {
+                toggleCellSelection(key);
+            }
+        });
+    }
 }
 
 export function renderSelectedCells() {
@@ -143,50 +177,7 @@ export function renderSelectedCells() {
     state.selectedCellKeys.forEach(key => {
         const cell = state.allCells.get(key);
         if (cell) {
-            const cellBounds = L.latLngBounds(cell.bounds);
-            let fillColor = "rgba(200,200,200,0.5)";
-            let fillOpacity = 0.9;
-
-            if (cell.scores) {
-                let validSolutions = Object.entries(cell.scores)
-                    .filter(([sol, score]) => score.isSuitable && isWithinFilters(sol, score) && state.selectedSolutions[sol] !== false);
-
-                if (validSolutions.length > 0) {
-                    validSolutions.sort((a, b) => {
-                        const aValue = state.currentSortColumn === 'impact' ? a[1].impact : a[1].cost;
-                        const bValue = state.currentSortColumn === 'impact' ? b[1].impact : b[1].cost;
-                        return state.isAscending ? aValue - bValue : bValue - aValue;
-                    });
-
-                    // Select the top solution for coloring
-                    const selectedSolution = validSolutions[0];
-                    fillColor = state.colorScale(selectedSolution[0]);
-                }
-            }
-
-            const existingLayer = state.gridLayer.getLayers().find(layer => 
-                layer.getBounds().equals(cellBounds)
-            );
-
-            if (existingLayer) {
-                existingLayer.setStyle({
-                    fillColor: fillColor,
-                    fillOpacity: fillOpacity
-                });
-            } else {
-                const rectangle = L.rectangle(cellBounds, {
-                    color: 'red',
-                    weight: 2,
-                    fillColor: fillColor,
-                    fillOpacity: fillOpacity
-                }).addTo(state.gridLayer);
-
-                rectangle.on('click', function() {
-                    if (!state.isDrawMode) {
-                        toggleCellSelection(key);
-                    }
-                });
-            }
+            renderCell(cell, state.map.getBounds());
         }
     });
 }
@@ -202,38 +193,7 @@ export function highlightSolutionCells(solution) {
         return;
     }
 
-    state.allCells.forEach(({ key, bounds, scores }) => {
-        const cellBounds = L.latLngBounds(bounds);
-        const isVisible = mapBounds.intersects(cellBounds);
-        const isSelected = state.selectedCellKeys.has(key);
-
-        if (isVisible || isSelected) {
-            let fillColor = "rgba(200,200,200,0.5)";
-            let fillOpacity = 0.5;
-
-            if (scores && scores[solution] && scores[solution].isSuitable) {
-                fillColor = state.colorScale(solution);
-                fillOpacity = 0.7;
-            }
-
-            if (isSelected) {
-                fillOpacity = 0.9;
-            }
-
-            const rectangle = L.rectangle(cellBounds, {
-                color: isSelected ? 'red' : 'transparent',
-                weight: isSelected ? 2 : 1,
-                fillColor: fillColor,
-                fillOpacity: fillOpacity
-            }).addTo(state.gridLayer);
-
-            rectangle.on('click', function() {
-                if (!state.isDrawMode) {
-                    toggleCellSelection(key);
-                }
-            });
-        }
-    });
+    state.allCells.forEach(cell => renderCell(cell, mapBounds));
 }
 
 export function updateSelectionRectangle() {
@@ -287,6 +247,11 @@ function getTopSolutionValue(scores) {
     return state.currentSortColumn === 'impact' ? validSolutions[0][1].impact : validSolutions[0][1].cost;
 }
 
+const debouncedUpdateGrid = debounce((map) => {
+    updateGrid(map);
+    updateMap(state.currentCategory);
+}, 250);
+
 function debounce(func, wait) {
     let timeout;
     return function (...args) {
@@ -295,10 +260,5 @@ function debounce(func, wait) {
         timeout = setTimeout(() => func.apply(context, args), wait);
     };
 }
-
-const debouncedUpdateGrid = debounce((map) => {
-    updateGrid(map);
-    updateMap(state.currentCategory);
-}, 500);
 
 export { debouncedUpdateGrid };

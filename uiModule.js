@@ -207,16 +207,22 @@ function highlightVisibleSolutions() {
     const tbody = table.tBodies[0];
     const rows = tbody.rows;
 
+    // Get all solutions present in the selected cells with non-zero scores
+    const solutionsInSelection = new Set();
+    state.selectedCellKeys.forEach(key => {
+        const cell = state.allCells.get(key);
+        if (cell && cell.scores) {
+            Object.entries(cell.scores).forEach(([solution, score]) => {
+                if (score.impact > 0 || score.cost > 0) {
+                    solutionsInSelection.add(solution);
+                }
+            });
+        }
+    });
+
     for (let row of rows) {
         const solution = row.getAttribute('data-solution');
-        const isVisible = state.selectedCellKeys.size > 0 && 
-                          Array.from(state.selectedCellKeys).some(key => {
-                              const cell = state.allCells.get(key);
-                              return cell && cell.scores && cell.scores[solution] && 
-                                     isWithinFilters(solution, cell.scores[solution]);
-                          });
-
-        if (isVisible) {
+        if (solutionsInSelection.has(solution)) {
             row.style.border = '2px solid red';
         } else {
             row.style.border = '';

@@ -1,3 +1,4 @@
+// dataModule.js
 import { state, updateState, getRasterValueAtPoint } from './stateModule.js';
 
 export async function loadJSONData() {
@@ -103,12 +104,12 @@ export async function calculateSuitabilityScores(bounds, challengeCategory) {
         const promises = Object.entries(state.solutionCriteria)
             .filter(([solution]) => state.selectedSolutions[solution] !== false)
             .map(async ([solution, criteria]) => {
-                const area = await calculateOverlapArea(lat, lng, criteria);
+                const isSuitable = await checkCriteriaOverlap(lat, lng, criteria);
                 const weight = state.challengeCategories[challengeCategory]?.[solution] || 0;
                 cellScores[solution] = {
-                    impact: area * weight * 100,
-                    cost: area * (state.solutionCosts[solution] || 0),
-                    area: area
+                    impact: isSuitable ? weight * 100 : 0,
+                    cost: isSuitable ? (state.solutionCosts[solution] || 0) : 0,
+                    isSuitable: isSuitable
                 };
             });
         await Promise.all(promises);
@@ -120,28 +121,17 @@ export async function calculateSuitabilityScores(bounds, challengeCategory) {
     console.timeEnd('calculateSuitabilityScores');
 }
 
-async function calculateOverlapArea(lat, lng, criteria) {
-    let totalValue = 0;
-    let validCriteria = 0;
+async function checkCriteriaOverlap(lat, lng, criteria) {
+    if (criteria.length !== 2) {
+        console.error(`Invalid criteria length for solution:`, criteria);
+        return false;
+    }
 
-    await Promise.all(criteria.map(async (criterion) => {
-        const raster = state.criteriaRasters[criterion];
-        if (raster) {
-            try {
-                const value = getRasterValueAtPoint(raster, lat, lng);
-                if (value !== undefined) {
-                    totalValue += value;
-                    validCriteria++;
-                }
-            } catch (error) {
-                console.error(`Error calculating overlap for ${criterion}:`, error);
-            }
-        } else {
-            console.warn(`Raster not found for criterion: ${criterion}`);
-        }
-    }));
+    const [criterion1, criterion2] = criteria;
+    const value1 = getRasterValueAtPoint(state.criteriaRasters[criterion1], lat, lng);
+    const value2 = getRasterValueAtPoint(state.criteriaRasters[criterion2], lat, lng);
 
-    return validCriteria > 0 ? totalValue / validCriteria : 0;
+    return value1 > 0 && value2 > 0;
 }
 
 function boundsIntersect(bounds1, bounds2) {

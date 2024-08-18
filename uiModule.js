@@ -207,13 +207,13 @@ function highlightVisibleSolutions() {
     const tbody = table.tBodies[0];
     const rows = tbody.rows;
 
-    // Get all solutions present in the selected cells with non-zero scores
+    // Get all solutions present in the selected cells with non-zero scores and are suitable
     const solutionsInSelection = new Set();
     state.selectedCellKeys.forEach(key => {
         const cell = state.allCells.get(key);
         if (cell && cell.scores) {
             Object.entries(cell.scores).forEach(([solution, score]) => {
-                if (score.impact > 0 || score.cost > 0) {
+                if (score.isSuitable && (score.impact > 0 || score.cost > 0)) {
                     solutionsInSelection.add(solution);
                 }
             });
@@ -508,7 +508,6 @@ window.addEventListener('resize', () => {
     renderCells();
 });
 
-// Export all necessary functions
 export {
     setupUI,
     updateSolutionTable,

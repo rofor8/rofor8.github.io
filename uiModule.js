@@ -328,7 +328,7 @@ function sortRowData(rowData) {
 
 function updateUIForCategory(challengeCategory) {
     updateSolutionTable();
-    updateSliderRanges();
+   
 }
 
 function createButtons(containerId, dataArray, buttonClass) {

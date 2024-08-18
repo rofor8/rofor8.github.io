@@ -118,7 +118,7 @@ function renderCellsBatched() {
         batchCount++;
 
         if (batchCount * CELL_RENDER_BATCH_SIZE < totalCells) {
-            requestAnimationFrame(renderBatch);
+            
         }
     }
 

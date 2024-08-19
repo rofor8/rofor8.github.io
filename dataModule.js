@@ -1,8 +1,10 @@
 // dataModule.js
 
-import { state, updateState, getRasterValueAtPoint } from './stateModule.js';
+import { state, updateState } from './stateModule.js';
 
 const dataCache = new Map();
+const tileCache = new Map();
+const TILE_SIZE = 256;
 
 export async function loadJSONData() {
     const cachedData = dataCache.get('jsonData');
@@ -52,10 +54,8 @@ async function loadRaster(criterion) {
         state.criteriaRasters[criterion] = {
             tiff: tiff,
             bounds: [minX, minY, maxX, maxY],
-            data: null,
-            width: null,
-            height: null,
-            windowBounds: null
+            width: image.getWidth(),
+            height: image.getHeight()
         };
         console.log(`Loaded raster metadata for ${criterion}:`, state.criteriaRasters[criterion]);
     } catch (error) {
@@ -64,57 +64,87 @@ async function loadRaster(criterion) {
 }
 
 export async function loadTilesForViewport(bounds) {
-    console.log("Loading tiles for viewport:", bounds);
+    console.time('loadTilesForViewport');
     const visibleCriteria = new Set(Object.values(state.solutionCriteria).flat());
+    const tilePromises = [];
 
-    const loadPromises = Array.from(visibleCriteria).map(criterion => loadTileForCriterion(criterion, bounds));
-    await Promise.all(loadPromises);
+    for (const criterion of visibleCriteria) {
+        const raster = state.criteriaRasters[criterion];
+        if (!raster || !boundsIntersect(bounds, raster.bounds)) continue;
+
+        const tiles = getTilesForBounds(bounds, raster);
+        for (const tile of tiles) {
+            const tileKey = `${criterion}-${tile.x}-${tile.y}-${tile.z}`;
+            if (!tileCache.has(tileKey)) {
+                tilePromises.push(loadTile(criterion, tile, tileKey));
+            }
+        }
+    }
+
+    await Promise.all(tilePromises);
+    console.timeEnd('loadTilesForViewport');
 }
 
-async function loadTileForCriterion(criterion, bounds) {
-    if (!state.criteriaRasters[criterion]) {
-        console.warn(`Criterion ${criterion} not found in criteriaRasters`);
-        return;
-    }
+async function loadTile(criterion, tile, tileKey) {
+    const raster = state.criteriaRasters[criterion];
+    const { tiff, width, height, bounds } = raster;
 
-    const { tiff, bounds: rasterBounds } = state.criteriaRasters[criterion];
-    if (!boundsIntersect(bounds, rasterBounds)) {
-        console.log(`Viewport does not intersect with raster for ${criterion}`);
-        return;
-    }
+    const tileWidth = Math.min(TILE_SIZE, width - tile.x * TILE_SIZE);
+    const tileHeight = Math.min(TILE_SIZE, height - tile.y * TILE_SIZE);
+
+    const window = [
+        tile.x * TILE_SIZE,
+        tile.y * TILE_SIZE,
+        tile.x * TILE_SIZE + tileWidth,
+        tile.y * TILE_SIZE + tileHeight
+    ];
 
     try {
         const image = await tiff.getImage();
-        const imageWidth = image.getWidth();
-        const imageHeight = image.getHeight();
-
-        const window = calculateWindow(bounds, rasterBounds, imageWidth, imageHeight);
         const rasterData = await image.readRasters({ window });
+        
+        const tileData = {
+            data: rasterData[0],
+            width: tileWidth,
+            height: tileHeight,
+            bounds: calculateTileBounds(window, bounds, width, height)
+        };
 
-        state.criteriaRasters[criterion].data = rasterData[0];
-        state.criteriaRasters[criterion].width = window[2] - window[0];
-        state.criteriaRasters[criterion].height = window[3] - window[1];
-        state.criteriaRasters[criterion].windowBounds = calculateWindowBounds(window, rasterBounds, imageWidth, imageHeight);
-
-        console.log(`Loaded data for ${criterion}:`, {
-            dataLength: state.criteriaRasters[criterion].data.length,
-            width: state.criteriaRasters[criterion].width,
-            height: state.criteriaRasters[criterion].height,
-            windowBounds: state.criteriaRasters[criterion].windowBounds
-        });
+        tileCache.set(tileKey, tileData);
     } catch (error) {
-        console.error(`Error loading raster data for ${criterion}:`, error);
+        console.error(`Error loading tile for ${criterion}:`, error);
     }
+}
+
+function getTilesForBounds(bounds, raster) {
+    const { width, height, bounds: rasterBounds } = raster;
+    const [minX, minY, maxX, maxY] = rasterBounds;
+
+    const topLeftTile = latLngToTile(bounds.getNorth(), bounds.getWest(), minX, minY, maxX, maxY, width, height);
+    const bottomRightTile = latLngToTile(bounds.getSouth(), bounds.getEast(), minX, minY, maxX, maxY, width, height);
+
+    const tiles = [];
+    for (let x = topLeftTile.x; x <= bottomRightTile.x; x++) {
+        for (let y = topLeftTile.y; y <= bottomRightTile.y; y++) {
+            tiles.push({ x, y, z: topLeftTile.z });
+        }
+    }
+
+    return tiles;
+}
+
+function latLngToTile(lat, lng, minX, minY, maxX, maxY, width, height) {
+    const x = Math.floor((lng - minX) / (maxX - minX) * width / TILE_SIZE);
+    const y = Math.floor((maxY - lat) / (maxY - minY) * height / TILE_SIZE);
+    return { x, y, z: 0 }; // z is always 0 for our single-zoom-level rasters
 }
 
 export async function calculateSuitabilityScores(bounds, challengeCategory) {
     console.time('calculateSuitabilityScores');
 
-    const startTime = performance.now();
     const visibleCells = Array.from(state.allCells.values()).filter(cell =>
         bounds.intersects(L.latLngBounds(cell.bounds))
     );
-    console.log('Time to filter visible cells:', performance.now() - startTime, 'ms');
 
     const batchSize = 1000;
     const batches = Math.ceil(visibleCells.length / batchSize);
@@ -126,7 +156,7 @@ export async function calculateSuitabilityScores(bounds, challengeCategory) {
 
         await new Promise(resolve => {
             setTimeout(async () => {
-                await Promise.all(cellBatch.map(cell => calculateCellScores(cell, challengeCategory)));
+                cellBatch.forEach(cell => calculateCellScores(cell, challengeCategory));
                 resolve();
             }, 0);
         });
@@ -135,17 +165,16 @@ export async function calculateSuitabilityScores(bounds, challengeCategory) {
     console.timeEnd('calculateSuitabilityScores');
 }
 
-async function calculateCellScores(cell, challengeCategory) {
+function calculateCellScores(cell, challengeCategory) {
     const [lat, lng] = cell.key.split(',').map(Number);
     const cellScores = {};
 
-    const criteriaStartTime = performance.now();
-    const promises = Object.entries(state.solutionCriteria)
+    Object.entries(state.solutionCriteria)
         .filter(([solution]) => state.selectedSolutions[solution] !== false)
-        .map(async ([solution, criteria]) => {
+        .forEach(([solution, criteria]) => {
             const [criterion1, criterion2] = criteria;
-            const value1 = getRasterValueAtPoint(state.criteriaRasters[criterion1], lat, lng);
-            const value2 = getRasterValueAtPoint(state.criteriaRasters[criterion2], lat, lng);
+            const value1 = getRasterValueAtPoint(criterion1, lat, lng);
+            const value2 = getRasterValueAtPoint(criterion2, lat, lng);
             
             const isSuitable = value1 > 0 && value2 > 0;
             
@@ -156,10 +185,35 @@ async function calculateCellScores(cell, challengeCategory) {
                 isSuitable: isSuitable
             };
         });
-    await Promise.all(promises);
-    console.log('Time to calculate scores for cell:', performance.now() - criteriaStartTime, 'ms');
 
     cell.scores = cellScores;
+}
+
+function getRasterValueAtPoint(criterion, lat, lng) {
+    const raster = state.criteriaRasters[criterion];
+    if (!raster) return 0;
+
+    const { bounds, width, height } = raster;
+    const [minX, minY, maxX, maxY] = bounds;
+
+    if (lng < minX || lng > maxX || lat < minY || lat > maxY) {
+        return 0;
+    }
+
+    const tileX = Math.floor((lng - minX) / (maxX - minX) * width / TILE_SIZE);
+    const tileY = Math.floor((maxY - lat) / (maxY - minY) * height / TILE_SIZE);
+    const tileKey = `${criterion}-${tileX}-${tileY}-0`;
+
+    const tile = tileCache.get(tileKey);
+    if (!tile) return 0;
+
+    const { data, width: tileWidth, height: tileHeight, bounds: tileBounds } = tile;
+    const [tMinX, tMinY, tMaxX, tMaxY] = tileBounds;
+
+    const x = Math.floor((lng - tMinX) / (tMaxX - tMinX) * tileWidth);
+    const y = Math.floor((tMaxY - lat) / (tMaxY - tMinY) * tileHeight);
+
+    return data[y * tileWidth + x] || 0;
 }
 
 function boundsIntersect(bounds1, bounds2) {
@@ -167,17 +221,7 @@ function boundsIntersect(bounds1, bounds2) {
              bounds1.getSouth() > bounds2[3] || bounds1.getNorth() < bounds2[1]);
 }
 
-function calculateWindow(bounds, rasterBounds, imageWidth, imageHeight) {
-    const [minX, minY, maxX, maxY] = rasterBounds;
-    return [
-        Math.max(0, Math.floor((bounds.getWest() - minX) / (maxX - minX) * imageWidth)),
-        Math.max(0, Math.floor((maxY - bounds.getNorth()) / (maxY - minY) * imageHeight)),
-        Math.min(imageWidth, Math.ceil((bounds.getEast() - minX) / (maxX - minX) * imageWidth)),
-        Math.min(imageHeight, Math.ceil((maxY - bounds.getSouth()) / (maxY - minY) * imageHeight))
-    ];
-}
-
-function calculateWindowBounds(window, rasterBounds, imageWidth, imageHeight) {
+function calculateTileBounds(window, rasterBounds, imageWidth, imageHeight) {
     const [minX, minY, maxX, maxY] = rasterBounds;
     const [left, top, right, bottom] = window;
     return [
@@ -188,4 +232,4 @@ function calculateWindowBounds(window, rasterBounds, imageWidth, imageHeight) {
     ];
 }
 
-export { loadRaster, loadTileForCriterion };
+export { loadRaster };

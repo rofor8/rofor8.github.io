@@ -1,4 +1,5 @@
 // dataModule.js
+
 import { state, updateState, getRasterValueAtPoint } from './stateModule.js';
 
 const dataCache = new Map();

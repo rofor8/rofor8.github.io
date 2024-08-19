@@ -6,9 +6,7 @@ from rasterio.transform import from_origin
 from rasterio.features import rasterize
 from rasterio.enums import Resampling
 import numpy as np
-from shapely.geometry import box, LineString, Polygon, Point, MultiPolygon
-from shapely.ops import unary_union
-from shapely.validation import make_valid
+from shapely.geometry import box, LineString, Polygon, Point
 import json
 
 # Define the area of interest (1km x 1km)
@@ -37,29 +35,12 @@ transform = from_origin(xmin, ymax, res, res)
 with open('solutionCriteria.json', 'r') as f:
     solution_criteria = json.load(f)
 
-import os
-import requests
-import geopandas as gpd
-import rasterio
-from rasterio.transform import from_origin
-from rasterio.features import rasterize
-from rasterio.enums import Resampling
-import numpy as np
-from shapely.geometry import box, LineString, Polygon, Point, MultiPolygon
-from shapely.ops import unary_union
-from shapely.validation import make_valid
-import json
-import random
-
-# ... [Keep the existing imports and initial setup] ...
-
 def download_osm_data(bbox):
     """Download OSM data for the given bounding box."""
     overpass_url = "http://overpass-api.de/api/interpreter"
     overpass_query = f"""
     [out:json];
     (
-      node({bbox[1]},{bbox[0]},{bbox[3]},{bbox[2]});
       way({bbox[1]},{bbox[0]},{bbox[3]},{bbox[2]});
       relation({bbox[1]},{bbox[0]},{bbox[3]},{bbox[2]});
     );
@@ -70,63 +51,56 @@ def download_osm_data(bbox):
     return data
 
 def osm_to_geodataframe(osm_data):
-    """Convert OSM data to a GeoDataFrame with improved feature handling and error checking."""
+    """Convert OSM data to a GeoDataFrame."""
     features = []
+    print(f"Number of elements: {len(osm_data['elements'])}")
     for element in osm_data['elements']:
-        try:
-            if element['type'] == 'way':
-                coords = [(node['lon'], node['lat']) for node in element['geometry']]
-                geometry = Polygon(coords) if coords[0] == coords[-1] else LineString(coords)
-            elif element['type'] == 'node':
-                geometry = Point(element['lon'], element['lat'])
-            elif element['type'] == 'relation':
-                outer_rings = []
-                inner_rings = []
-                for member in element['members']:
-                    if member['type'] == 'way':
-                        coords = [(node['lon'], node['lat']) for node in member['geometry']]
-                        try:
-                            poly = Polygon(coords)
-                            if member['role'] == 'outer':
-                                outer_rings.append(poly)
-                            elif member['role'] == 'inner':
-                                inner_rings.append(poly)
-                        except ValueError:
-                            print(f"Invalid polygon: {coords}")
-                            continue
-                
-                if outer_rings:
-                    try:
-                        geometry = unary_union(outer_rings)
-                        for inner in inner_rings:
-                            geometry = geometry.difference(inner)
-                    except Exception as e:
-                        print(f"Error creating multipolygon: {e}")
-                        continue
+        print(f"Processing element: {element['type']}")
+        if element['type'] == 'way':
+            try:
+                if 'geometry' in element:
+                    coords = [(node['lon'], node['lat']) for node in element['geometry']]
+                elif 'nodes' in element:
+                    coords = [(node['lon'], node['lat']) for node in element['nodes']]
                 else:
-                    continue  # Skip relations without outer rings
-            
-            if not geometry.is_valid:
-                geometry = make_valid(geometry)
-            
-            features.append({
-                'geometry': geometry,
-                'properties': element.get('tags', {})
-            })
-        except Exception as e:
-            print(f"Error processing element: {e}")
-            continue
+                    print(f"Unexpected element structure: {element.keys()}")
+                    continue
+
+                if len(coords) < 2:
+                    print(f"Invalid geometry: {coords}")
+                    continue
+
+                if coords[0] == coords[-1]:
+                    geometry = Polygon(coords)
+                else:
+                    geometry = LineString(coords)
+                
+                features.append({
+                    'geometry': geometry,
+                    'properties': element.get('tags', {})
+                })
+            except KeyError as e:
+                print(f"KeyError in element: {e}")
+                print(f"Element structure: {element.keys()}")
+                continue
+        elif element['type'] == 'node':
+            try:
+                geometry = Point(element['lon'], element['lat'])
+                features.append({
+                    'geometry': geometry,
+                    'properties': element.get('tags', {})
+                })
+            except KeyError as e:
+                print(f"KeyError in node element: {e}")
+                print(f"Node element structure: {element.keys()}")
+                continue
 
     if not features:
         print("No valid features found in the OSM data.")
         return gpd.GeoDataFrame(crs='EPSG:4326')
     
+    print(f"Number of valid features: {len(features)}")
     return gpd.GeoDataFrame.from_features(features, crs='EPSG:4326')
-
-def buffer_features(gdf, min_buffer=3, max_buffer=30):
-    """Buffer features by a random distance between min_buffer and max_buffer meters."""
-    buffer_distances = np.random.uniform(min_buffer, max_buffer, len(gdf))
-    return gdf.to_crs('EPSG:3857').buffer(buffer_distances).to_crs('EPSG:4326')
 
 def create_cog(data, output_path, transform):
     """Create a Cloud Optimized GeoTIFF."""
@@ -148,60 +122,62 @@ def create_cog(data, output_path, transform):
     with rasterio.open(output_path, 'w', **profile) as dst:
         dst.write(data.astype(rasterio.uint8), 1)
 
+    # Add overviews
     with rasterio.open(output_path, 'r+') as dst:
         factors = [2, 4, 8, 16]
         dst.build_overviews(factors, Resampling.average)
         dst.update_tags(ns='rio_overview', resampling='average')
 
 def generate_raster(gdf, criterion):
-    """Generate a raster based on the GeoDataFrame and criterion with randomized buffering."""
+    """Generate a raster based on the GeoDataFrame and criterion."""
     raster = np.zeros((height, width), dtype=np.uint8)
     
-    try:
-        if criterion == 'buildings':
-            filtered_gdf = gdf[gdf['building'].notna()]
-        elif criterion == 'roads':
-            filtered_gdf = gdf[gdf['highway'].notna()]
-        elif criterion == 'water_bodies':
-            filtered_gdf = gdf[gdf['natural'] == 'water']
-        elif criterion == 'green_areas':
-            filtered_gdf = gdf[gdf['landuse'].isin(['park', 'forest', 'grass', 'meadow']) | gdf['leisure'].isin(['park', 'garden'])]
-        elif criterion == 'commercial_areas':
-            filtered_gdf = gdf[(gdf['landuse'] == 'commercial') | (gdf['shop'].notna())]
-        elif criterion == 'residential_areas':
-            filtered_gdf = gdf[gdf['landuse'] == 'residential']
-        elif criterion == 'industrial_areas':
-            filtered_gdf = gdf[gdf['landuse'] == 'industrial']
-        elif criterion == 'railways':
-            filtered_gdf = gdf[gdf['railway'].notna()]
-        elif criterion == 'waterways':
-            filtered_gdf = gdf[gdf['waterway'].notna()]
-        elif criterion == 'amenities':
-            filtered_gdf = gdf[gdf['amenity'].notna()]
-        elif criterion == 'natural_features':
-            filtered_gdf = gdf[gdf['natural'].notna()]
-        elif criterion == 'power_infrastructure':
-            filtered_gdf = gdf[gdf['power'].notna()]
-        else:
-            filtered_gdf = gdf
-
-        if not filtered_gdf.empty:
-            filtered_gdf = filtered_gdf.copy()  # Create a copy to avoid SettingWithCopyWarning
-            filtered_gdf['geometry'] = buffer_features(filtered_gdf)
-            shapes = ((geom, 255) for geom in filtered_gdf.geometry)
-            rasterize(shapes=shapes, out=raster, transform=transform, fill=0, all_touched=True)
-        else:
-            print(f"No features found for criterion: {criterion}")
+    # Filter GeoDataFrame based on criterion
+    if criterion in ['soil permeability', 'soil type', 'soil quality']:
+        filtered_gdf = gdf[gdf['natural'].isin(['heath', 'grassland', 'scrub'])]
+    elif criterion in ['flood risk', 'urban runoff', 'water flow']:
+        filtered_gdf = gdf[gdf['waterway'].notna() | gdf['natural'].isin(['water', 'wetland'])]
+    elif criterion in ['building density', 'building height']:
+        filtered_gdf = gdf[gdf['building'].notna()]
+    elif criterion in ['rainfall']:
+        # Simulate rainfall with random points
+        points = gpd.GeoDataFrame(geometry=gpd.points_from_xy(
+            np.random.uniform(xmin, xmax, 1000),
+            np.random.uniform(ymin, ymax, 1000)
+        ), crs='EPSG:4326')
+        filtered_gdf = points
+    elif criterion in ['air quality', 'urban heat island']:
+        filtered_gdf = gdf[gdf['highway'].notna()]
+    elif criterion in ['biodiversity index', 'habitat connectivity']:
+        filtered_gdf = gdf[gdf['natural'].notna() | gdf['landuse'].isin(['forest', 'grass', 'meadow'])]
+    elif criterion in ['population density', 'pedestrian flow']:
+        filtered_gdf = gdf[gdf['highway'].isin(['pedestrian', 'footway', 'path'])]
+    elif criterion in ['current road network']:
+        filtered_gdf = gdf[gdf['highway'].notna()]
+    elif criterion in ['sunlight exposure']:
+        # Simulate sunlight exposure with a gradient
+        xx, yy = np.mgrid[0:height, 0:width]
+        filtered_gdf = gpd.GeoDataFrame(geometry=[box(xmin, ymin, xmax, ymax)], crs='EPSG:4326')
+        raster = (xx + yy) / (height + width) * 255
+    elif criterion in ['housing density', 'socioeconomic factors']:
+        filtered_gdf = gdf[gdf['building'] == 'residential']
+    elif criterion in ['land availability', 'accessibility']:
+        filtered_gdf = gdf[gdf['landuse'].isin(['grass', 'meadow', 'recreation_ground'])]
+    else:
+        filtered_gdf = gdf
     
-    except Exception as e:
-        print(f"Error processing criterion {criterion}: {str(e)}")
+    if criterion != 'sunlight exposure':
+        shapes = ((geom, 255) for geom in filtered_gdf.geometry)
+        rasterize(shapes=shapes, out=raster, transform=transform, fill=0, all_touched=True)
     
     return raster
 
 # Main execution
 if __name__ == "__main__":
+    # Ensure output directory exists
     os.makedirs('rasters', exist_ok=True)
 
+    # Download OSM data
     bbox = (xmin, ymin, xmax, ymax)
     osm_data = download_osm_data(bbox)
     
@@ -215,23 +191,13 @@ if __name__ == "__main__":
         print(f"Columns: {gdf.columns}")
         print(f"Geometry types: {gdf.geometry.type.value_counts()}")
 
-        # Define criteria based on OSM features
-        criteria = [
-            'buildings', 'roads', 'water_bodies', 'green_areas', 'commercial_areas',
-            'residential_areas', 'industrial_areas', 'railways', 'waterways',
-            'amenities', 'natural_features', 'power_infrastructure'
-        ]
+        # Generate and save COGs for each criterion
+        all_criteria = set(criterion for criteria in solution_criteria.values() for criterion in criteria)
 
-        for criterion in criteria:
-            try:
-                raster = generate_raster(gdf, criterion)
-                if np.any(raster):  # Check if the raster contains any non-zero values
-                    output_path = f'rasters/{criterion}.tif'
-                    create_cog(raster, output_path, transform)
-                    print(f"Generated COG for {criterion}")
-                else:
-                    print(f"Skipping empty raster for {criterion}")
-            except Exception as e:
-                print(f"Error generating raster for {criterion}: {str(e)}")
+        for criterion in all_criteria:
+            raster = generate_raster(gdf, criterion)
+            output_path = f'rasters/{criterion}.tif'
+            create_cog(raster, output_path, transform)
+            print(f"Generated COG for {criterion}")
 
         print("All COGs generated successfully.")

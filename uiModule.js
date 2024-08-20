@@ -1,5 +1,5 @@
 // uiModule.js
-import { state, updateState, updateMap, updateTotals, isWithinFilters, getFilterRanges, storeSliderValues } from './stateModule.js';
+import { state, updateState, updateMap, updateTotals, isWithinFilters, getFilterRanges } from './stateModule.js';
 import { updateGrid, updateSelectionRectangle, highlightSolutionCells, clearHighlightedCells } from './mapModule.js';
 
 let isUpdating = false;
@@ -92,8 +92,8 @@ function updateSolutionTable() {
         sortRowData(rowData);
 
         const fragment = document.createDocumentFragment();
-        rowData.forEach(({ solution, impact, cost }) => {
-            const row = createTableRow(solution, impact, cost, maxImpact, maxCost);
+        rowData.forEach(data => {
+            const row = createTableRow(data.solution, data.impact, data.cost, maxImpact, maxCost);
             fragment.appendChild(row);
         });
 
@@ -132,10 +132,10 @@ function getMaxValues(solutionTotals) {
 }
 
 function prepareRowData(solutionTotals) {
-    return Object.entries(solutionTotals).map(([solution, totals]) => ({
+    return Object.keys(state.solutionCriteria).map(solution => ({
         solution,
-        impact: totals.impact,
-        cost: totals.cost
+        impact: solutionTotals[solution]?.impact || 0,
+        cost: solutionTotals[solution]?.cost || 0
     }));
 }
 
@@ -143,18 +143,22 @@ function createTableRow(solution, impact, cost, maxImpact, maxCost) {
     const row = document.createElement('tr');
     row.setAttribute('data-solution', solution);
 
+    const isChecked = state.selectedSolutions[solution] !== false;
+    const impactWidth = maxImpact > 0 ? (impact / maxImpact) * 100 : 0;
+    const costWidth = maxCost > 0 ? (cost / maxCost) * 100 : 0;
+
     row.innerHTML = `
         <td>
-            <input type="checkbox" ${state.selectedSolutions[solution] !== false ? 'checked' : ''}
+            <input type="checkbox" ${isChecked ? 'checked' : ''}
                    style="accent-color: ${state.colorScale(solution)}">
         </td>
         <td>${solution}</td>
         <td class="impact">
-            <div class="bar-graph impact-bar" style="width: ${(impact / maxImpact) * 100}%; background-color: ${state.colorScale(solution)}"></div>
+            <div class="bar-graph impact-bar" style="width: ${impactWidth}%; background-color: ${state.colorScale(solution)}"></div>
             <span class="value">${impact.toFixed(2)}</span>
         </td>
         <td class="cost">
-            <div class="bar-graph cost-bar" style="width: ${(cost / maxCost) * 100}%; background-color: ${state.colorScale(solution)}"></div>
+            <div class="bar-graph cost-bar" style="width: ${costWidth}%; background-color: ${state.colorScale(solution)}"></div>
             <span class="value">${cost.toFixed(2)}</span>
         </td>
     `;
@@ -187,8 +191,8 @@ function createTableRow(solution, impact, cost, maxImpact, maxCost) {
     });
 
     const isFiltered = !isWithinFilters(solution, { impact, cost });
-    row.style.opacity = isFiltered ? '0.3' : '1';
-    row.style.pointerEvents = isFiltered ? 'none' : 'auto';
+    row.style.opacity = isChecked ? (isFiltered ? '0.3' : '1') : '0.5';
+    row.style.pointerEvents = 'auto';
 
     return row;
 }
@@ -251,16 +255,14 @@ function setupFilterSliders() {
 
     if (impactSlider && costSlider) {
         const ranges = getFilterRanges();
-        const storedValues = state.categorySliderValues[state.currentCategory] || {};
-
-        setupSlider(impactSlider, "impact", ranges.impact, storedValues.impact);
-        setupSlider(costSlider, "cost", ranges.cost, storedValues.cost);
+        setupSlider(impactSlider, "impact", ranges.impact);
+        setupSlider(costSlider, "cost", ranges.cost);
     }
 }
 
-function setupSlider(slider, type, range, storedValues) {
+function setupSlider(slider, type, range) {
     noUiSlider.create(slider, {
-        start: storedValues || [range[0], range[1]],
+        start: state[`${type}Filter`] || [range[0], range[1]],
         connect: true,
         range: {
             'min': range[0],
@@ -283,6 +285,18 @@ function setupSlider(slider, type, range, storedValues) {
     }, 100));
 }
 
+function storeSliderValues() {
+    const impactSlider = document.getElementById("impactSlider");
+    const costSlider = document.getElementById("costSlider");
+
+    if (impactSlider && impactSlider.noUiSlider && costSlider && costSlider.noUiSlider) {
+        state.categorySliderValues[state.currentCategory] = {
+            impact: impactSlider.noUiSlider.get().map(Number),
+            cost: costSlider.noUiSlider.get().map(Number)
+        };
+    }
+}
+
 function updateTableStyles() {
     const table = document.getElementById("solutionsTable");
     if (!table) return;
@@ -296,8 +310,9 @@ function updateTableStyles() {
         const cost = parseFloat(row.cells[3].textContent);
 
         const isFiltered = !isWithinFilters(solution, { impact, cost });
-        row.style.opacity = isFiltered ? '0.3' : '1';
-        row.style.pointerEvents = isFiltered ? 'none' : 'auto';
+        const isChecked = state.selectedSolutions[solution] !== false;
+        row.style.opacity = isChecked ? (isFiltered ? '0.3' : '1') : '0.5';
+        row.style.pointerEvents = 'auto';
     }
 
     highlightVisibleSolutions();
@@ -320,8 +335,8 @@ function updateSliderRange(slider, type, range) {
                 'max': range[1]
             }
         });
-        const storedValues = state.categorySliderValues[state.currentCategory]?.[type] || [range[0], range[1]];
-        slider.noUiSlider.set(storedValues);
+        // Use the current filter values
+        slider.noUiSlider.set(state[`${type}Filter`]);
     }
 }
 
@@ -329,12 +344,17 @@ function sortRowData(rowData) {
     rowData.sort((a, b) => {
         const aValue = a[state.currentSortColumn];
         const bValue = b[state.currentSortColumn];
+        if (aValue === bValue) {
+            return a.solution.localeCompare(b.solution); // Secondary sort by solution name
+        }
         return state.isAscending ? aValue - bValue : bValue - aValue;
     });
 }
 
 function updateUIForCategory(challengeCategory) {
     updateSolutionTable();
+    updateSliderRanges();
+    updateFilterDisplay();
 }
 
 function createButtons(containerId, dataArray, buttonClass) {
@@ -394,7 +414,7 @@ function updateSelectionTotals() {
         const cell = state.allCells.get(key);
         if (cell && cell.scores) {
             Object.entries(cell.scores).forEach(([solution, score]) => {
-                if (isWithinFilters(solution, score)) {
+                if (isWithinFilters(solution, score) && state.selectedSolutions[solution] !== false) {
                     totalImpact += score.impact;
                     totalCost += score.cost;
                 }
@@ -403,23 +423,23 @@ function updateSelectionTotals() {
     });
 
     selectionTotals.innerHTML = `
-    <p>Selected Cells: ${selectedCells}</p>
-    <p>Total Impact: ${totalImpact.toFixed(2)}</p>
-    <p>Total Cost: £${totalCost.toFixed(2)}</p>
-`;
+        <p>Selected Cells: ${selectedCells}</p>
+        <p>Total Impact: ${totalImpact.toFixed(2)}</p>
+        <p>Total Cost: £${totalCost.toFixed(2)}</p>
+    `;
 }
 
 function updateFilterDisplay() {
-const impactValue = document.getElementById("impactValue");
-const costValue = document.getElementById("costValue");
+    const impactValue = document.getElementById("impactValue");
+    const costValue = document.getElementById("costValue");
 
-if (impactValue) {
-    impactValue.textContent = `${state.impactFilter[0].toFixed(2)} - ${state.impactFilter[1].toFixed(2)}`;
-}
+    if (impactValue) {
+        impactValue.textContent = `${state.impactFilter[0].toFixed(2)} - ${state.impactFilter[1].toFixed(2)}`;
+    }
 
-if (costValue) {
-    costValue.textContent = `${state.costFilter[0].toFixed(2)} - ${state.costFilter[1].toFixed(2)}`;
-}
+    if (costValue) {
+        costValue.textContent = `${state.costFilter[0].toFixed(2)} - ${state.costFilter[1].toFixed(2)}`;
+    }
 }
 
 function setupReportButton() {
@@ -490,5 +510,6 @@ export {
     generateReport,
     searchLocation,
     initializeUI,
-    highlightVisibleSolutions
+    highlightVisibleSolutions,
+    storeSliderValues
 };

@@ -114,7 +114,7 @@ export function getRasterValueAtPoint(raster, lat, lng) {
     const y = Math.floor((maxY - lat) / (maxY - minY) * height);
 
     if (x >= 0 && x < width && y >= 0 && y < height) {
-        return data[y * width + x];
+        return data[y * width + x] || 0;
     }
 
     console.log('Invalid raster coordinates', { x, y, width, height });
@@ -176,7 +176,6 @@ export function getFilterRanges() {
     };
 }
 
-// New function to store slider values for the current category
 export function storeSliderValues() {
     state.categorySliderValues[state.currentCategory] = {
         impact: [...state.impactFilter],

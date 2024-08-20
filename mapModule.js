@@ -33,7 +33,7 @@ export function initMap() {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 20,
         minZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenstreetMap</a> contributors',
         className: 'map-tiles'
     }).addTo(map);
 
@@ -118,7 +118,6 @@ function renderCellsBatched() {
         batchCount++;
 
         if (batchCount * CELL_RENDER_BATCH_SIZE < totalCells) {
-            
         }
     }
 
@@ -187,13 +186,37 @@ export function highlightSolutionCells(solution) {
     state.gridLayer.clearLayers();
     const mapBounds = state.map.getBounds();
 
-    const criteria = state.solutionCriteria[solution];
-    if (!criteria || criteria.length !== 2) {
-        console.error(`Invalid criteria for solution: ${solution}`);
-        return;
-    }
+    state.allCells.forEach(cell => {
+        const { key, bounds, scores } = cell;
+        const cellBounds = L.latLngBounds(bounds);
+        const isVisible = mapBounds.intersects(cellBounds);
+        const isSelected = state.selectedCellKeys.has(key);
 
-    state.allCells.forEach(cell => renderCell(cell, mapBounds));
+        if (isVisible || isSelected) {
+            let fillColor = "rgba(200,200,200,0.5)";
+            let fillOpacity = 0.5;
+
+            if (scores && scores[solution] && scores[solution].isSuitable) {
+                fillColor = state.colorScale(solution);
+                fillOpacity = 0.7;
+            }
+
+            if (isSelected) {
+                fillOpacity = 0.9;
+            }
+
+            L.rectangle(cellBounds, {
+                color: isSelected ? 'red' : 'transparent',
+                weight: isSelected ? 2 : 1,
+                fillColor: fillColor,
+                fillOpacity: fillOpacity
+            }).addTo(state.gridLayer);
+        }
+    });
+}
+
+export function clearHighlightedCells() {
+    renderCells();
 }
 
 export function updateSelectionRectangle() {

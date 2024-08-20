@@ -1,6 +1,6 @@
 // uiModule.js
 import { state, updateState, updateMap, updateTotals, isWithinFilters, getFilterRanges, storeSliderValues } from './stateModule.js';
-import { updateGrid, updateSelectionRectangle, highlightSolutionCells } from './mapModule.js';
+import { updateGrid, updateSelectionRectangle, highlightSolutionCells, clearHighlightedCells } from './mapModule.js';
 
 let isUpdating = false;
 let updateSolutionTableTimeout = null;
@@ -181,12 +181,21 @@ function createTableRow(solution, impact, cost, count, maxImpact, maxCost, maxCo
         updateGrid(state.map);
     });
 
+    // Add hover events for checkbox
+    checkbox.addEventListener('mouseenter', () => {
+        if (checkbox.checked) {
+            highlightSolutionCells(solution);
+        }
+    });
+    checkbox.addEventListener('mouseleave', () => {
+        if (checkbox.checked) {
+            clearHighlightedCells();
+        }
+    });
+
     const isFiltered = !isWithinFilters(solution, { impact, cost });
     row.style.opacity = isFiltered ? '0.3' : '1';
-    row.style.pointerEvents = 'auto';
-
-    row.addEventListener('mouseenter', () => highlightSolutionCells(solution));
-    row.addEventListener('mouseleave', () => updateGrid(state.map));
+    row.style.pointerEvents = isFiltered ? 'none' : 'auto';
 
     return row;
 }
@@ -401,92 +410,92 @@ function updateSelectionTotals() {
     });
 
     selectionTotals.innerHTML = `
-        <p>Selected Cells: ${selectedCells}</p>
-        <p>Total Impact: ${totalImpact.toFixed(2)}</p>
-        <p>Total Cost: £${totalCost.toFixed(2)}</p>
-    `;
+    <p>Selected Cells: ${selectedCells}</p>
+    <p>Total Impact: ${totalImpact.toFixed(2)}</p>
+    <p>Total Cost: £${totalCost.toFixed(2)}</p>
+`;
 }
 
 function updateFilterDisplay() {
-    const impactValue = document.getElementById("impactValue");
-    const costValue = document.getElementById("costValue");
-    
-    if (impactValue) {
-        impactValue.textContent = `${state.impactFilter[0].toFixed(2)} - ${state.impactFilter[1].toFixed(2)}`;
-    }
-    
-    if (costValue) {
-        costValue.textContent = `${state.costFilter[0].toFixed(2)} - ${state.costFilter[1].toFixed(2)}`;
-    }
+const impactValue = document.getElementById("impactValue");
+const costValue = document.getElementById("costValue");
+
+if (impactValue) {
+    impactValue.textContent = `${state.impactFilter[0].toFixed(2)} - ${state.impactFilter[1].toFixed(2)}`;
+}
+
+if (costValue) {
+    costValue.textContent = `${state.costFilter[0].toFixed(2)} - ${state.costFilter[1].toFixed(2)}`;
+}
 }
 
 function setupReportButton() {
-    const reportButton = document.getElementById('generateReport');
-    if (reportButton) {
-        reportButton.addEventListener('click', generateReport);
-    }
+const reportButton = document.getElementById('generateReport');
+if (reportButton) {
+    reportButton.addEventListener('click', generateReport);
+}
 }
 
 function generateReport() {
-    console.log('Generating report...');
-    // You can call a function from reportModule.js here
-    // For example: reportModule.generatePDFReport(state);
+console.log('Generating report...');
+// You can call a function from reportModule.js here
+// For example: reportModule.generatePDFReport(state);
 }
 
 function setupSearchBar() {
-    const searchInput = document.getElementById('searchInput');
-    const searchButton = document.getElementById('searchButton');
-    
-    if (searchInput && searchButton) {
-        searchButton.addEventListener('click', () => searchLocation(searchInput.value));
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                searchLocation(searchInput.value);
-            }
-        });
-    }
+const searchInput = document.getElementById('searchInput');
+const searchButton = document.getElementById('searchButton');
+
+if (searchInput && searchButton) {
+    searchButton.addEventListener('click', () => searchLocation(searchInput.value));
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            searchLocation(searchInput.value);
+        }
+    });
+}
 }
 
 function searchLocation(query) {
-    console.log('Searching for location:', query);
-    // You can call a function from a geocoding service or API here
-    // For example: mapModule.geocodeAndZoom(query);
+console.log('Searching for location:', query);
+// You can call a function from a geocoding service or API here
+// For example: mapModule.geocodeAndZoom(query);
 }
 
 function initializeUI() {
-    setupUI();
-    setupReportButton();
-    setupSearchBar();
-    updateSelectionTotals();
-    updateFilterDisplay();
+setupUI();
+setupReportButton();
+setupSearchBar();
+updateSelectionTotals();
+updateFilterDisplay();
 }
 
 function debounce(func, wait) {
-    let timeout;
-    return function (...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
-    };
+let timeout;
+return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+};
 }
 
 // Event listeners for window resize
 window.addEventListener('resize', debounce(() => {
-    updateSelectionRectangle();
-    updateGrid(state.map);
+updateSelectionRectangle();
+updateGrid(state.map);
 }, 250));
 
 // Export all necessary functions
 export {
-    setupUI,
-    updateSolutionTable,
-    updateUIForCategory,
-    createButtons,
-    updateCategoryDropdown,
-    updateSliderRanges,
-    updateSelectionTotals,
-    updateFilterDisplay,
-    generateReport,
-    searchLocation,
-    initializeUI,
-    highlightVisibleSolutions
+setupUI,
+updateSolutionTable,
+updateUIForCategory,
+createButtons,
+updateCategoryDropdown,
+updateSliderRanges,
+updateSelectionTotals,
+updateFilterDisplay,
+generateReport,
+searchLocation,
+initializeUI,
+highlightVisibleSolutions
 };

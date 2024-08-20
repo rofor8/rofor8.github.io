@@ -174,8 +174,11 @@ function createTableRow(solution, impact, cost, maxImpact, maxCost) {
             selectedSolutions: updatedSolutions
         });
         
-        updateSolutionTable();
-        updateGrid(state.map);
+        // Only update the current row's style
+        updateRowStyle(row, this.checked);
+        
+        // Debounce the more expensive operations
+        debouncedUpdateAfterCheckboxChange();
     });
 
     // Add hover events for checkbox
@@ -190,12 +193,25 @@ function createTableRow(solution, impact, cost, maxImpact, maxCost) {
         }
     });
 
-    const isFiltered = !isWithinFilters(solution, { impact, cost });
-    row.style.opacity = isChecked ? (isFiltered ? '0.3' : '1') : '0.5';
-    row.style.pointerEvents = 'auto';
+    updateRowStyle(row, isChecked);
 
     return row;
 }
+
+function updateRowStyle(row, isChecked) {
+    const solution = row.getAttribute('data-solution');
+    const impact = parseFloat(row.querySelector('.impact .value').textContent);
+    const cost = parseFloat(row.querySelector('.cost .value').textContent);
+
+    const isFiltered = !isWithinFilters(solution, { impact, cost });
+    row.style.opacity = isChecked ? (isFiltered ? '0.3' : '1') : '0.5';
+    row.style.pointerEvents = 'auto';
+}
+
+const debouncedUpdateAfterCheckboxChange = debounce(() => {
+    updateGrid(state.map);
+    updateSelectionTotals();
+}, 250);
 
 function updateTableHeader(table) {
     const headers = table.tHead.rows[0].cells;
@@ -511,5 +527,7 @@ export {
     searchLocation,
     initializeUI,
     highlightVisibleSolutions,
-    storeSliderValues
+    storeSliderValues,
+    updateRowStyle,
+    debouncedUpdateAfterCheckboxChange
 };

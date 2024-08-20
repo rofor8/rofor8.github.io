@@ -49,7 +49,7 @@ function setupSolutionTable() {
     const tbody = table.createTBody();
 
     const headerRow = thead.insertRow();
-    ["", "Solution", "Impact", "Cost"].forEach((text, index) => {
+    ["", "Solution", "Impact", "Cost", "Count"].forEach((text, index) => {
         const th = document.createElement("th");
         th.textContent = text;
         th.className = text.toLowerCase();
@@ -85,15 +85,15 @@ function updateSolutionTable() {
         const tbody = table.tBodies[0];
         const selectedCellCount = state.selectedCellKeys.size;
 
-        const solutionTotals = calculateSolutionTotals(selectedCellCount);
-        const { maxImpact, maxCost } = getMaxValues(solutionTotals);
+        const solutionTotals = calculateSolutionTotals();
+        const { maxImpact, maxCost, maxCount } = getMaxValues(solutionTotals);
 
         const rowData = prepareRowData(solutionTotals);
         sortRowData(rowData);
 
         const fragment = document.createDocumentFragment();
-        rowData.forEach(({ solution, impact, cost }) => {
-            const row = createTableRow(solution, impact, cost, maxImpact, maxCost);
+        rowData.forEach(({ solution, impact, cost, count }) => {
+            const row = createTableRow(solution, impact, cost, count, maxImpact, maxCost, maxCount);
             fragment.appendChild(row);
         });
 
@@ -107,15 +107,20 @@ function updateSolutionTable() {
     }, 0);
 }
 
-function calculateSolutionTotals(selectedCellCount) {
+function calculateSolutionTotals() {
     const solutionTotals = {};
-    Object.keys(state.solutionCriteria).forEach(solution => {
-        const impactWeight = state.challengeCategories[state.currentCategory][solution] || 0;
-        const cost = state.solutionCosts[solution] || 0;
-        solutionTotals[solution] = {
-            impact: selectedCellCount > 0 ? impactWeight * selectedCellCount : impactWeight,
-            cost: selectedCellCount > 0 ? cost * selectedCellCount : cost
-        };
+    state.selectedCellKeys.forEach(key => {
+        const cell = state.allCells.get(key);
+        if (cell && cell.scores) {
+            Object.entries(cell.scores).forEach(([solution, scores]) => {
+                if (!solutionTotals[solution]) {
+                    solutionTotals[solution] = { impact: 0, cost: 0, count: 0 };
+                }
+                solutionTotals[solution].impact += scores.impact;
+                solutionTotals[solution].cost += scores.cost;
+                solutionTotals[solution].count++;
+            });
+        }
     });
     return solutionTotals;
 }
@@ -123,7 +128,8 @@ function calculateSolutionTotals(selectedCellCount) {
 function getMaxValues(solutionTotals) {
     return {
         maxImpact: Math.max(...Object.values(solutionTotals).map(s => s.impact)),
-        maxCost: Math.max(...Object.values(solutionTotals).map(s => s.cost))
+        maxCost: Math.max(...Object.values(solutionTotals).map(s => s.cost)),
+        maxCount: Math.max(...Object.values(solutionTotals).map(s => s.count))
     };
 }
 
@@ -131,11 +137,12 @@ function prepareRowData(solutionTotals) {
     return Object.entries(solutionTotals).map(([solution, totals]) => ({
         solution,
         impact: totals.impact,
-        cost: totals.cost
+        cost: totals.cost,
+        count: totals.count
     }));
 }
 
-function createTableRow(solution, impact, cost, maxImpact, maxCost) {
+function createTableRow(solution, impact, cost, count, maxImpact, maxCost, maxCount) {
     const row = document.createElement('tr');
     row.setAttribute('data-solution', solution);
 
@@ -153,31 +160,29 @@ function createTableRow(solution, impact, cost, maxImpact, maxCost) {
             <div class="bar-graph cost-bar" style="width: ${(cost / maxCost) * 100}%; background-color: ${state.colorScale(solution)}"></div>
             <span class="value">${cost.toFixed(2)}</span>
         </td>
+        <td class="count">
+            <div class="bar-graph count-bar" style="width: ${(count / maxCount) * 100}%; background-color: ${state.colorScale(solution)}"></div>
+            <span class="value">${count}</span>
+        </td>
     `;
 
     const checkbox = row.querySelector('input[type="checkbox"]');
     checkbox.addEventListener("change", function() {
-        // Update the state with the current checkbox state (checked/unchecked)
         const updatedSolutions = {
             ...state.selectedSolutions,
             [solution]: this.checked
         };
         
-        // Call your state update function
         updateState({
             selectedSolutions: updatedSolutions
         });
         
-        // Update the UI
         updateSolutionTable();
         updateGrid(state.map);
     });
-    
 
     const isFiltered = !isWithinFilters(solution, { impact, cost });
     row.style.opacity = isFiltered ? '0.3' : '1';
-    
-    // Keep the row interactive even if it's filtered
     row.style.pointerEvents = 'auto';
 
     row.addEventListener('mouseenter', () => highlightSolutionCells(solution));
@@ -320,15 +325,14 @@ function updateSliderRange(slider, type, range) {
 
 function sortRowData(rowData) {
     rowData.sort((a, b) => {
-        const aValue = state.currentSortColumn === 'impact' ? a.impact : a.cost;
-        const bValue = state.currentSortColumn === 'impact' ? b.impact : b.cost;
+        const aValue = a[state.currentSortColumn];
+        const bValue = b[state.currentSortColumn];
         return state.isAscending ? aValue - bValue : bValue - aValue;
     });
 }
 
 function updateUIForCategory(challengeCategory) {
     updateSolutionTable();
-   
 }
 
 function createButtons(containerId, dataArray, buttonClass) {

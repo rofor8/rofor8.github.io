@@ -49,7 +49,7 @@ function setupSolutionTable() {
     const tbody = table.createTBody();
 
     const headerRow = thead.insertRow();
-    ["", "Solution", "Impact", "Cost", "Count"].forEach((text, index) => {
+    ["", "Solution", "Impact", "Cost"].forEach((text, index) => {
         const th = document.createElement("th");
         th.textContent = text;
         th.className = text.toLowerCase();
@@ -86,14 +86,14 @@ function updateSolutionTable() {
         const selectedCellCount = state.selectedCellKeys.size;
 
         const solutionTotals = calculateSolutionTotals();
-        const { maxImpact, maxCost, maxCount } = getMaxValues(solutionTotals);
+        const { maxImpact, maxCost } = getMaxValues(solutionTotals);
 
         const rowData = prepareRowData(solutionTotals);
         sortRowData(rowData);
 
         const fragment = document.createDocumentFragment();
-        rowData.forEach(({ solution, impact, cost, count }) => {
-            const row = createTableRow(solution, impact, cost, count, maxImpact, maxCost, maxCount);
+        rowData.forEach(({ solution, impact, cost }) => {
+            const row = createTableRow(solution, impact, cost, maxImpact, maxCost);
             fragment.appendChild(row);
         });
 
@@ -114,11 +114,10 @@ function calculateSolutionTotals() {
         if (cell && cell.scores) {
             Object.entries(cell.scores).forEach(([solution, scores]) => {
                 if (!solutionTotals[solution]) {
-                    solutionTotals[solution] = { impact: 0, cost: 0, count: 0 };
+                    solutionTotals[solution] = { impact: 0, cost: 0 };
                 }
                 solutionTotals[solution].impact += scores.impact;
                 solutionTotals[solution].cost += scores.cost;
-                solutionTotals[solution].count++;
             });
         }
     });
@@ -128,8 +127,7 @@ function calculateSolutionTotals() {
 function getMaxValues(solutionTotals) {
     return {
         maxImpact: Math.max(...Object.values(solutionTotals).map(s => s.impact)),
-        maxCost: Math.max(...Object.values(solutionTotals).map(s => s.cost)),
-        maxCount: Math.max(...Object.values(solutionTotals).map(s => s.count))
+        maxCost: Math.max(...Object.values(solutionTotals).map(s => s.cost))
     };
 }
 
@@ -137,12 +135,11 @@ function prepareRowData(solutionTotals) {
     return Object.entries(solutionTotals).map(([solution, totals]) => ({
         solution,
         impact: totals.impact,
-        cost: totals.cost,
-        count: totals.count
+        cost: totals.cost
     }));
 }
 
-function createTableRow(solution, impact, cost, count, maxImpact, maxCost, maxCount) {
+function createTableRow(solution, impact, cost, maxImpact, maxCost) {
     const row = document.createElement('tr');
     row.setAttribute('data-solution', solution);
 
@@ -159,10 +156,6 @@ function createTableRow(solution, impact, cost, count, maxImpact, maxCost, maxCo
         <td class="cost">
             <div class="bar-graph cost-bar" style="width: ${(cost / maxCost) * 100}%; background-color: ${state.colorScale(solution)}"></div>
             <span class="value">${cost.toFixed(2)}</span>
-        </td>
-        <td class="count">
-            <div class="bar-graph count-bar" style="width: ${(count / maxCount) * 100}%; background-color: ${state.colorScale(solution)}"></div>
-            <span class="value">${count}</span>
         </td>
     `;
 
@@ -430,72 +423,72 @@ if (costValue) {
 }
 
 function setupReportButton() {
-const reportButton = document.getElementById('generateReport');
-if (reportButton) {
-    reportButton.addEventListener('click', generateReport);
-}
+    const reportButton = document.getElementById('generateReport');
+    if (reportButton) {
+        reportButton.addEventListener('click', generateReport);
+    }
 }
 
 function generateReport() {
-console.log('Generating report...');
-// You can call a function from reportModule.js here
-// For example: reportModule.generatePDFReport(state);
+    console.log('Generating report...');
+    // You can call a function from reportModule.js here
+    // For example: reportModule.generatePDFReport(state);
 }
 
 function setupSearchBar() {
-const searchInput = document.getElementById('searchInput');
-const searchButton = document.getElementById('searchButton');
+    const searchInput = document.getElementById('searchInput');
+    const searchButton = document.getElementById('searchButton');
 
-if (searchInput && searchButton) {
-    searchButton.addEventListener('click', () => searchLocation(searchInput.value));
-    searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            searchLocation(searchInput.value);
-        }
-    });
-}
+    if (searchInput && searchButton) {
+        searchButton.addEventListener('click', () => searchLocation(searchInput.value));
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchLocation(searchInput.value);
+            }
+        });
+    }
 }
 
 function searchLocation(query) {
-console.log('Searching for location:', query);
-// You can call a function from a geocoding service or API here
-// For example: mapModule.geocodeAndZoom(query);
+    console.log('Searching for location:', query);
+    // You can call a function from a geocoding service or API here
+    // For example: mapModule.geocodeAndZoom(query);
 }
 
 function initializeUI() {
-setupUI();
-setupReportButton();
-setupSearchBar();
-updateSelectionTotals();
-updateFilterDisplay();
+    setupUI();
+    setupReportButton();
+    setupSearchBar();
+    updateSelectionTotals();
+    updateFilterDisplay();
 }
 
 function debounce(func, wait) {
-let timeout;
-return function (...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-};
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
 }
 
 // Event listeners for window resize
 window.addEventListener('resize', debounce(() => {
-updateSelectionRectangle();
-updateGrid(state.map);
+    updateSelectionRectangle();
+    updateGrid(state.map);
 }, 250));
 
 // Export all necessary functions
 export {
-setupUI,
-updateSolutionTable,
-updateUIForCategory,
-createButtons,
-updateCategoryDropdown,
-updateSliderRanges,
-updateSelectionTotals,
-updateFilterDisplay,
-generateReport,
-searchLocation,
-initializeUI,
-highlightVisibleSolutions
+    setupUI,
+    updateSolutionTable,
+    updateUIForCategory,
+    createButtons,
+    updateCategoryDropdown,
+    updateSliderRanges,
+    updateSelectionTotals,
+    updateFilterDisplay,
+    generateReport,
+    searchLocation,
+    initializeUI,
+    highlightVisibleSolutions
 };

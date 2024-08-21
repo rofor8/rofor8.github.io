@@ -1,8 +1,8 @@
 // app.js
+import { state, updateState, updateMap, getRasterValueAtPoint, updateSelectedCellKeys } from './stateModule.js';
 import { initMap, updateGrid, renderCells } from './mapModule.js';
 import { setupUI, updateSolutionTable } from './uiModule.js';
 import { loadJSONData, loadAllRasters } from './dataModule.js';
-import { state, updateState, updateMap, getRasterValueAtPoint, updateSelectedCellKeys } from './stateModule.js';
 import { toggleRanking, clearSelection, toggleDrawMode, searchLocation } from './interactionModule.js';
 import { updateScores } from './updateScores.js';
 import { generateReport } from './reportModule.js';

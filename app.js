@@ -8,7 +8,7 @@ import { updateScores } from './updateScores.js';
 import { generateReport } from './reportModule.js';
 
 function checkAuth() {
-    if (!isUserSignedIn()) {
+    if (!window.isUserSignedIn()) {
         window.location.href = 'index.html';
         return;
     }
@@ -103,18 +103,6 @@ function handleReportGeneration() {
     }
 }
 
-// Add event listeners for custom auth events
-window.addEventListener('userSignedIn', (event) => {
-    document.getElementById('authCheck').style.display = 'none';
-    document.getElementById('app-container').style.display = 'block';
-    initializeApp();
-});
-
-window.addEventListener('userSignedOut', () => {
-    document.getElementById('authCheck').style.display = 'block';
-    document.getElementById('app-container').style.display = 'none';
-});
-
 // Initialize the application
 document.addEventListener('DOMContentLoaded', checkAuth);
 console.log('DOMContentLoaded event listener attached');
@@ -127,10 +115,6 @@ window.updateMap = updateMap;
 window.searchLocation = searchLocation;
 window.updateSolutionTable = updateSolutionTable;
 
-// Initialize the application
-document.addEventListener('DOMContentLoaded', checkAuth);
-console.log('DOMContentLoaded event listener attached');
-
 // Expose necessary variables and functions for updateScores.js
 Object.assign(window, {
     allCells: state.allCells,
@@ -141,4 +125,9 @@ Object.assign(window, {
     criteriaColorScale: state.criteriaColorScale,
     getRasterValueAtPoint,
     selectedSolutions: state.selectedSolutions
+});
+
+// Add event listener for sign out
+document.getElementById('signOutButton').addEventListener('click', () => {
+    window.signOut();
 });

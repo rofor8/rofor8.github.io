@@ -49,6 +49,9 @@ function handleCredentialResponse(response) {
     // Decode the JWT to get user information
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
     console.log('User info:', payload);
+
+    // Redirect to app page after successful sign-in
+    window.location.href = 'app.html';
 }
 
 function signOut() {
@@ -68,6 +71,22 @@ function isUserSignedIn() {
     return localStorage.getItem('isSignedIn') === 'true';
 }
 
-window.onload = initializeGSI;
+function checkAuthAndRedirect() {
+    if (isUserSignedIn()) {
+        if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/') {
+            window.location.href = 'app.html';
+        }
+    } else {
+        if (window.location.pathname.endsWith('app.html')) {
+            window.location.href = 'index.html';
+        }
+    }
+}
+
+window.onload = function() {
+    initializeGSI();
+    checkAuthAndRedirect();
+};
+
 window.signOut = signOut;
 window.isUserSignedIn = isUserSignedIn;

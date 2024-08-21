@@ -3,40 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nature-based Solutions Map</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://unpkg.com/geotiff"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.6.3/nouislider.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.6.3/nouislider.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-
+    <title>Nature-based Solutions Mapper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        header {
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            padding: 1rem;
+        }
+        main {
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 0.5rem 1rem;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .feature-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .feature-list li {
+            margin-bottom: 1rem;
+        }
+        footer {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 1rem;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
-    <div id="app-container">
-        <div id="mapContainer">
-            <div id="map"></div>
-            <div id="mapButtons">
-                <button id="drawToggle" class="map-button" onclick="toggleDrawMode()">Draw</button>
-                <button id="clearButton" class="map-button" onclick="clearSelection()">Clear</button>
-            </div>
-        </div>
-        <div id="infoPanel">
-            <h3>Nature-based Solutions</h3>
-
-            <div id="categoryDropdown" class="dropdown">
-                <button class="dropbtn">Select Category</button>
-                <div id="categoryButtons" class="dropdown-content"></div>
-            </div>
-            <div id="filterSliders"></div>
-            <div id="solutionsContainer"></div>
-            <div id="selectionTotals"></div>
-            <button id="generateReport" style="float: right;">Generate Report</button>
-        </div>
-    </div>
-    <script type="module" src="app.js"></script>
+    <header>
+        <h1>Nature-based Solutions Mapper</h1>
+    </header>
+    <main>
+        <h2>Discover Sustainable Solutions for Your Urban Environment</h2>
+        <p>Our innovative mapping tool helps urban planners, environmentalists, and policymakers identify and implement nature-based solutions to address climate challenges.</p>
+        <ul class="feature-list">
+            <li>✅ Interactive mapping of potential nature-based solutions</li>
+            <li>✅ Data-driven insights on impact and cost</li>
+            <li>✅ Customizable filters and categories</li>
+            <li>✅ Generate comprehensive reports</li>
+        </ul>
+        <p>Ready to transform your urban landscape?</p>
+        <a href="/app.html" class="cta-button">Get Started</a>
+    </main>
+    <footer>
+        <p>&copy; 2024 Nature-based Solutions Mapper. All rights reserved.</p>
+    </footer>
 </body>
 </html>

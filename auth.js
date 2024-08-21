@@ -6,7 +6,6 @@ let googleApiLoaded = false;
 function initializeGSI() {
     let CLIENT_ID;
     
-    // Determine which client ID to use based on the current origin
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         CLIENT_ID = 'YOUR_LOCALHOST_CLIENT_ID'; // Replace with your localhost client ID
     } else {
@@ -16,7 +15,6 @@ function initializeGSI() {
     console.log('Initializing Google Sign-In with Client ID:', CLIENT_ID);
     console.log('Current origin:', window.location.origin);
 
-    // Load the Google API client library
     loadGoogleApiScript(CLIENT_ID);
 }
 
@@ -37,13 +35,12 @@ function loadGoogleApiScript(clientId) {
 }
 
 function initializeGoogleSignIn(clientId) {
-    try {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: clientId,
-            scope: 'profile email',
-            callback: handleCredentialResponse
-        });
+    if (typeof google === 'undefined') {
+        console.error('Google API not loaded');
+        return;
+    }
 
+    try {
         google.accounts.id.initialize({
             client_id: clientId,
             callback: handleCredentialResponse
@@ -71,15 +68,12 @@ function handleCredentialResponse(response) {
     isSignedIn = true;
     localStorage.setItem('isSignedIn', 'true');
     
-    // Dispatch a custom event for sign in
     const event = new CustomEvent('userSignedIn', { detail: response });
     window.dispatchEvent(event);
     
-    // Decode the JWT to get user information
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
     console.log('User info:', payload);
 
-    // Update UI to show "Get Started" button instead of redirecting
     updateUIAfterSignIn();
 }
 
@@ -97,19 +91,17 @@ function signOut() {
     if (googleApiLoaded && typeof google !== 'undefined' && google.accounts && google.accounts.id) {
         google.accounts.id.disableAutoSelect();
     } else {
-        console.warn('Google API not loaded. Proceeding with local sign-out.');
+        console.warn('Google API not loaded or initialized. Proceeding with local sign-out.');
     }
     
     isSignedIn = false;
     localStorage.removeItem('isSignedIn');
     
-    // Dispatch a custom event for sign out
     const event = new CustomEvent('userSignedOut');
     window.dispatchEvent(event);
     
     console.log('User signed out.');
 
-    // Update UI to show sign-in button
     updateUIAfterSignOut();
 
     // Redirect to the landing page

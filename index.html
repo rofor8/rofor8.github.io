@@ -4,9 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nature-based Solutions Mapper</title>
-    <script src="https://apis.google.com/js/platform.js" async defer></script>
     <meta name="google-signin-client_id" content="20635675841-uf569724tui760htgqqgebfi6echcoku.apps.googleusercontent.com">
-    <script src="auth.js"></script>
+    <script>
+        function gapiLoaded() {
+            console.log('Google API client loaded');
+        }
+    </script>
+    <script src="https://apis.google.com/js/platform.js?onload=gapiLoaded" async defer></script>
+    <script src="auth.js" defer></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -96,22 +101,5 @@
     <footer>
         <p>&copy; 2024 Nature-based Solutions Mapper. All rights reserved.</p>
     </footer>
-    <script>
-        function onSignIn(googleUser) {
-            document.getElementById('googleSignInButton').style.display = 'none';
-            document.getElementById('signOutButton').style.display = 'inline-block';
-            document.getElementById('startAppButton').style.display = 'inline-block';
-        }
-
-        function signOut() {
-            var auth2 = gapi.auth2.getAuthInstance();
-            auth2.signOut().then(function () {
-                console.log('User signed out.');
-                document.getElementById('googleSignInButton').style.display = 'block';
-                document.getElementById('signOutButton').style.display = 'none';
-                document.getElementById('startAppButton').style.display = 'none';
-            });
-        }
-    </script>
 </body>
 </html>

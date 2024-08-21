@@ -4,38 +4,100 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nature-based Solutions Mapper</title>
-    <link rel="stylesheet" href="styles.css">
     <script src="auth.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            overflow: hidden;
+            padding: 20px;
+        }
+        header {
+            background: #50b3a2;
+            color: white;
+            padding-top: 30px;
+            min-height: 70px;
+            border-bottom: #e8491d 3px solid;
+        }
+        header h1 {
+            margin: 0;
+            text-align: center;
+            padding-bottom: 20px;
+        }
+        .content {
+            background: white;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        ul li:before {
+            content: "✅ ";
+        }
+        .cta {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .button {
+            display: inline-block;
+            background: #e8491d;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 5px;
+        }
+        footer {
+            background: #50b3a2;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header>
+    <header>
+        <div class="container">
             <h1>Nature-based Solutions Mapper</h1>
-        </header>
+        </div>
+    </header>
 
-        <main>
-            <section class="intro">
-                <h2>Discover Sustainable Solutions for Your Urban Environment</h2>
-                <p>Our innovative mapping tool helps urban planners, environmentalists, and policymakers identify and implement nature-based solutions to address climate challenges.</p>
-                <ul>
-                    <li>✅ Interactive mapping of potential nature-based solutions</li>
-                    <li>✅ Data-driven insights on impact and cost</li>
-                    <li>✅ Customizable filters and categories</li>
-                    <li>✅ Generate comprehensive reports</li>
-                </ul>
-            </section>
-
-            <section id="authSection">
+    <div class="container">
+        <div class="content">
+            <h2>Discover Sustainable Solutions for Your Urban Environment</h2>
+            <p>Our innovative mapping tool helps urban planners, environmentalists, and policymakers identify and implement nature-based solutions to address climate challenges.</p>
+            <ul>
+                <li>Interactive mapping of potential nature-based solutions</li>
+                <li>Data-driven insights on impact and cost</li>
+                <li>Customizable filters and categories</li>
+                <li>Generate comprehensive reports</li>
+            </ul>
+            <p>Ready to transform your urban landscape?</p>
+            <div class="cta">
                 <div id="googleSignInButton"></div>
-                <button id="startAppButton" style="display:none;" onclick="window.location.href='app.html'">Get Started</button>
-                <button id="signOutButton" style="display:none;" onclick="signOut()">Sign Out</button>
-            </section>
-        </main>
-
-        <footer>
-            <p>© 2024 Nature-based Solutions Mapper. All rights reserved.</p>
-        </footer>
+                <a href="app.html" id="startAppButton" class="button" style="display:none;">Get Started</a>
+                <button id="signOutButton" class="button" style="display:none;" onclick="signOut()">Sign Out</button>
+            </div>
+        </div>
     </div>
+
+    <footer>
+        <p>© 2024 Nature-based Solutions Mapper. All rights reserved.</p>
+    </footer>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {

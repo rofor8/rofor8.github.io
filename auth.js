@@ -41,13 +41,9 @@ function handleCredentialResponse(response) {
     console.log('Authentication successful');
     isSignedIn = true;
     
-    const signInButton = document.getElementById('googleSignInButton');
-    const signOutButton = document.getElementById('signOutButton');
-    const startAppButton = document.getElementById('startAppButton');
-    
-    if (signInButton) signInButton.style.display = 'none';
-    if (signOutButton) signOutButton.style.display = 'inline-block';
-    if (startAppButton) startAppButton.style.display = 'inline-block';
+    // Dispatch a custom event for sign in
+    const event = new CustomEvent('userSignedIn', { detail: response });
+    window.dispatchEvent(event);
     
     // Decode the JWT to get user information
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
@@ -58,13 +54,9 @@ function signOut() {
     google.accounts.id.disableAutoSelect();
     isSignedIn = false;
     
-    const signInButton = document.getElementById('googleSignInButton');
-    const signOutButton = document.getElementById('signOutButton');
-    const startAppButton = document.getElementById('startAppButton');
-    
-    if (signInButton) signInButton.style.display = 'block';
-    if (signOutButton) signOutButton.style.display = 'none';
-    if (startAppButton) startAppButton.style.display = 'none';
+    // Dispatch a custom event for sign out
+    const event = new CustomEvent('userSignedOut');
+    window.dispatchEvent(event);
     
     console.log('User signed out.');
 }
@@ -86,3 +78,4 @@ async function checkSignInStatus() {
 window.onload = initializeGSI;
 window.signOut = signOut;
 window.checkSignInStatus = checkSignInStatus;
+window.isSignedIn = isSignedIn;  // Make isSignedIn accessible globally

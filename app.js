@@ -113,6 +113,18 @@ function handleReportGeneration() {
     }
 }
 
+// Add event listeners for custom auth events
+window.addEventListener('userSignedIn', (event) => {
+    document.getElementById('authCheck').style.display = 'none';
+    document.getElementById('app-container').style.display = 'block';
+    initializeApp();
+});
+
+window.addEventListener('userSignedOut', () => {
+    document.getElementById('authCheck').style.display = 'block';
+    document.getElementById('app-container').style.display = 'none';
+});
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', checkAuth);
 console.log('DOMContentLoaded event listener attached');
@@ -136,9 +148,3 @@ Object.assign(window, {
     getRasterValueAtPoint,
     selectedSolutions: state.selectedSolutions
 });
-
-// Add sign out functionality
-window.signOut = function() {
-    signOut(); // Call the signOut function from auth.js
-    window.location.href = 'index.html'; // Redirect to landing page after sign out
-};

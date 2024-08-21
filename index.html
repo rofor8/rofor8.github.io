@@ -90,8 +90,8 @@
             <div class="cta">
                 <div id="googleSignInButton"></div>
                 <a href="app.html" id="startAppButton" class="button" style="display:none;">Get Started</a>
-                <button id="signOutButton" class="button" style="display:none;" onclick="signOut()">Sign Out</button>            </div>
-        </div>
+                <button id="signOutButton" style="display:none;">Sign Out</button>
+            </div>
     </div>
 
     <footer>
@@ -100,8 +100,8 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            initializeGSI();
-            checkAuthAndUpdateUI();
+            window.initializeGSI();
+            window.checkAuthAndUpdateUI();
         });
     </script>
 </body>

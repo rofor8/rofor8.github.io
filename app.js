@@ -7,15 +7,6 @@ import { toggleRanking, clearSelection, toggleDrawMode, searchLocation } from '.
 import { updateScores } from './updateScores.js';
 import { generateReport } from './reportModule.js';
 
-function checkAuth() {
-    if (!window.isUserSignedIn()) {
-        window.location.href = 'index.html';
-        return;
-    }
-    initializeApp();
-}
-
-// Main initialization function
 async function initializeApp() {
     try {
         console.log('Initializing app...');
@@ -26,21 +17,17 @@ async function initializeApp() {
             solutionCosts: data.solutionCosts,
             selectedSolutions: Object.fromEntries(Object.keys(data.solutionCriteria).map(solution => [solution, true]))
         });
-        updateSelectedCellKeys(new Set()); // Ensure selectedCellKeys is initialized
+        updateSelectedCellKeys(new Set());
 
         state.colorScale.domain(Object.keys(state.solutionCriteria));
 
-        // Initialize map before loading rasters
         const { map, gridLayer } = initMap();
         updateState({ map, gridLayer });
 
-        // Set up UI before updating the map
         setupUI();
         
-        // Load rasters after state has been initialized
         await loadAllRasters();
         
-        // Set the callUpdateScores function
         updateState({
             callUpdateScores: () => {
                 updateScores(
@@ -69,7 +56,7 @@ async function initializeApp() {
         
         setupReportButton();
         setupSignOutButton();
-        render(); // Start the render loop
+        render();
         console.log('App initialization complete');
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -114,6 +101,14 @@ function setupSignOutButton() {
         signOutButton.addEventListener('click', () => {
             window.signOut();
         });
+    }
+}
+
+function checkAuth() {
+    if (window.isUserSignedIn()) {
+        initializeApp();
+    } else {
+        window.location.href = 'index.html';
     }
 }
 

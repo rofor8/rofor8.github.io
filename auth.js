@@ -1,4 +1,3 @@
-// auth.js
 let auth2;
 let isSignedIn = false;
 
@@ -9,7 +8,7 @@ function onSignIn(googleUser) {
     console.log('Name: ' + profile.getName());
     console.log('Image URL: ' + profile.getImageUrl());
     console.log('Email: ' + profile.getEmail());
-    
+
     document.getElementById('googleSignInButton').style.display = 'none';
     document.getElementById('signOutButton').style.display = 'inline-block';
     document.getElementById('startAppButton').style.display = 'inline-block';
@@ -17,7 +16,7 @@ function onSignIn(googleUser) {
 
 function signOut() {
     if (auth2) {
-        auth2.signOut().then(function () {
+        auth2.signOut().then(() => {
             console.log('User signed out.');
             isSignedIn = false;
             document.getElementById('googleSignInButton').style.display = 'block';
@@ -35,20 +34,19 @@ function initAuth() {
             reject(new Error('Google API client not loaded'));
             return;
         }
-        gapi.load('auth2', function() {
+        gapi.load('auth2', () => {
             gapi.auth2.init({
-                client_id: '20635675841-uf569724tui760htgqqgebfi6echcoku.apps.googleusercontent.com',
-                scope: 'profile email'
+                client_id: '20635675841-uf569724tui760htgqgqebfi6echcoku.apps.googleusercontent.com',
+                scope: 'profile email',
             }).then(() => {
                 auth2 = gapi.auth2.getAuthInstance();
                 isSignedIn = auth2.isSignedIn.get();
                 console.log('Auth2 initialized successfully');
                 auth2.isSignedIn.listen(updateSignInStatus);
-                updateSignInStatus(auth2.isSignedIn.get());
+                updateSignInStatus(isSignedIn);
                 resolve(isSignedIn);
             }).catch(error => {
                 console.error('Error initializing Google Sign-In:', error);
-                console.error('Error details:', JSON.stringify(error, null, 2));
                 reject(error);
             });
         });
@@ -71,7 +69,7 @@ function checkSignInStatus() {
     return initAuth();
 }
 
-// Call initAuth when the script loads
+// Initialize the authentication when the page is ready
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     initAuth().then((signedIn) => {
         console.log('Auth initialized, user signed in:', signedIn);

@@ -36,28 +36,35 @@ function initAuth() {
             return;
         }
         gapi.load('auth2', function() {
-            if (gapi.auth2.getAuthInstance()) {
+            gapi.auth2.init({
+                client_id: '20635675841-uf569724tui760htgqqgebfi6echcoku.apps.googleusercontent.com',
+                scope: 'profile email'
+            }).then(() => {
                 auth2 = gapi.auth2.getAuthInstance();
                 isSignedIn = auth2.isSignedIn.get();
-                console.log('Auth2 already initialized');
+                console.log('Auth2 initialized successfully');
+                auth2.isSignedIn.listen(updateSignInStatus);
+                updateSignInStatus(auth2.isSignedIn.get());
                 resolve(isSignedIn);
-            } else {
-                gapi.auth2.init({
-                    client_id: '20635675841-uf569724tui760htgqqgebfi6echcoku.apps.googleusercontent.com',
-                    scope: 'profile email'
-                }).then(() => {
-                    auth2 = gapi.auth2.getAuthInstance();
-                    isSignedIn = auth2.isSignedIn.get();
-                    console.log('Auth2 initialized successfully');
-                    resolve(isSignedIn);
-                }).catch(error => {
-                    console.error('Error initializing Google Sign-In:', error);
-                    console.error('Error details:', JSON.stringify(error, null, 2));
-                    reject(error);
-                });
-            }
+            }).catch(error => {
+                console.error('Error initializing Google Sign-In:', error);
+                console.error('Error details:', JSON.stringify(error, null, 2));
+                reject(error);
+            });
         });
     });
+}
+
+function updateSignInStatus(isSignedIn) {
+    if (isSignedIn) {
+        document.getElementById('googleSignInButton').style.display = 'none';
+        document.getElementById('signOutButton').style.display = 'inline-block';
+        document.getElementById('startAppButton').style.display = 'inline-block';
+    } else {
+        document.getElementById('googleSignInButton').style.display = 'block';
+        document.getElementById('signOutButton').style.display = 'none';
+        document.getElementById('startAppButton').style.display = 'none';
+    }
 }
 
 function checkSignInStatus() {

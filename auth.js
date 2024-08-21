@@ -40,6 +40,7 @@ function handleCredentialResponse(response) {
     }
     console.log('Authentication successful');
     isSignedIn = true;
+    localStorage.setItem('isSignedIn', 'true');
     
     // Dispatch a custom event for sign in
     const event = new CustomEvent('userSignedIn', { detail: response });
@@ -53,29 +54,20 @@ function handleCredentialResponse(response) {
 function signOut() {
     google.accounts.id.disableAutoSelect();
     isSignedIn = false;
+    localStorage.removeItem('isSignedIn');
     
     // Dispatch a custom event for sign out
     const event = new CustomEvent('userSignedOut');
     window.dispatchEvent(event);
     
     console.log('User signed out.');
+    window.location.href = 'index.html'; // Redirect to landing page after sign out
 }
 
-async function checkSignInStatus() {
-    return new Promise((resolve) => {
-        if (isSignedIn) {
-            resolve(true);
-        } else {
-            google.accounts.id.prompt((notification) => {
-                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                    resolve(false);
-                }
-            });
-        }
-    });
+function isUserSignedIn() {
+    return localStorage.getItem('isSignedIn') === 'true';
 }
 
 window.onload = initializeGSI;
 window.signOut = signOut;
-window.checkSignInStatus = checkSignInStatus;
-window.isSignedIn = isSignedIn;  // Make isSignedIn accessible globally
+window.isUserSignedIn = isUserSignedIn;

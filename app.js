@@ -7,22 +7,12 @@ import { toggleRanking, clearSelection, toggleDrawMode, searchLocation } from '.
 import { updateScores } from './updateScores.js';
 import { generateReport } from './reportModule.js';
 
-async function checkAuth() {
-    try {
-        const isSignedIn = await window.checkSignInStatus();
-        if (isSignedIn) {
-            document.getElementById('authCheck').style.display = 'none';
-            document.getElementById('app-container').style.display = 'block';
-            initializeApp();
-        } else {
-            document.getElementById('authCheck').style.display = 'block';
-            document.getElementById('app-container').style.display = 'none';
-        }
-    } catch (error) {
-        console.error('Error checking authentication status:', error);
-        document.getElementById('authCheck').style.display = 'block';
-        document.getElementById('app-container').style.display = 'none';
+function checkAuth() {
+    if (!isUserSignedIn()) {
+        window.location.href = 'index.html';
+        return;
     }
+    initializeApp();
 }
 
 // Main initialization function
@@ -136,6 +126,10 @@ window.toggleDrawMode = toggleDrawMode;
 window.updateMap = updateMap;
 window.searchLocation = searchLocation;
 window.updateSolutionTable = updateSolutionTable;
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', checkAuth);
+console.log('DOMContentLoaded event listener attached');
 
 // Expose necessary variables and functions for updateScores.js
 Object.assign(window, {

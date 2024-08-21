@@ -1,4 +1,5 @@
 // dataModule.js
+
 import { state, updateState } from './stateModule.js';
 
 const dataCache = new Map();
@@ -135,7 +136,7 @@ function getTilesForBounds(bounds, raster) {
 function latLngToTile(lat, lng, minX, minY, maxX, maxY, width, height) {
     const x = Math.floor((lng - minX) / (maxX - minX) * width / TILE_SIZE);
     const y = Math.floor((maxY - lat) / (maxY - minY) * height / TILE_SIZE);
-    return { x, y, z: 0 };
+    return { x, y, z: 0 }; // z is always 0 for our single-zoom-level rasters
 }
 
 export async function calculateSuitabilityScores(bounds, challengeCategory) {

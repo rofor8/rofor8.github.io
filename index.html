@@ -4,70 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nature-based Solutions Mapper</title>
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <meta name="google-signin-client_id" content="20635675841-uf569724tui760htgqqgebfi6echcoku.apps.googleusercontent.com">    <script src="auth.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
             margin: 0;
-            padding: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
             color: #333;
         }
-        header {
-            background-color: #4CAF50;
-            color: white;
-            text-align: center;
-            padding: 1rem;
-        }
-        main {
-            padding: 2rem;
-            max-width: 800px;
-            margin: 0 auto;
+        p {
+            color: #666;
+            margin-bottom: 1.5rem;
         }
         .cta-button {
-            display: inline-block;
             background-color: #4CAF50;
             color: white;
-            padding: 0.5rem 1rem;
+            padding: 10px 20px;
             text-decoration: none;
             border-radius: 5px;
             font-weight: bold;
-        }
-        .feature-list {
-            list-style-type: none;
-            padding: 0;
-        }
-        .feature-list li {
-            margin-bottom: 1rem;
-        }
-        footer {
-            background-color: #333;
-            color: white;
-            text-align: center;
-            padding: 1rem;
-            position: absolute;
-            bottom: 0;
-            width: 100%;
+            display: inline-block;
+            margin-top: 1rem;
         }
     </style>
 </head>
 <body>
-    <header>
+    <div class="container">
         <h1>Nature-based Solutions Mapper</h1>
-    </header>
-    <main>
-        <h2>Discover Sustainable Solutions for Your Urban Environment</h2>
-        <p>Our innovative mapping tool helps urban planners, environmentalists, and policymakers identify and implement nature-based solutions to address climate challenges.</p>
-        <ul class="feature-list">
-            <li>✅ Interactive mapping of potential nature-based solutions</li>
-            <li>✅ Data-driven insights on impact and cost</li>
-            <li>✅ Customizable filters and categories</li>
-            <li>✅ Generate comprehensive reports</li>
-        </ul>
-        <p>Ready to transform your urban landscape?</p>
-        <a href="/app.html" class="cta-button">Get Started</a>
-    </main>
-    <footer>
-        <p>&copy; 2024 Nature-based Solutions Mapper. All rights reserved.</p>
-    </footer>
+        <p>Discover sustainable solutions for your urban environment</p>
+        <div id="googleSignInButton" class="g-signin2" data-onsuccess="onSignIn"></div>
+        <a href="#" onclick="signOut();" style="display:none;" id="signOutButton">Sign out</a>
+        <a href="app.html" id="startAppButton" class="cta-button" style="display:none;">Get Started</a>
+    </div>
 </body>
 </html>

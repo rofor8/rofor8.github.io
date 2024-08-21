@@ -7,6 +7,24 @@ import { toggleRanking, clearSelection, toggleDrawMode, searchLocation } from '.
 import { updateScores } from './updateScores.js';
 import { generateReport } from './reportModule.js';
 
+async function checkAuth() {
+    try {
+        const isSignedIn = await window.checkSignInStatus();
+        if (isSignedIn) {
+            document.getElementById('authCheck').style.display = 'none';
+            document.getElementById('app-container').style.display = 'block';
+            initializeApp();
+        } else {
+            document.getElementById('authCheck').style.display = 'block';
+            document.getElementById('app-container').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error checking authentication status:', error);
+        document.getElementById('authCheck').style.display = 'block';
+        document.getElementById('app-container').style.display = 'none';
+    }
+}
+
 // Main initialization function
 async function initializeApp() {
     try {
@@ -18,21 +36,17 @@ async function initializeApp() {
             solutionCosts: data.solutionCosts,
             selectedSolutions: Object.fromEntries(Object.keys(data.solutionCriteria).map(solution => [solution, true]))
         });
-        updateSelectedCellKeys(new Set()); // Ensure selectedCellKeys is initialized
+        updateSelectedCellKeys(new Set());
 
         state.colorScale.domain(Object.keys(state.solutionCriteria));
 
-        // Initialize map before loading rasters
         const { map, gridLayer } = initMap();
         updateState({ map, gridLayer });
 
-        // Set up UI before updating the map
         setupUI();
         
-        // Load rasters after state has been initialized
         await loadAllRasters();
         
-        // Set the callUpdateScores function
         updateState({
             callUpdateScores: () => {
                 updateScores(
@@ -60,7 +74,7 @@ async function initializeApp() {
         }
         
         setupReportButton();
-        render(); // Start the render loop
+        render();
         console.log('App initialization complete');
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -100,7 +114,7 @@ function handleReportGeneration() {
 }
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', initializeApp);
+document.addEventListener('DOMContentLoaded', checkAuth);
 console.log('DOMContentLoaded event listener attached');
 
 // Export functions to global scope for use in HTML

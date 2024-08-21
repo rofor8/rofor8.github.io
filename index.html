@@ -4,99 +4,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nature-based Solutions Mapper</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
     <meta name="google-signin-client_id" content="20635675841-uf569724tui760htgqqgebfi6echcoku.apps.googleusercontent.com">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 0;
-            color: #333;
-        }
-        header {
-            background-color: #4CAF50;
-            color: white;
-            text-align: center;
-            padding: 1rem;
-        }
-        main {
-            padding: 2rem;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        .cta-button {
-            display: inline-block;
-            background-color: #4CAF50;
-            color: white;
-            padding: 0.5rem 1rem;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-            margin-top: 1rem;
-        }
-        .feature-list {
-            list-style-type: none;
-            padding: 0;
-        }
-        .feature-list li {
-            margin-bottom: 1rem;
-        }
-        footer {
-            background-color: #333;
-            color: white;
-            text-align: center;
-            padding: 1rem;
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-        }
-        #authSection {
-            text-align: center;
-            margin-top: 2rem;
-        }
-        #signOutButton {
-            display: none;
-            margin-top: 1rem;
-            background-color: #f44336;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-    </style>
 </head>
 <body>
-    <header>
+    <div>
         <h1>Nature-based Solutions Mapper</h1>
-    </header>
-    <main>
+    </div>
+
+    <main role="main">
         <h2>Discover Sustainable Solutions for Your Urban Environment</h2>
-        <p>Our innovative mapping tool helps urban planners, environmentalists, and policymakers identify and implement nature-based solutions to address climate challenges.</p>
-        <ul class="feature-list">
+        <p>Our innovative mapping tool helps urban planners, environmentalists, and
+        policymakers identify and implement nature-based solutions to address
+        climate challenges.</p>
+        <ul>
             <li>✅ Interactive mapping of potential nature-based solutions</li>
             <li>✅ Data-driven insights on impact and cost</li>
             <li>✅ Customizable filters and categories</li>
             <li>✅ Generate comprehensive reports</li>
         </ul>
         <p>Ready to transform your urban landscape?</p>
+
         <div id="authSection">
-            <div id="googleSignInButton"></div>
+            <div class="g-signin2" data-onsuccess="onSignIn"></div>
             <button id="signOutButton" style="display:none;" onclick="signOut()">Sign Out</button>
             <a href="/app.html" id="startAppButton" class="cta-button" style="display:none;">Get Started</a>
         </div>
     </main>
+
     <footer>
-        <p>&copy; 2024 Nature-based Solutions Mapper. All rights reserved.</p>
+        © 2024 Nature-based Solutions Mapper. All rights reserved.
     </footer>
 
-    <!-- Load the Google Identity Services script and call initializeGSI when it's ready -->
-    <script src="https://accounts.google.com/gsi/client" async defer onload="initializeGSI()"></script>
-    <script src="auth.js"></script>
+    <script>
+        function onSignIn(googleUser) {
+            var profile = googleUser.getBasicProfile();
+            console.log('ID: ' + profile.getId());
+            console.log('Name: ' + profile.getName());
+            console.log('Image URL: ' + profile.getImageUrl());
+            console.log('Email: ' + profile.getEmail());
+            
+            document.getElementById('signOutButton').style.display = 'inline-block';
+            document.getElementById('startAppButton').style.display = 'inline-block';
+        }
+
+        function signOut() {
+            var auth2 = gapi.auth2.getAuthInstance();
+            auth2.signOut().then(function () {
+                console.log('User signed out.');
+                document.getElementById('signOutButton').style.display = 'none';
+                document.getElementById('startAppButton').style.display = 'none';
+            });
+        }
+    </script>
 </body>
 </html>

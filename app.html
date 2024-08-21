@@ -3,29 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nature-based Solutions Mapper</title>
-    <meta name="google-signin-client_id" content="20635675841-uf569724tui760htgqgqebfi6echcoku.apps.googleusercontent.com">
-    <script>
-        function gapiLoaded() {
-            console.log('Google API client loaded');
-        }
-    </script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="auth.js" defer></script>
+    <title>Nature-based Solutions Mapper - App</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <meta name="google-signin-client_id" content="20635675841-uf569724tui760htgqqgebfi6echcoku.apps.googleusercontent.com">
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.0.0/d3.min.js"></script>
-    <script src="https://unpkg.com/geotiff"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.6.3/nouislider.min.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.6.3/nouislider.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.6.3/nouislider.min.css" />
 </head>
 <body>
-    <div id="authCheck" style="display: none;">
+    <div id="authCheck">
         <p>Please sign in to access the app.</p>
-        <div id="googleSignInButton" class="g-signin2" data-onsuccess="onSignIn"></div>
+        <div class="g-signin2" data-onsuccess="onSignIn"></div>
     </div>
+
     <div id="app-container" style="display: none;">
         <div id="mapContainer">
             <div id="map"></div>
@@ -34,6 +27,7 @@
                 <button onclick="clearSelection()">Clear</button>
             </div>
         </div>
+
         <div id="infoPanel">
             <h3>Nature-based Solutions</h3>
             <div id="categoryDropdown" class="dropdown">
@@ -44,9 +38,46 @@
             <div id="solutionsContainer"></div>
             <div id="selectionTotals"></div>
             <button id="generateReport">Generate Report</button>
-            <button id="signOutButton" onclick="signOut();">Sign Out</button>
+            <button onclick="signOut()">Sign Out</button>
         </div>
     </div>
+
     <script type="module" src="app.js"></script>
+    <script>
+        function onSignIn(googleUser) {
+            var profile = googleUser.getBasicProfile();
+            console.log('ID: ' + profile.getId());
+            document.getElementById('authCheck').style.display = 'none';
+            document.getElementById('app-container').style.display = 'block';
+            // Initialize your app here
+            initializeApp();
+        }
+
+        function signOut() {
+            var auth2 = gapi.auth2.getAuthInstance();
+            auth2.signOut().then(function () {
+                console.log('User signed out.');
+                document.getElementById('authCheck').style.display = 'block';
+                document.getElementById('app-container').style.display = 'none';
+            });
+        }
+
+        // Check if the user is already signed in
+        function checkSignInStatus() {
+            var auth2 = gapi.auth2.getAuthInstance();
+            if (auth2.isSignedIn.get()) {
+                onSignIn(auth2.currentUser.get());
+            }
+        }
+
+        gapi.load('auth2', function() {
+            gapi.auth2.init().then(checkSignInStatus);
+        });
+
+        // Expose necessary functions to window object for HTML onclick attributes
+        window.toggleDrawMode = toggleDrawMode;
+        window.clearSelection = clearSelection;
+        window.signOut = signOut;
+    </script>
 </body>
 </html>

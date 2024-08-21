@@ -5,36 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nature-based Solutions Mapper</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="auth.js"></script>
 </head>
 <body>
-    <div>
-        <h1>Nature-based Solutions Mapper</h1>
+    <div class="container">
+        <header>
+            <h1>Nature-based Solutions Mapper</h1>
+        </header>
+
+        <main>
+            <section class="intro">
+                <h2>Discover Sustainable Solutions for Your Urban Environment</h2>
+                <p>Our innovative mapping tool helps urban planners, environmentalists, and policymakers identify and implement nature-based solutions to address climate challenges.</p>
+                <ul>
+                    <li>✅ Interactive mapping of potential nature-based solutions</li>
+                    <li>✅ Data-driven insights on impact and cost</li>
+                    <li>✅ Customizable filters and categories</li>
+                    <li>✅ Generate comprehensive reports</li>
+                </ul>
+            </section>
+
+            <section id="authSection">
+                <div id="googleSignInButton"></div>
+                <button id="startAppButton" style="display:none;" onclick="window.location.href='app.html'">Get Started</button>
+                <button id="signOutButton" style="display:none;" onclick="signOut()">Sign Out</button>
+            </section>
+        </main>
+
+        <footer>
+            <p>© 2024 Nature-based Solutions Mapper. All rights reserved.</p>
+        </footer>
     </div>
 
-    <main role="main">
-        <h2>Discover Sustainable Solutions for Your Urban Environment</h2>
-        <p>Our innovative mapping tool helps urban planners, environmentalists, and policymakers identify and implement nature-based solutions to address climate challenges.</p>
-        <ul>
-            <li>✅ Interactive mapping of potential nature-based solutions</li>
-            <li>✅ Data-driven insights on impact and cost</li>
-            <li>✅ Customizable filters and categories</li>
-            <li>✅ Generate comprehensive reports</li>
-        </ul>
-        <p>Ready to transform your urban landscape?</p>
-
-        <div id="authSection">
-            <div id="googleSignInButton"></div>
-            <button id="signOutButton" style="display:none;" onclick="signOut()">Sign Out</button>
-            <a href="app.html" id="startAppButton" class="cta-button" style="display:none;">Get Started</a>
-        </div>
-    </main>
-
-    <footer>
-        <p>© 2024 Nature-based Solutions Mapper. All rights reserved.</p>
-    </footer>
-
-    <script src="auth.js"></script>
-    <script src="index.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeGSI();
+            checkAuthAndUpdateUI();
+        });
+    </script>
 </body>
 </html>

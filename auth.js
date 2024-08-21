@@ -1,6 +1,7 @@
 // auth.js
 let isSignedIn = false;
 let tokenClient;
+let googleApiLoaded = false;
 
 function initializeGSI() {
     let CLIENT_ID;
@@ -15,15 +16,36 @@ function initializeGSI() {
     console.log('Initializing Google Sign-In with Client ID:', CLIENT_ID);
     console.log('Current origin:', window.location.origin);
 
+    // Load the Google API client library
+    loadGoogleApiScript(CLIENT_ID);
+}
+
+function loadGoogleApiScript(clientId) {
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+        googleApiLoaded = true;
+        initializeGoogleSignIn(clientId);
+    };
+    script.onerror = () => {
+        console.error('Failed to load Google API script');
+        googleApiLoaded = false;
+    };
+    document.head.appendChild(script);
+}
+
+function initializeGoogleSignIn(clientId) {
     try {
         tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
+            client_id: clientId,
             scope: 'profile email',
             callback: handleCredentialResponse
         });
 
         google.accounts.id.initialize({
-            client_id: CLIENT_ID,
+            client_id: clientId,
             callback: handleCredentialResponse
         });
 
@@ -72,7 +94,12 @@ function updateUIAfterSignIn() {
 }
 
 function signOut() {
-    google.accounts.id.disableAutoSelect();
+    if (googleApiLoaded && typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        google.accounts.id.disableAutoSelect();
+    } else {
+        console.warn('Google API not loaded. Proceeding with local sign-out.');
+    }
+    
     isSignedIn = false;
     localStorage.removeItem('isSignedIn');
     
@@ -84,6 +111,9 @@ function signOut() {
 
     // Update UI to show sign-in button
     updateUIAfterSignOut();
+
+    // Redirect to the landing page
+    window.location.href = 'index.html';
 }
 
 function updateUIAfterSignOut() {
@@ -108,10 +138,14 @@ function checkAuthAndUpdateUI() {
     }
 }
 
-window.onload = function() {
-    initializeGSI();
-    checkAuthAndUpdateUI();
-};
-
+// Expose necessary functions to the global scope
 window.signOut = signOut;
 window.isUserSignedIn = isUserSignedIn;
+window.initializeGSI = initializeGSI;
+window.checkAuthAndUpdateUI = checkAuthAndUpdateUI;
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function() {
+    initializeGSI();
+    checkAuthAndUpdateUI();
+});

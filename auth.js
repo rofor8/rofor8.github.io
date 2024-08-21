@@ -3,7 +3,14 @@ let isSignedIn = false;
 let tokenClient;
 
 function initializeGSI() {
-    const CLIENT_ID = '20635675841-uf569724tui760htgqgqebfi6echcoku.apps.googleusercontent.com';
+    let CLIENT_ID;
+    
+    // Determine which client ID to use based on the current origin
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        CLIENT_ID = 'YOUR_LOCALHOST_CLIENT_ID'; // Replace with your localhost client ID
+    } else {
+        CLIENT_ID = '20635675841-uf569724tui760htgqgqebfi6echcoku.apps.googleusercontent.com';
+    }
     
     console.log('Initializing Google Sign-In with Client ID:', CLIENT_ID);
     console.log('Current origin:', window.location.origin);
@@ -50,8 +57,18 @@ function handleCredentialResponse(response) {
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
     console.log('User info:', payload);
 
-    // Redirect to app page after successful sign-in
-    window.location.href = 'app.html';
+    // Update UI to show "Get Started" button instead of redirecting
+    updateUIAfterSignIn();
+}
+
+function updateUIAfterSignIn() {
+    const signInButton = document.getElementById('googleSignInButton');
+    const startAppButton = document.getElementById('startAppButton');
+    const signOutButton = document.getElementById('signOutButton');
+
+    if (signInButton) signInButton.style.display = 'none';
+    if (startAppButton) startAppButton.style.display = 'inline-block';
+    if (signOutButton) signOutButton.style.display = 'inline-block';
 }
 
 function signOut() {
@@ -64,28 +81,36 @@ function signOut() {
     window.dispatchEvent(event);
     
     console.log('User signed out.');
-    window.location.href = 'index.html'; // Redirect to landing page after sign out
+
+    // Update UI to show sign-in button
+    updateUIAfterSignOut();
+}
+
+function updateUIAfterSignOut() {
+    const signInButton = document.getElementById('googleSignInButton');
+    const startAppButton = document.getElementById('startAppButton');
+    const signOutButton = document.getElementById('signOutButton');
+
+    if (signInButton) signInButton.style.display = 'inline-block';
+    if (startAppButton) startAppButton.style.display = 'none';
+    if (signOutButton) signOutButton.style.display = 'none';
 }
 
 function isUserSignedIn() {
     return localStorage.getItem('isSignedIn') === 'true';
 }
 
-function checkAuthAndRedirect() {
+function checkAuthAndUpdateUI() {
     if (isUserSignedIn()) {
-        if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/') {
-            window.location.href = 'app.html';
-        }
+        updateUIAfterSignIn();
     } else {
-        if (window.location.pathname.endsWith('app.html')) {
-            window.location.href = 'index.html';
-        }
+        updateUIAfterSignOut();
     }
 }
 
 window.onload = function() {
     initializeGSI();
-    checkAuthAndRedirect();
+    checkAuthAndUpdateUI();
 };
 
 window.signOut = signOut;

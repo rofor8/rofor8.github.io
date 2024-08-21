@@ -7,51 +7,19 @@ import { toggleRanking, clearSelection, toggleDrawMode, searchLocation } from '.
 import { updateScores } from './updateScores.js';
 import { generateReport } from './reportModule.js';
 
-// Google Sign-In Configuration
-const CLIENT_ID = '20635675841-uf569724tui760htgqgqebfi6echcoku.apps.googleusercontent.com';
-
-function initializeGoogleSignIn() {
-    gapi.load('auth2', function() {
-        gapi.auth2.init({
-            client_id: CLIENT_ID
-        }).then(function(auth2) {
-            console.log('Google Sign-In initialized');
-            attachSignIn(document.getElementById('googleSignInButton'));
-            checkAuth();
-        }, function(error) {
-            console.error('Error initializing Google Sign-In:', error);
-        });
-    });
-}
-
-function attachSignIn(element) {
-    const auth2 = gapi.auth2.getAuthInstance();
-    auth2.attachClickHandler(element, {},
-        function(googleUser) {
-            console.log('User signed in');
-            onSignIn(googleUser);
-        }, function(error) {
-            console.error('Error signing in:', error);
-        });
-}
-
-function onSignIn(googleUser) {
-    const profile = googleUser.getBasicProfile();
-    console.log('ID: ' + profile.getId());
-    console.log('Name: ' + profile.getName());
-    console.log('Image URL: ' + profile.getImageUrl());
-    console.log('Email: ' + profile.getEmail());
-    
-    document.getElementById('authCheck').style.display = 'none';
-    document.getElementById('app-container').style.display = 'block';
-    initializeApp();
-}
-
 async function checkAuth() {
-    const auth2 = gapi.auth2.getAuthInstance();
-    if (auth2.isSignedIn.get()) {
-        onSignIn(auth2.currentUser.get());
-    } else {
+    try {
+        const isSignedIn = await window.checkSignInStatus();
+        if (isSignedIn) {
+            document.getElementById('authCheck').style.display = 'none';
+            document.getElementById('app-container').style.display = 'block';
+            initializeApp();
+        } else {
+            document.getElementById('authCheck').style.display = 'block';
+            document.getElementById('app-container').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error checking authentication status:', error);
         document.getElementById('authCheck').style.display = 'block';
         document.getElementById('app-container').style.display = 'none';
     }
@@ -146,7 +114,7 @@ function handleReportGeneration() {
 }
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', initializeGoogleSignIn);
+document.addEventListener('DOMContentLoaded', checkAuth);
 console.log('DOMContentLoaded event listener attached');
 
 // Export functions to global scope for use in HTML
@@ -171,10 +139,6 @@ Object.assign(window, {
 
 // Add sign out functionality
 window.signOut = function() {
-    const auth2 = gapi.auth2.getAuthInstance();
-    auth2.signOut().then(function () {
-        console.log('User signed out.');
-        document.getElementById('authCheck').style.display = 'block';
-        document.getElementById('app-container').style.display = 'none';
-    });
+    signOut(); // Call the signOut function from auth.js
+    window.location.href = 'index.html'; // Redirect to landing page after sign out
 };

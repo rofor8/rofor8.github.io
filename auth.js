@@ -1,49 +1,79 @@
-let isSignedIn = false;
-let tokenClient;
-let user;
+// At the top of your auth.js file
+console.log('Current origin:', window.location.origin);
 
 function initializeGSI() {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: '20635675841-uf569724tui760htgqgqebfi6echcoku.apps.googleusercontent.com',
-        scope: 'profile email',
-        callback: (response) => {
-            if (response.error) {
-                console.error('Error during token request:', response.error);
-                return;
-            }
-            handleCredentialResponse(response);
-        },
-    });
+    const CLIENT_ID = '20635675841-uf569724tui760htgqgqebfi6echcoku.apps.googleusercontent.com';
+    
+    console.log('Initializing Google Sign-In with Client ID:', CLIENT_ID);
+    console.log('Current origin:', window.location.origin);
+   
 
-    google.accounts.id.initialize({
-        client_id: '20635675841-uf569724tui760htgqqgebfi6echcoku.apps.googleusercontent.com',
-        callback: handleCredentialResponse,
-    });
+    try {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: 'profile email',
+            callback: handleCredentialResponse
+        });
 
-    google.accounts.id.renderButton(
-        document.getElementById('googleSignInButton'),
-        { theme: 'outline', size: 'large' }
-    );
+        google.accounts.id.initialize({
+            client_id: CLIENT_ID,
+            callback: handleCredentialResponse
+        });
 
-    google.accounts.id.prompt(); // Automatically prompt the user for sign-in
+        google.accounts.id.renderButton(
+            document.getElementById('googleSignInButton'),
+            { theme: 'outline', size: 'large' }
+        );
+
+        google.accounts.id.prompt();
+    } catch (error) {
+        console.error('Error initializing Google Sign-In:', error);
+        alert('An error occurred while setting up Google Sign-In. Please try again later or contact support.');
+    }
 }
 
 function handleCredentialResponse(response) {
-    console.log('Encoded JWT ID token: ' + response.credential);
+    if (response.error) {
+        console.error('Authentication error:', response.error);
+        alert('An error occurred during sign-in. Please try again.');
+        return;
+    }
+    console.log('Authentication successful');
     isSignedIn = true;
     document.getElementById('googleSignInButton').style.display = 'none';
     document.getElementById('signOutButton').style.display = 'inline-block';
     document.getElementById('startAppButton').style.display = 'inline-block';
+    
+    // Decode the JWT to get user information
+    const payload = JSON.parse(atob(response.credential.split('.')[1]));
+    console.log('User info:', payload);
+    
+    // You can use payload.name, payload.email, payload.picture, etc.
 }
 
 function signOut() {
     google.accounts.id.disableAutoSelect();
-    console.log('User signed out.');
     isSignedIn = false;
     document.getElementById('googleSignInButton').style.display = 'block';
     document.getElementById('signOutButton').style.display = 'none';
     document.getElementById('startAppButton').style.display = 'none';
+    console.log('User signed out.');
 }
 
+async function checkSignInStatus() {
+    return new Promise((resolve) => {
+        if (isSignedIn) {
+            resolve(true);
+        } else {
+            google.accounts.id.prompt((notification) => {
+                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                    resolve(false);
+                }
+            });
+        }
+    });
+}
+
+window.onload = initializeGSI;
 window.signOut = signOut;
-window.isSignedIn = isSignedIn;
+window.checkSignInStatus = checkSignInStatus;

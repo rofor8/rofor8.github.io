@@ -1,14 +1,14 @@
 // app.js
-import { state, updateState, updateMap, getRasterValueAtPoint, updateSelectedCellKeys } from './stateModule.js';
 import { initMap, updateGrid, renderCells } from './mapModule.js';
 import { setupUI, updateSolutionTable } from './uiModule.js';
 import { loadJSONData, loadAllRasters } from './dataModule.js';
+import { state, updateState, updateMap, getRasterValueAtPoint, updateSelectedCellKeys } from './stateModule.js';
 import { toggleRanking, clearSelection, toggleDrawMode, searchLocation } from './interactionModule.js';
 import { updateScores } from './updateScores.js';
 import { generateReport } from './reportModule.js';
 
 function checkAuth() {
-    if (!isUserSignedIn()) {
+    if (!window.isUserSignedIn()) {
         window.location.href = 'index.html';
         return;
     }
@@ -26,17 +26,21 @@ async function initializeApp() {
             solutionCosts: data.solutionCosts,
             selectedSolutions: Object.fromEntries(Object.keys(data.solutionCriteria).map(solution => [solution, true]))
         });
-        updateSelectedCellKeys(new Set());
+        updateSelectedCellKeys(new Set()); // Ensure selectedCellKeys is initialized
 
         state.colorScale.domain(Object.keys(state.solutionCriteria));
 
+        // Initialize map before loading rasters
         const { map, gridLayer } = initMap();
         updateState({ map, gridLayer });
 
+        // Set up UI before updating the map
         setupUI();
         
+        // Load rasters after state has been initialized
         await loadAllRasters();
         
+        // Set the callUpdateScores function
         updateState({
             callUpdateScores: () => {
                 updateScores(
@@ -64,7 +68,8 @@ async function initializeApp() {
         }
         
         setupReportButton();
-        render();
+        setupSignOutButton();
+        render(); // Start the render loop
         console.log('App initialization complete');
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -103,17 +108,14 @@ function handleReportGeneration() {
     }
 }
 
-// Add event listeners for custom auth events
-window.addEventListener('userSignedIn', (event) => {
-    document.getElementById('authCheck').style.display = 'none';
-    document.getElementById('app-container').style.display = 'block';
-    initializeApp();
-});
-
-window.addEventListener('userSignedOut', () => {
-    document.getElementById('authCheck').style.display = 'block';
-    document.getElementById('app-container').style.display = 'none';
-});
+function setupSignOutButton() {
+    const signOutButton = document.getElementById('signOutButton');
+    if (signOutButton) {
+        signOutButton.addEventListener('click', () => {
+            window.signOut();
+        });
+    }
+}
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', checkAuth);
@@ -126,10 +128,6 @@ window.toggleDrawMode = toggleDrawMode;
 window.updateMap = updateMap;
 window.searchLocation = searchLocation;
 window.updateSolutionTable = updateSolutionTable;
-
-// Initialize the application
-document.addEventListener('DOMContentLoaded', checkAuth);
-console.log('DOMContentLoaded event listener attached');
 
 // Expose necessary variables and functions for updateScores.js
 Object.assign(window, {

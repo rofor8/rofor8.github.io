@@ -4,14 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nature-based Solutions Mapper</title>
-    <meta name="google-signin-client_id" content="20635675841-uf569724tui760htgqgqebfi6echcoku.apps.googleusercontent.com">
-    <script>
-        function gapiLoaded() {
-            console.log('Google API client loaded');
-        }
-    </script>
-    <script src="https://apis.google.com/js/platform.js?onload=gapiLoaded" async defer></script>
-    <script src="auth.js" defer></script>
+    <meta name="google-signin-client_id" content="20635675841-uf569724tui760htgqqgebfi6echcoku.apps.googleusercontent.com">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -93,13 +86,17 @@
         </ul>
         <p>Ready to transform your urban landscape?</p>
         <div id="authSection">
-            <div id="googleSignInButton" class="g-signin2" data-onsuccess="onSignIn"></div>
-            <button id="signOutButton" onclick="signOut();" style="display:none;">Sign Out</button>
+            <div id="googleSignInButton"></div>
+            <button id="signOutButton" style="display:none;" onclick="signOut()">Sign Out</button>
             <a href="/app.html" id="startAppButton" class="cta-button" style="display:none;">Get Started</a>
         </div>
     </main>
     <footer>
         <p>&copy; 2024 Nature-based Solutions Mapper. All rights reserved.</p>
     </footer>
+
+    <!-- Load the Google Identity Services script and call initializeGSI when it's ready -->
+    <script src="https://accounts.google.com/gsi/client" async defer onload="initializeGSI()"></script>
+    <script src="auth.js"></script>
 </body>
 </html>

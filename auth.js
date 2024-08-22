@@ -43,8 +43,7 @@ function initializeGoogleSignIn(clientId) {
     try {
         google.accounts.id.initialize({
             client_id: clientId,
-            callback: handleCredentialResponse,
-            auto_select: true // This will attempt to automatically sign in the user
+            callback: handleCredentialResponse
         });
 
         const signInButton = document.getElementById('googleSignInButton');
@@ -54,10 +53,7 @@ function initializeGoogleSignIn(clientId) {
             console.warn('Google Sign-In button element not found');
         }
 
-        // Only prompt if the user is not already signed in
-        if (!isUserSignedIn()) {
-            google.accounts.id.prompt();
-        }
+        google.accounts.id.prompt();
     } catch (error) {
         console.error('Error initializing Google Sign-In:', error);
     }
@@ -71,7 +67,6 @@ function handleCredentialResponse(response) {
     console.log('Authentication successful');
     isSignedIn = true;
     localStorage.setItem('isSignedIn', 'true');
-    localStorage.setItem('authToken', response.credential); // Store the token
     
     const event = new CustomEvent('userSignedIn', { detail: response });
     window.dispatchEvent(event);
@@ -101,7 +96,6 @@ function signOut() {
     
     isSignedIn = false;
     localStorage.removeItem('isSignedIn');
-    localStorage.removeItem('authToken');
     
     const event = new CustomEvent('userSignedOut');
     window.dispatchEvent(event);
@@ -125,7 +119,7 @@ function updateUIAfterSignOut() {
 }
 
 function isUserSignedIn() {
-    return localStorage.getItem('isSignedIn') === 'true' && localStorage.getItem('authToken') !== null;
+    return localStorage.getItem('isSignedIn') === 'true';
 }
 
 function checkAuthAndUpdateUI() {
@@ -144,11 +138,6 @@ window.checkAuthAndUpdateUI = checkAuthAndUpdateUI;
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', function() {
-    if (isUserSignedIn()) {
-        // User is already signed in, skip Google Sign-In initialization
-        updateUIAfterSignIn();
-    } else {
-        initializeGSI();
-    }
+    initializeGSI();
     checkAuthAndUpdateUI();
 });

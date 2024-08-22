@@ -38,37 +38,48 @@ export function clearSelection() {
 export function toggleDrawMode() {
     const newIsDrawMode = !state.isDrawMode;
     updateState({ isDrawMode: newIsDrawMode });
+    
     const drawToggle = document.getElementById('drawToggle');
-    drawToggle.classList.toggle('active');
+    if (drawToggle) {
+        drawToggle.classList.toggle('active');
+    } else {
+        console.warn("Draw toggle button not found in the DOM");
+    }
 
     if (newIsDrawMode) {
-        state.map.dragging.disable();
-        state.map.touchZoom.disable();
-        state.map.doubleClickZoom.disable();
-        state.map.scrollWheelZoom.disable();
-        state.map.boxZoom.disable();
-        state.map.keyboard.disable();
+        if (state.map) {
+            state.map.dragging.disable();
+            state.map.touchZoom.disable();
+            state.map.doubleClickZoom.disable();
+            state.map.scrollWheelZoom.disable();
+            state.map.boxZoom.disable();
+            state.map.keyboard.disable();
 
-        state.map.getContainer().addEventListener('mousedown', handleDrawStart);
-        state.map.getContainer().addEventListener('mousemove', handleDrawMove);
-        state.map.getContainer().addEventListener('mouseup', handleDrawEnd);
-        state.map.getContainer().addEventListener('touchstart', handleDrawStart);
-        state.map.getContainer().addEventListener('touchmove', handleDrawMove);
-        state.map.getContainer().addEventListener('touchend', handleDrawEnd);
+            state.map.getContainer().addEventListener('mousedown', handleDrawStart);
+            state.map.getContainer().addEventListener('mousemove', handleDrawMove);
+            state.map.getContainer().addEventListener('mouseup', handleDrawEnd);
+            state.map.getContainer().addEventListener('touchstart', handleDrawStart);
+            state.map.getContainer().addEventListener('touchmove', handleDrawMove);
+            state.map.getContainer().addEventListener('touchend', handleDrawEnd);
+        } else {
+            console.error("Map object not initialized");
+        }
     } else {
-        state.map.dragging.enable();
-        state.map.touchZoom.enable();
-        state.map.doubleClickZoom.enable();
-        state.map.scrollWheelZoom.enable();
-        state.map.boxZoom.enable();
-        state.map.keyboard.enable();
+        if (state.map) {
+            state.map.dragging.enable();
+            state.map.touchZoom.enable();
+            state.map.doubleClickZoom.enable();
+            state.map.scrollWheelZoom.enable();
+            state.map.boxZoom.enable();
+            state.map.keyboard.enable();
 
-        state.map.getContainer().removeEventListener('mousedown', handleDrawStart);
-        state.map.getContainer().removeEventListener('mousemove', handleDrawMove);
-        state.map.getContainer().removeEventListener('mouseup', handleDrawEnd);
-        state.map.getContainer().removeEventListener('touchstart', handleDrawStart);
-        state.map.getContainer().removeEventListener('touchmove', handleDrawMove);
-        state.map.getContainer().removeEventListener('touchend', handleDrawEnd);
+            state.map.getContainer().removeEventListener('mousedown', handleDrawStart);
+            state.map.getContainer().removeEventListener('mousemove', handleDrawMove);
+            state.map.getContainer().removeEventListener('mouseup', handleDrawEnd);
+            state.map.getContainer().removeEventListener('touchstart', handleDrawStart);
+            state.map.getContainer().removeEventListener('touchmove', handleDrawMove);
+            state.map.getContainer().removeEventListener('touchend', handleDrawEnd);
+        }
 
         if (state.drawLayer) {
             state.map.removeLayer(state.drawLayer);

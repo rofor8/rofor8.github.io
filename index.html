@@ -20,7 +20,7 @@
             padding: 20px;
         }
         header {
-            background: #50b3a2;
+            background: #4CAF50;
             color: white;
             padding-top: 30px;
             min-height: 70px;
@@ -59,14 +59,17 @@
             margin: 5px;
         }
         footer {
-            background: #50b3a2;
-            color: white;
-            text-align: center;
-            padding: 10px;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-        }
+    background: #4CAF50;
+    color: white;
+    text-align: center;
+    padding: 10px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
     </style>
 </head>
 <body>
@@ -90,8 +93,8 @@
             <div class="cta">
                 <div id="googleSignInButton"></div>
                 <a href="app.html" id="startAppButton" class="button" style="display:none;">Get Started</a>
-                <button id="signOutButton" class="button" style="display:none;" onclick="signOut()">Sign Out</button>            </div>
-        </div>
+                <button id="signOutButton" style="display:none;">Sign Out</button>
+            </div>
     </div>
 
     <footer>
@@ -100,8 +103,8 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            initializeGSI();
-            checkAuthAndUpdateUI();
+            window.initializeGSI();
+            window.checkAuthAndUpdateUI();
         });
     </script>
 </body>

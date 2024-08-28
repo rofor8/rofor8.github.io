@@ -11,14 +11,14 @@ export async function loadJSONData() {
         return cachedData;
     }
 
-    const [solutionCriteriaData, challengeCategoriesData, solutionCostsData] = await Promise.all([
-        fetch('data/solutionCriteria.json').then(response => response.json()),
+    const [solutionImpactData, challengeCategoriesData, solutionCostsData] = await Promise.all([
+        fetch('data/solutionImpact.json').then(response => response.json()),
         fetch('data/challengeCategories.json').then(response => response.json()),
         fetch('data/solutionCosts.json').then(response => response.json())
     ]);
 
     const data = {
-        solutionCriteria: solutionCriteriaData,
+        solutionImpact: solutionImpactData,
         challengeCategories: challengeCategoriesData,
         solutionCosts: solutionCostsData
     };
@@ -28,12 +28,12 @@ export async function loadJSONData() {
 }
 
 export async function loadAllRasters() {
-    if (!state.solutionCriteria || Object.keys(state.solutionCriteria).length === 0) {
+    if (!state.solutionImpact || Object.keys(state.solutionImpact).length === 0) {
         console.error('Solution criteria not loaded yet');
         return;
     }
 
-    const criteria = new Set(Object.values(state.solutionCriteria).flat());
+    const criteria = new Set(Object.values(state.solutionImpact).flat());
     const loadPromises = Array.from(criteria).map(loadRaster);
     await Promise.all(loadPromises);
 }
@@ -64,7 +64,7 @@ async function loadRaster(criterion) {
 
 export async function loadTilesForViewport(bounds) {
     console.time('loadTilesForViewport');
-    const visibleCriteria = new Set(Object.values(state.solutionCriteria).flat());
+    const visibleCriteria = new Set(Object.values(state.solutionImpact).flat());
     const tilePromises = [];
 
     for (const criterion of visibleCriteria) {
@@ -168,7 +168,7 @@ function calculateCellScores(cell, challengeCategory) {
     const [lat, lng] = cell.key.split(',').map(Number);
     const cellScores = {};
 
-    Object.entries(state.solutionCriteria)
+    Object.entries(state.solutionImpact)
         .filter(([solution]) => state.selectedSolutions[solution] !== false)
         .forEach(([solution, criteria]) => {
             const [criterion1, criterion2] = criteria;

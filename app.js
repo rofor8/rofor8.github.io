@@ -13,14 +13,14 @@ async function initializeApp() {
         console.log('Initializing app...');
         const data = await loadJSONData();
         updateState({
-            solutionCriteria: data.solutionCriteria,
+            solutionImpact: data.solutionImpact,
             challengeCategories: data.challengeCategories,
             solutionCosts: data.solutionCosts,
-            selectedSolutions: Object.fromEntries(Object.keys(data.solutionCriteria).map(solution => [solution, true]))
+            selectedSolutions: Object.fromEntries(Object.keys(data.solutionImpact).map(solution => [solution, true]))
         });
         updateSelectedCellKeys(new Set()); // Ensure selectedCellKeys is initialized
 
-        state.colorScale.domain(Object.keys(state.solutionCriteria));
+        state.colorScale.domain(Object.keys(state.solutionImpact));
 
         // Initialize map before loading rasters
         const { map, gridLayer } = initMap();
@@ -42,7 +42,7 @@ async function initializeApp() {
                     state.impactFilter,
                     state.costFilter,
                     state.criteriaRasters,
-                    state.solutionCriteria,
+                    state.solutionImpact,
                     state.colorScale,
                     state.criteriaColorScale,
                     getRasterValueAtPoint
@@ -116,7 +116,7 @@ Object.assign(window, {
     allCells: state.allCells,
     currentRanking: state.currentRanking,
     criteriaRasters: state.criteriaRasters,
-    solutionCriteria: state.solutionCriteria,
+    solutionImpact: state.solutionImpact,
     colorScale: state.colorScale,
     criteriaColorScale: state.criteriaColorScale,
     getRasterValueAtPoint,

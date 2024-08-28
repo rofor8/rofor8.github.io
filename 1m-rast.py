@@ -36,7 +36,7 @@ res = max((xmax - xmin) / width, (ymax - ymin) / height)
 transform = from_origin(xmin, ymax, res, res)
 
 # Load criteria
-with open('solutionCriteria.json', 'r') as f:
+with open('solutionImpact.json', 'r') as f:
     solution_criteria = json.load(f)
 
 def create_cog(data, output_path, transform):

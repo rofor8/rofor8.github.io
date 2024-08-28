@@ -6,7 +6,7 @@ import { renderCells, renderSelectedCells } from './mapModule.js';
 // stateModule.js
 export const state = {
     allCells: new Map(),
-    solutionCriteria: {},
+    solutionImpact: {},
     challengeCategories: {},
     solutionCosts: {},
     map: null,
@@ -147,7 +147,7 @@ export function updateMaxValues() {
     let maxImpactWeight = 0;
     let maxCostPerCell = 0;
 
-    Object.keys(state.solutionCriteria).forEach(solution => {
+    Object.keys(state.solutionImpact).forEach(solution => {
         const impactWeight = state.challengeCategories[state.currentCategory][solution] || 0;
         const costPerCell = state.solutionCosts[solution] || 0;
 

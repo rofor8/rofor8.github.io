@@ -6,7 +6,7 @@ export function updateScores(
     impactFilter,
     costFilter,
     criteriaRasters,
-    solutionCriteria,
+    solutionImpact,
     colorScale,
     criteriaColorScale,
     getRasterValueAtPoint
@@ -76,7 +76,7 @@ export function updateScores(
                     }
                 });
 
-                const criteria = solutionCriteria[solution] || [];
+                const criteria = solutionImpact[solution] || [];
                 if (!solutionOverlaps[solution]) {
                     solutionOverlaps[solution] = 0;
                 }

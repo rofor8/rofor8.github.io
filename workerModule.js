@@ -3,7 +3,7 @@ export function initializeWebWorker() {
     const workerCode = `
     self.onmessage = function(e) {
         if (e.data.type === 'calculateSuitabilityScores') {
-            const { bounds, challengeCategory, allCells, solutionCriteria, challengeCategories, solutionCosts, criteriaRasters } = e.data;
+            const { bounds, challengeCategory, allCells, solutionImpact, challengeCategories, solutionCosts, criteriaRasters } = e.data;
             
             const updatedCells = new Map(allCells);
             
@@ -11,8 +11,8 @@ export function initializeWebWorker() {
                 const [lat, lng] = key.split(',').map(Number);
                 
                 const scores = {};
-                Object.keys(solutionCriteria).forEach(solution => {
-                    const criteria = solutionCriteria[solution];
+                Object.keys(solutionImpact).forEach(solution => {
+                    const criteria = solutionImpact[solution];
                     const criteriaScores = criteria.map(criterion => {
                         const rasterValue = getRasterValueAtPoint(criteriaRasters[criterion], lat, lng);
                         return rasterValue > 0 ? 1 : 0;

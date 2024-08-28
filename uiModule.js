@@ -132,7 +132,7 @@ function getMaxValues(solutionTotals) {
 }
 
 function prepareRowData(solutionTotals) {
-    return Object.keys(state.solutionCriteria).map(solution => ({
+    return Object.keys(state.solutionImpact).map(solution => ({
         solution,
         impact: solutionTotals[solution]?.impact || 0,
         cost: solutionTotals[solution]?.cost || 0

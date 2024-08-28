@@ -3,6 +3,7 @@ import { loadTilesForViewport, calculateSuitabilityScores } from './dataModule.j
 import { updateUIForCategory, updateSolutionTable } from './uiModule.js';
 import { renderCells, renderSelectedCells } from './mapModule.js';
 
+// stateModule.js
 export const state = {
     allCells: new Map(),
     solutionCriteria: {},
@@ -14,7 +15,7 @@ export const state = {
     selectedCellKeys: new Set(),
     currentRanking: 'impact',
     CELL_SIZE: 1, // meters
-    currentCategory: "Biodiversity and soils",
+    currentCategory: "climate change mitigation & adaptation", // Corrected property name
     drawLayer: null,
     isDrawMode: false,
     drawStartTime: null,
@@ -27,17 +28,18 @@ export const state = {
     criteriaRasters: {},
     callUpdateScores: null,
     selectedSolutions: {},
-    impactFilter: [0, 1], // Impact weight range
-    costFilter: [0, 100], // Cost range
+    impactFilter: [0, 5], // Updated to cover full range
+    costFilter: [0, 150000], // Updated to cover full range
+
     currentSortColumn: 'impact',
     isAscending: false,
     totalImpacts: {},
     totalCosts: {},
-    impactRange: [0, 1],
-    costRange: [0, 100],
+    impactRange: [0, 5], // New property for impact range
+    costRange: [0, 150000], // New property for cost range
     maxImpactWeight: 1,
     maxCostPerCell: 100,
-    categorySliderValues: {} // New property to store slider values for each category
+    categorySliderValues: {}
 };
 
 export function updateState(newState) {
